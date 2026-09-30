@@ -206,13 +206,10 @@ def test_given_foreground_run_when_interrupted_then_it_detaches_and_resumes_late
         text=True,
     )
     deadline = time.monotonic() + 20
+    runs = project / ".arcflow" / "runs"
     while time.monotonic() < deadline:
-        runs = project / ".arcflow" / "runs"
-        if (
-            runs.exists()
-            and any(runs.iterdir())
-            and "attempt_started" in (next(runs.iterdir()) / "events.jsonl").read_text()
-        ):
+        logs = list(runs.glob("*/events.jsonl")) if runs.exists() else []
+        if logs and "attempt_started" in logs[0].read_text():
             break
         time.sleep(0.05)
 
