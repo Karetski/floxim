@@ -1,2 +1,13 @@
 # Claude Code: personal, machine-local settings
 .claude/settings.local.json
+
+# Python and build output
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/

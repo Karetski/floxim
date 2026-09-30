@@ -16,5 +16,6 @@
 | [0012](0012-run-storage-and-resume.md) | Run storage and resume semantics | Accepted |
 | [0013](0013-name-arcflow.md) | Project name: Arcflow, CLI `arcflow` with alias `arcf` | Accepted |
 | [0014](0014-v1-scope.md) | v1 scope: Core plus structured editing, the extra node types and command adapters | Accepted |
+| [0015](0015-dev-tooling.md) | CLI with `argparse`; `hatchling`, `mypy --strict`, `ruff`, `uv` with a lockfile | Accepted |
 
 Background for all of these: [../research.md](../research.md).
