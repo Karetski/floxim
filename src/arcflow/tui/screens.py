@@ -33,6 +33,16 @@ from arcflow.engine.budget import run_limits
 from arcflow.flow import Flow, load_flow
 from arcflow.store.events import read_log
 from arcflow.store.rundir import RunDir
+from arcflow.tui.actions import (
+    AnswerModal,
+    RunModal,
+    cancel_run,
+    clean,
+    editor_command,
+    interactive,
+    resume_run,
+    who,
+)
 from arcflow.tui.common import RUN_STATUS_ORDER, FileWatcher, GraphView, node_status, status_text
 from arcflow.units import parse_duration
 from arcflow.validate import validate
@@ -73,10 +83,69 @@ def run_flow_of(run: RunDir) -> Flow | None:
     return flow
 
 
-class RunsScreen(Screen[None]):
+class VisitItem(ListItem):
+    """A timeline entry for one visit."""
+
+    def __init__(self, visit: tuple[str, int], *children: Any) -> None:
+        super().__init__(*children)
+        self.visit = visit
+
+
+def pending_banner(config: Config) -> Text:
+    """Every prompt waiting in the project, for the banner on list screens."""
+    lines = []
+    for item in runinfo.list_runs(config.runs_dir, Clock(), runinfo.RunFilter(active_only=True)):
+        for node in item["pending"]:
+            lines.append(f"? {item['run_id']} · {node} is waiting for an answer (a)")
+    return Text("\n".join(lines), style="magenta bold")
+
+
+class RunControl(Screen[None]):
+    """Answer, cancel and resume, shared by the runs list and run detail."""
+
+    config: Config
+
+    def selected_run(self) -> RunDir | None:
+        raise NotImplementedError
+
+    def action_handoff(self) -> None:
+        self.notify("open the run to hand over its session")
+
+    def action_answer(self) -> None:
+        run = self.selected_run()
+        if run is None:
+            return
+        pending = run.read_state().get("pending_human") or {}
+        if not pending:
+            self.notify("nothing is waiting for an answer")
+            return
+        node, prompt = next(iter(pending.items()))
+        if prompt.get("kind") == "handoff":
+            self.action_handoff()
+            return
+        self.app.push_screen(AnswerModal(self.config, run, node, prompt))
+
+    def action_cancel_run(self) -> None:
+        run = self.selected_run()
+        if run is not None:
+            self.notify(cancel_run(self.config, run))
+
+    def action_resume_run(self) -> None:
+        run = self.selected_run()
+        if run is not None:
+            self.notify(resume_run(self.config, run))
+
+
+class RunsScreen(RunControl):
     """Active and recent runs; pending prompts first (§10.1)."""
 
-    BINDINGS = [Binding("enter", "open", "Open"), Binding("s", "cycle_filter", "Filter status")]
+    BINDINGS = [
+        Binding("enter", "open", "Open"),
+        Binding("s", "cycle_filter", "Filter status"),
+        Binding("a", "answer", "Answer"),
+        Binding("c", "cancel_run", "Cancel"),
+        Binding("u", "resume_run", "Resume"),
+    ]
     FILTERS = (None, "waiting", "running", "failed", "succeeded")
 
     def __init__(self, config: Config) -> None:
@@ -86,6 +155,7 @@ class RunsScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
+        yield Static("", id="banner")
         yield Label("", id="runs-filter")
         yield DataTable(id="runs", cursor_type="row", zebra_stripes=True)
         yield Footer()
@@ -119,6 +189,14 @@ class RunsScreen(Screen[None]):
             table.move_cursor(row=min(cursor, len(runs) - 1))
         label = f"filter: {self.status_filter or 'all'}  ·  {len(runs)} run(s)"
         self.query_one("#runs-filter", Label).update(label)
+        self.query_one("#banner", Static).update(pending_banner(self.config))
+
+    def selected_run(self) -> RunDir | None:
+        table = self.query_one("#runs", DataTable)
+        if not table.row_count:
+            return None
+        run_id = str(table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value)
+        return RunDir(self.config.runs_dir / run_id)
 
     def action_cycle_filter(self) -> None:
         index = self.FILTERS.index(self.status_filter)
@@ -139,7 +217,11 @@ class RunsScreen(Screen[None]):
 class FlowsScreen(Screen[None]):
     """Flow files under flow_paths (§10.1)."""
 
-    BINDINGS = [Binding("enter", "open", "Graph")]
+    BINDINGS = [
+        Binding("enter", "open", "Graph"),
+        Binding("x", "run_flow", "Run"),
+        Binding("v", "validate_flow", "Validate"),
+    ]
 
     def __init__(self, config: Config) -> None:
         super().__init__()
@@ -147,6 +229,7 @@ class FlowsScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Header()
+        yield Static("", id="banner")
         yield DataTable(id="flows", cursor_type="row", zebra_stripes=True)
         yield Footer()
 
@@ -165,6 +248,7 @@ class FlowsScreen(Screen[None]):
         for item in runinfo.discover_flows(self.config):
             badge = Text("✓", style="green") if item["valid"] else Text("✗", style="red")
             description = (item["description"] or "").splitlines()[0] if item["description"] else ""
+            self.query_one("#banner", Static).update(pending_banner(self.config))
             status = last.get(str(item["name"]))
             table.add_row(
                 badge,
@@ -177,21 +261,56 @@ class FlowsScreen(Screen[None]):
                 key=item["file"],
             )
 
-    def action_open(self) -> None:
+    def selected_flow(self) -> Path | None:
         table = self.query_one("#flows", DataTable)
-        if table.row_count:
-            path = str(table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value)
-            self.app.push_screen(FlowGraphScreen(Path(path)))
+        if not table.row_count:
+            return None
+        return Path(str(table.coordinate_to_cell_key(table.cursor_coordinate).row_key.value))
+
+    def action_open(self) -> None:
+        path = self.selected_flow()
+        if path is not None:
+            self.app.push_screen(FlowGraphScreen(path))
+
+    def action_run_flow(self) -> None:
+        path = self.selected_flow()
+        if path is None:
+            return
+
+        def started(run_id: str | None) -> None:
+            if run_id:
+                self.app.push_screen(RunDetailScreen(self.config, run_id))
+
+        self.app.push_screen(RunModal(self.config, path), started)
+
+    def action_validate_flow(self) -> None:
+        path = self.selected_flow()
+        if path is None:
+            return
+        report = validate(path, config=self.config, workdir=self.config.root)
+        if report.ok():
+            self.notify(f"{path.name} is valid ({len(report.problems)} warning(s))")
+        else:
+            self.notify(report.errors[0].render(), severity="error")
 
     @on(DataTable.RowSelected, "#flows")
     def _selected(self, event: DataTable.RowSelected) -> None:
         self.app.push_screen(FlowGraphScreen(Path(str(event.row_key.value))))
 
 
-class RunDetailScreen(Screen[None]):
+class RunDetailScreen(RunControl):
     """One run: live graph, visit timeline, inspector, gauges (§10.1)."""
 
-    BINDINGS = [Binding("escape", "app.pop_screen", "Back")]
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Back"),
+        Binding("a", "answer", "Answer"),
+        Binding("c", "cancel_run", "Cancel"),
+        Binding("u", "resume_run", "Resume"),
+        Binding("h", "handoff", "Handoff"),
+        Binding("g", "open_in_harness", "Open session"),
+        Binding("y", "copy_session", "Copy session ID"),
+        Binding("o", "open_artifact", "Open artifact"),
+    ]
 
     def __init__(self, config: Config, run_id: str) -> None:
         super().__init__()
@@ -225,6 +344,70 @@ class RunDetailScreen(Screen[None]):
         self.refresh_detail()
         self.set_interval(DETAIL_REFRESH_S, self.refresh_detail)
 
+    def selected_run(self) -> RunDir | None:
+        return self.run
+
+    def _selected_result(self) -> dict[str, Any]:
+        if self.selected is None:
+            return {}
+        node, visit = self.selected
+        visits = (self.run.read_state()["nodes"].get(node) or {}).get("visits", [])
+        return next((v for v in visits if v.get("visit") == visit), {})
+
+    def action_copy_session(self) -> None:
+        session = self._selected_result().get("session_id")
+        if session:
+            self.app.copy_to_clipboard(str(session))
+            self.notify(f"copied {session}")
+        else:
+            self.notify("the selected visit has no session")
+
+    def _session_command(self) -> tuple[list[str], str] | None:
+        from arcflow.adapters import registry
+
+        result = self._selected_result()
+        session, harness = result.get("session_id"), result.get("harness")
+        if not session or not harness:
+            return None
+        adapter = registry.load(str(harness), self.config.root)
+        command = adapter.interactive_command(str(session), str(self.run.meta().get("workdir")))
+        return (command, str(self.run.meta().get("workdir"))) if command else None
+
+    def action_open_in_harness(self) -> None:
+        found = self._session_command()
+        if found is None:
+            self.notify("the selected visit has no session to open")
+            return
+        with self.app.suspend():
+            interactive(*found)
+
+    def action_handoff(self) -> None:
+        pending = self.run.read_state().get("pending_human") or {}
+        node = next((n for n, p in pending.items() if p.get("kind") == "handoff"), None)
+        if node is None:
+            self.notify("no handoff is waiting")
+            return
+        prompt = pending[node]
+        with self.app.suspend():
+            code = interactive([str(part) for part in prompt.get("command") or []])
+        from arcflow.engine.human import Answer
+        from arcflow.engine.respond import respond
+
+        answer = Answer(acknowledged=True, responder=who(), via="handoff", exit_code=code)
+        respond(self.run, node, answer, clock=Clock(), project_root=self.config.root)
+        self.notify("handed back; the run continues")
+
+    def action_open_artifact(self) -> None:
+        if self.selected is None:
+            return
+        node, visit = self.selected
+        found = [a for a in runinfo.artifacts(self.run, node) if a["visit"] == visit]
+        if not found:
+            self.notify("the selected visit has no artifacts")
+            return
+        with self.app.suspend():
+            interactive(editor_command(found[0]["path"]))
+
     def refresh_detail(self) -> None:
         events = read_log(self.run.events).events
         if len(events) == self.seen_events:
@@ -244,7 +427,7 @@ class RunDetailScreen(Screen[None]):
         banner.update(
             Text(
                 "\n".join(
-                    f"? {node}: {str(prompt.get('message', '')).strip()}"
+                    f"? {node}: {clean(str(prompt.get('message', ''))).strip()}  (a to answer)"
                     for node, prompt in pending.items()
                 ),
                 style="magenta bold",
@@ -292,9 +475,7 @@ class RunDetailScreen(Screen[None]):
             done = finished.get(key)
             outcome = done["data"]["outcome"] if done else "running"
             label = Text.assemble(status_text(outcome), f"  {event['node']} #{event['visit']}")
-            item = ListItem(Label(label))
-            item.visit = key  # type: ignore[attr-defined]
-            timeline.append(item)
+            timeline.append(VisitItem(key, Label(label)))
         if self.selected is None and finished:
             self.selected = list(finished)[-1]
 
@@ -347,7 +528,7 @@ class RunDetailScreen(Screen[None]):
             ),
         }
         for tab, text in texts.items():
-            self.query_one(f"#inspect-{tab}", Static).update(Text(text))
+            self.query_one(f"#inspect-{tab}", Static).update(Text(clean(text)))
 
 
 class FlowGraphScreen(Screen[None]):
