@@ -872,6 +872,9 @@ Each line is a JSON object with at least:
 - The interrupted attempt keeps its number and is recorded as `interrupted`; the new attempt counts toward `retry.max_attempts` only if it later fails.
 - **At-least-once.** Side effects of an interrupted attempt (files written, commands run, commits made) are not undone. Flows with non-idempotent shell steps should set `on_resume: ask`. This is documented prominently.
 - Workspaces are reused as recorded; if a recorded worktree is missing, resume fails with `E-WORKSPACE-MISSING` unless `--recreate-workspaces`.
+- An attempt's normalized result (`result.json`) is written before its `attempt_finished` event. A visit whose last attempt finished but whose `visit_finished` was not written is completed from that result without running anything again; a visit that finished but whose `route_taken` was not written is routed from its recorded result.
+- `--from` and `--force` record the jump as `route_taken` with `via: "resume"`. `--from` closes an interrupted visit as `interrupted` without rerunning it.
+- `arcflow resume` exits 2 with `E-RESUME-REFUSED` when the run cannot be resumed as asked (a succeeded run, a failed or cancelled run without `--force`, an unknown `--from` node, a `--reload` that removes or retypes a visited node), 6 when the run is not found, and 7 with `E-LOCKED` when a live runner holds it.
 
 ### 7.6 Resume options
 
@@ -879,8 +882,8 @@ Each line is a JSON object with at least:
 |---|---|
 | `--reload` | Use the **current** flow file instead of the snapshot. Allowed only if every node that has a finished visit still exists with the same type; the diff is recorded as `flow_reloaded` with both hashes, and the new snapshot is stored as `snapshot-<n>/`. |
 | `--from <node>` | Continue at `<node>` (as if routed there), leaving earlier visits recorded. Implies nothing is rerun automatically. |
-| `--rerun` | Rerun the interrupted visit from scratch regardless of `on_resume`. |
-| `--force` | Allow resuming a `failed` or `cancelled` run; it continues from the node that failed (a new visit) or with `--from`. |
+| `--rerun` | Rerun the interrupted visit from scratch regardless of `on_resume`: a new attempt with freshly rendered templates. |
+| `--force` | Allow resuming a `failed` or `cancelled` run (recorded as `run_reopened`); it continues from the node that failed (a new visit) or with `--from`. A run that failed outside a node (a limit reached before a visit, an `outputs` error) needs `--from`. |
 | `--due` | Resume only runs whose waiting human timeout or sleep has passed. Takes no run ID; meant for cron. |
 
 ### 7.7 Retention
@@ -1788,15 +1791,16 @@ All events carry `v`, `seq`, `ts`, `type`, and where relevant `branch`, `node`, 
 | `attempt_finished` | normalized result without large fields: `outcome`, `error`, `usage`, `cost_usd`, `stopped_by`, `result_ref` |
 | `schema_retry` | `errors` |
 | `visit_finished` | `outcome`, `result` (state fields, large values by reference) |
-| `route_taken` | `from`, `to`, `via` (`next` / `on_error`), `case_index`, `reason` |
+| `route_taken` | `from`, `to`, `via` (`next` / `on_error` / `resume`), `case_index`, `reason` |
 | `budget_updated` | `usd_spent`, `tokens_spent`, `usd_left`, `tokens_left` |
 | `human_waiting` | `message`, `choices`, `input`, `ack`, `deadline` |
 | `hook_ran` | `hook` (`on_wait`), `exit_code`, `duration_s` |
 | `human_responded` | `choice`, `text`, `acknowledged`, `responder`, `via` |
 | `cancel_requested` | `by`, `reason` |
 | `child_run` | `run_id`, `item_index` (map) |
-| `warning` | `code`, `message` |
+| `warning` | `code`, `message` (e.g. `W-TORN-LOG` when a torn last line was dropped) |
 | `run_waiting` | `nodes` (pending) |
+| `run_reopened` | `previous` (the status `--force` reopened) |
 | `run_succeeded` | `outputs`, `totals` |
 | `run_failed` | `reason` (`node_error`, `route_fail`, `no_route`, `max_visits_exceeded`, `max_steps_exceeded`, `max_duration_exceeded`, `budget_exceeded`, `expression_error`, `engine_error`), `node`, `message`, `totals` |
 | `run_cancelled` | `by`, `reason`, `totals` |

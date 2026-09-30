@@ -17,6 +17,7 @@ from collections import deque
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 TERM_WAIT_S = 5.0
 CHUNK = 64 * 1024
@@ -71,6 +72,7 @@ class Stop:
     """Asks a running process to stop; `reason` says why."""
 
     event: asyncio.Event = field(default_factory=asyncio.Event)
+    urgent: asyncio.Event = field(default_factory=asyncio.Event)  # skip the grace period
     reason: str | None = None
 
     def request(self, reason: str) -> None:
@@ -125,10 +127,10 @@ async def run_process(
         )
         if waiter not in done:
             reason = stop.reason if stopper in done else "timeout"
-            stopped_by = await _stop_group(process, waiter, grace)
+            stopped_by = await _stop_group(process, waiter, grace, stop.urgent)
     except asyncio.CancelledError:
         # The runner itself is being cancelled: stop the child before leaving.
-        await asyncio.shield(_stop_group(process, waiter, grace))
+        await asyncio.shield(_stop_group(process, waiter, grace, stop.urgent))
         raise
     finally:
         stopper.cancel()
@@ -151,14 +153,24 @@ async def run_process(
 
 
 async def _stop_group(
-    process: asyncio.subprocess.Process, waiter: asyncio.Future[int], grace: float
+    process: asyncio.subprocess.Process,
+    waiter: asyncio.Future[int],
+    grace: float,
+    urgent: asyncio.Event,
 ) -> str:
-    steps = ((signal.SIGINT, grace, "sigint"), (signal.SIGTERM, TERM_WAIT_S, "sigterm"))
-    for sig, wait, name in steps:
-        _signal_group(process.pid, sig)
-        with contextlib.suppress(asyncio.TimeoutError):
-            await asyncio.wait_for(asyncio.shield(waiter), wait)
-            return name
+    _signal_group(process.pid, signal.SIGINT)
+    hurry: asyncio.Future[Any] = asyncio.ensure_future(urgent.wait())
+    pending: set[asyncio.Future[Any]] = {waiter, hurry}
+    try:
+        await asyncio.wait(pending, timeout=grace, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        hurry.cancel()
+    if waiter.done():
+        return "sigint"
+    _signal_group(process.pid, signal.SIGTERM)
+    with contextlib.suppress(asyncio.TimeoutError):
+        await asyncio.wait_for(asyncio.shield(waiter), TERM_WAIT_S)
+        return "sigterm"
     _signal_group(process.pid, signal.SIGKILL)
     await waiter
     return "sigkill"

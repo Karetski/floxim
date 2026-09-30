@@ -20,11 +20,12 @@ from pathlib import Path
 from typing import Any
 
 from arcflow import __version__
-from arcflow.clock import Clock, iso
+from arcflow.clock import Clock, iso, parse_iso
 from arcflow.config import Config
 from arcflow.engine import environment
 from arcflow.engine.inputs import resolve_inputs
 from arcflow.engine.nodes import AttemptResult, Executor, SleepError, VisitContext
+from arcflow.engine.process import Stop
 from arcflow.engine.registry import EXECUTORS
 from arcflow.engine.routing import Decision, RoutingError, decide
 from arcflow.expr import EvalError, ExprError
@@ -32,9 +33,9 @@ from arcflow.flow import Flow, Node, load_flow
 from arcflow.flowspec import DEFAULT_TIMEOUTS
 from arcflow.redact import Redactor
 from arcflow.rendering import render_config
-from arcflow.store.events import Event, EventWriter
+from arcflow.store.events import Event, EventWriter, read_log
 from arcflow.store.ids import new_run_id
-from arcflow.store.lock import HEARTBEAT_S, RunLock, hostname
+from arcflow.store.lock import HEARTBEAT_S, RunLock, hostname, lock_state
 from arcflow.store.rundir import RunDir, write_json_atomic
 from arcflow.store.state import State, active_seconds, apply, reduce
 from arcflow.templates import render_value
@@ -125,6 +126,44 @@ class RunOutcome:
     state: State
 
 
+@dataclass
+class ResumeOptions:
+    """`arcflow resume` options (spec §7.6)."""
+
+    reload: bool = False
+    from_node: str | None = None
+    rerun: bool = False
+    force: bool = False
+
+
+class ResumeRefused(Exception):
+    """The run cannot be resumed as asked; nothing was changed."""
+
+
+class Detached(Exception):
+    """The runner was asked to stop and left the run resumable."""
+
+
+def crash_hook_from_env(environ: Mapping[str, str]) -> Callable[[Event], None] | None:
+    """Fault injection for tests (spec §13): `ARCFLOW_TEST_CRASH_AT=<event type>:<n>`
+    kills the process right after the n-th event of that type is written."""
+    spec = environ.get("ARCFLOW_TEST_CRASH_AT")
+    if not spec:
+        return None
+    kind, _, count = spec.rpartition(":")
+    target = int(count)
+    seen = 0
+
+    def hook(event: Event) -> None:
+        nonlocal seen
+        if event["type"] == kind:
+            seen += 1
+            if seen == target:
+                os._exit(137)
+
+    return hook
+
+
 class Runner:
     def __init__(
         self,
@@ -137,6 +176,7 @@ class Runner:
         heartbeat: bool = True,
         crash_hook: Callable[[Event], None] | None = None,
         grace: float = DEFAULT_GRACE_S,
+        resume: ResumeOptions | None = None,
     ) -> None:
         self.run_dir = run
         self.config = config
@@ -146,18 +186,41 @@ class Runner:
         self.heartbeat_enabled = heartbeat
         self.crash_hook = crash_hook
         self.grace = grace
+        self.options = resume or ResumeOptions()
         self.redactor = Redactor(config["redact"])
         self.meta = run.meta()
-        flow, problems = load_flow(run.path / self.meta["snapshot_flow"])
-        if flow is None:
-            raise RuntimeError(f"the run's flow snapshot no longer loads: {problems[:1]}")
-        self.flow: Flow = flow
-        self.state: State = {}
+        self.state: State = reduce(read_log(run.events).events)
+        self.flow: Flow = self._load_flow(self._snapshot_path())
         self.writer: EventWriter | None = None
+        self.shutting_down = False
+        self._current: tuple[VisitContext, asyncio.Future[AttemptResult], bool] | None = None
+
+    def _snapshot_path(self) -> Path:
+        relative = str(self.state["run"].get("snapshot") or self.meta["snapshot_flow"])
+        return self.run_dir.path / relative
+
+    @staticmethod
+    def _load_flow(path: Path) -> Flow:
+        flow, problems = load_flow(path)
+        if flow is None:
+            raise ResumeRefused(f"the run's flow snapshot no longer loads: {problems[:1]}")
+        return flow
 
     # -- lifecycle ----------------------------------------------------------------
 
+    def check_resumable(self) -> None:
+        """Raise ResumeRefused if this run cannot continue as asked (spec §1.1, §7.6)."""
+        status = self.state["status"]
+        if status == "succeeded":
+            raise ResumeRefused("the run succeeded; a succeeded run cannot be resumed")
+        if status in ("failed", "cancelled") and not self.options.force:
+            raise ResumeRefused(f"the run {status}; use --force to continue it anyway")
+        if self.options.from_node and self.options.from_node not in self.flow.nodes:
+            raise ResumeRefused(f"--from: no node named {self.options.from_node!r}")
+
     async def run(self) -> RunOutcome:
+        if self.state["status"] != "pending":
+            self.check_resumable()
         lock = RunLock(self.run_dir.lock, self.clock)
         lock.acquire()
         heartbeat: asyncio.Task[None] | None = None
@@ -170,6 +233,8 @@ class Runner:
                 redact=self.redactor.value if self.redactor else None,
             )
             self.state = reduce(self.writer.events)
+            if self.writer.torn_tail:
+                self.emit("warning", {"code": "W-TORN-LOG", "message": "ignored a torn last line"})
             if self.state["status"] == "pending":
                 self.emit("run_started", {"pid": os.getpid(), "host": hostname()})
             else:
@@ -177,7 +242,11 @@ class Runner:
                 self.emit(kind, {"pid": os.getpid(), "host": hostname(), "reason": "resume"})
             if self.heartbeat_enabled:
                 heartbeat = asyncio.ensure_future(self._heartbeat(lock))
-            status = await self._loop()
+            try:
+                status = await self._main()
+            except Detached:
+                self.emit("runner_detached", {"pid": os.getpid(), "reason": "signal"})
+                status = "detached"
             self.run_dir.write_state(self.state)
             return RunOutcome(status, self.state)
         finally:
@@ -188,6 +257,19 @@ class Runner:
             if self.writer is not None:
                 self.writer.close()
             lock.release()
+
+    def request_shutdown(self, urgent: bool = False) -> None:
+        """Stop the current attempt and leave the run resumable (spec §6.7)."""
+        self.shutting_down = True
+        if self._current is None:
+            return
+        ctx, task, handles_stop = self._current
+        if handles_stop:
+            ctx.stop.request("shutdown")
+            if urgent:
+                ctx.stop.urgent.set()
+        else:
+            task.cancel()
 
     async def _heartbeat(self, lock: RunLock) -> None:
         while True:
@@ -213,8 +295,13 @@ class Runner:
 
     # -- the step loop (§6.2) ---------------------------------------------------------
 
-    async def _loop(self) -> str:
+    async def _main(self) -> str:
+        status = await self._recover()
+        if status is not None:
+            return status
         while True:
+            if self.shutting_down:
+                raise Detached
             current = self.state["current"] or self.flow.start
             if current == "end":
                 return self._succeed()
@@ -223,31 +310,37 @@ class Runner:
             if limit is not None:
                 return self._fail(limit[0], limit[1], node.id)
             outcome, decision = await self._visit(node)
-            try:
-                if decision is None:
-                    decision = self._route(node, outcome)
-            except RoutingError as exc:
-                return self._fail(exc.reason, exc.message, node.id)
-            if decision is None:  # on_error: fail
-                error = (self.state["nodes"].get(node.id) or {}).get("error") or {}
-                message = error.get("message") or f"{node.id} {outcome}"
-                return self._fail("node_error", f"{node.id}: {message}", node.id)
-            via = "next" if outcome == "succeeded" or self._continues(node) else "on_error"
-            self.emit(
-                "route_taken",
-                {
-                    "from": node.id,
-                    "to": decision.target,
-                    "via": via,
-                    "case_index": decision.case_index,
-                    "reason": decision.reason,
-                },
-            )
-            self.run_dir.write_state(self.state)
-            if decision.target == "fail":
-                return self._fail(
-                    "route_fail", decision.reason or f"{node.id} routed to fail", node.id
-                )
+            status = self._after_visit(node, outcome, decision)
+            if status is not None:
+                return status
+
+    def _after_visit(self, node: Node, outcome: str, decision: Decision | None) -> str | None:
+        """Route after a finished visit (§6.2 step 5). Returns a final status, or None."""
+        try:
+            if decision is None:
+                decision = self._route(node, outcome)
+        except RoutingError as exc:
+            return self._fail(exc.reason, exc.message, node.id)
+        if decision is None:  # on_error: fail
+            error = (self.state["nodes"].get(node.id) or {}).get("error") or {}
+            message = error.get("message") or f"{node.id} {outcome}"
+            return self._fail("node_error", f"{node.id}: {message}", node.id)
+        via = "next" if outcome == "succeeded" or self._continues(node) else "on_error"
+        self.emit(
+            "route_taken",
+            {
+                "from": node.id,
+                "to": decision.target,
+                "via": via,
+                "case_index": decision.case_index,
+                "reason": decision.reason,
+            },
+        )
+        self.run_dir.write_state(self.state)
+        if decision.target == "fail":
+            message = decision.reason or f"{node.id} routed to fail"
+            return self._fail("route_fail", message, node.id)
+        return None
 
     def _limit_reached(self, node: Node) -> tuple[str, str] | None:
         max_visits = int(node.config.get("max_visits", DEFAULT_MAX_VISITS))
@@ -270,6 +363,139 @@ class Runner:
         if limit is None:
             return None
         return limit - active_seconds(self.state, iso(self.clock.now()))
+
+    # -- resume (§7.5, §7.6) ----------------------------------------------------------
+
+    async def _recover(self) -> str | None:
+        """Bring a resumed run back to a step boundary. Returns a final status, or
+        None to continue with the step loop."""
+        options = self.options
+        if self.state["status"] in ("failed", "cancelled"):
+            self._reopen()
+        if options.reload:
+            self._reload()
+        progress = self.state["in_progress"]
+        if options.from_node is not None:
+            if progress is not None:
+                self._close_interrupted(progress)
+            self._jump(options.from_node)
+            return None
+        if progress is not None:
+            node = self.flow.nodes[progress["node"]]
+            outcome, decision = await self._continue_visit(node, progress)
+            return self._after_visit(node, outcome, decision)
+        awaiting = self.state["awaiting_route"]
+        if awaiting is not None and self.state["current"] == awaiting:
+            node = self.flow.nodes[awaiting]
+            finished = self.state["nodes"][awaiting]
+            decision = Decision(finished["branch"]) if node.type == "condition" else None
+            return self._after_visit(node, finished["outcome"], decision)
+        return None
+
+    def _reopen(self) -> None:
+        failure = self.state.get("failure") or {}
+        previous = self.state["status"]
+        self.emit("run_reopened", {"previous": previous})
+        if self.options.from_node is None:
+            target = failure.get("node")
+            if target is None or target not in self.flow.nodes:
+                raise ResumeRefused(f"the run {previous} outside a node; use --from <node>")
+            self._jump(target)
+
+    def _jump(self, target: str) -> None:
+        self.emit(
+            "route_taken",
+            {"from": self.state["current"], "to": target, "via": "resume", "case_index": None},
+        )
+
+    def _reload(self) -> None:
+        current_path = Path(self.meta["flow_path"])
+        flow = self._load_flow(current_path)
+        for node_id, result in self.state["nodes"].items():
+            if result is None:
+                continue
+            new = flow.nodes.get(node_id)
+            if new is None or new.type != self.flow.nodes[node_id].type:
+                raise ResumeRefused(
+                    f"--reload: node {node_id!r} has finished visits and was removed or "
+                    "changed type"
+                )
+        generation = 1 + sum(1 for p in self.run_dir.path.glob("snapshot-*"))
+        copy = self.run_dir.write_snapshot(flow.files(), flow.path, generation)
+        old_sha = self.state["run"].get("flow_sha256") or self.meta["flow_sha256"]
+        new_sha = hashlib.sha256(current_path.read_bytes()).hexdigest()
+        self.emit(
+            "flow_reloaded",
+            {
+                "old_sha256": old_sha,
+                "new_sha256": new_sha,
+                "snapshot": str(copy.relative_to(self.run_dir.path)),
+            },
+        )
+        self.flow = self._load_flow(copy)
+
+    def _close_interrupted(self, progress: dict[str, Any]) -> None:
+        """Record an interrupted visit as finished without rerunning it (`--from`)."""
+        node, visit = progress["node"], progress["visit"]
+        attempts = progress["attempts"]
+        if attempts and "outcome" not in attempts[-1]:
+            self.emit(
+                "attempt_finished",
+                {"outcome": "interrupted", "error": None},
+                node=node,
+                visit=visit,
+                attempt=attempts[-1]["attempt"],
+            )
+        result = {
+            "outcome": "interrupted",
+            "visit": visit,
+            "attempts": len(attempts),
+            "started_at": progress["started_at"],
+            "finished_at": iso(self.clock.now()),
+            "error": None,
+        }
+        self.emit(
+            "visit_finished", {"outcome": "interrupted", "result": result}, node=node, visit=visit
+        )
+
+    async def _continue_visit(
+        self, node: Node, progress: dict[str, Any]
+    ) -> tuple[str, Decision | None]:
+        """Finish a visit that started before the runner stopped (§7.5)."""
+        executor = EXECUTORS[node.type]
+        visit = progress["visit"]
+        attempts = progress["attempts"]
+        last = attempts[-1] if attempts else None
+        if last is not None and "outcome" not in last:
+            self.emit(
+                "attempt_finished",
+                {"outcome": "interrupted", "error": None},
+                node=node.id,
+                visit=visit,
+                attempt=last["attempt"],
+            )
+        used = sum(1 for a in attempts if a.get("outcome") not in (None, "interrupted"))
+        mode = (
+            "restart"
+            if self.options.rerun
+            else node.config.get("on_resume", executor.default_on_resume)
+        )
+        ctx = VisitContext(self, node, visit, {}, dict(progress.get("data") or {}))
+        ctx.namespace = self.namespace(node, visit, (last or {}).get("attempt", 0) + 1)
+        if self.options.rerun:
+            ctx.config = render_config(node.type, node.config, ctx.namespace, self.clock.now)
+        else:
+            config_path = self.run_dir.path / progress["config_ref"]
+            ctx.config = json.loads(config_path.read_text())
+        ctx.resume = {"mode": mode, "session_id": progress.get("session_id")}
+        first = (last or {}).get("attempt", 0) + 1
+        started = parse_iso(progress["started_at"])
+        if last is not None and last.get("outcome") not in (None, "interrupted"):
+            finished = _read_result(self.run_dir.attempt_dir(node.id, visit, last["attempt"]))
+            if self._visit_ends(node, finished.outcome, used):
+                return self._finish_visit(ctx, finished, last["attempt"], started)
+        result, count = await self._attempts(executor, ctx, first=first, used=used)
+        return self._finish_visit(ctx, result, count, started)
 
     # -- visits and attempts --------------------------------------------------------------
 
@@ -301,15 +527,20 @@ class Runner:
             visit=visit,
         )
         if render_error is not None:
-            result = AttemptResult.failed("expression_error", render_error)
-            attempts = 0
-        else:
-            result, attempts = await self._attempts(executor, ctx)
+            return self._finish_visit(
+                ctx, AttemptResult.failed("expression_error", render_error), 0, started
+            )
+        result, count = await self._attempts(executor, ctx)
+        return self._finish_visit(ctx, result, count, started)
+
+    def _finish_visit(
+        self, ctx: VisitContext, result: AttemptResult, attempts: int, started: Any
+    ) -> tuple[str, Decision | None]:
         finished = self.clock.now()
         fields = {
             **result.fields,
             "outcome": result.outcome,
-            "visit": visit,
+            "visit": ctx.visit,
             "attempts": attempts,
             "started_at": iso(started),
             "finished_at": iso(finished),
@@ -319,23 +550,27 @@ class Runner:
         self.emit(
             "visit_finished",
             {"outcome": result.outcome, "result": fields},
-            node=node.id,
-            visit=visit,
+            node=ctx.node.id,
+            visit=ctx.visit,
         )
         return result.outcome, result.decision
 
-    async def _attempts(self, executor: Executor, ctx: VisitContext) -> tuple[AttemptResult, int]:
+    async def _attempts(
+        self, executor: Executor, ctx: VisitContext, *, first: int = 1, used: int = 0
+    ) -> tuple[AttemptResult, int]:
+        """Run attempts until one succeeds or retries run out (§6.6). `used` counts
+        earlier attempts that ended (interrupted ones do not count)."""
         node = ctx.node
         retry = node.config.get("retry") or {}
         max_attempts = int(retry.get("max_attempts", 1))
-        retry_on = set(retry.get("on", RETRYABLE_DEFAULT))
         backoff = parse_duration(retry.get("backoff", 0)) or 0.0
-        result = AttemptResult.failed("limit", "no attempt ran")
-        attempt = 0
-        for attempt in range(1, max_attempts + 1):
-            if attempt > 1:
+        result = AttemptResult.failed("limit", "no attempts left")
+        attempt = first - 1
+        while used < max_attempts:
+            attempt += 1
+            if used > 0:
                 if backoff:
-                    await self.clock.sleep(min(backoff * 2 ** (attempt - 2), BACKOFF_CAP_S))
+                    await self.clock.sleep(min(backoff * 2 ** (used - 1), BACKOFF_CAP_S))
                 try:
                     ctx.namespace = self.namespace(node, ctx.visit, attempt)
                     ctx.config = render_config(
@@ -344,7 +579,10 @@ class Runner:
                 except (ExprError, EvalError) as exc:
                     result = AttemptResult.failed("expression_error", str(exc))
                     break
+            if self.shutting_down:
+                raise Detached
             ctx.attempt = attempt
+            ctx.stop = Stop()
             ctx.attempt_dir = self.run_dir.attempt_dir(node.id, ctx.visit, attempt)
             ctx.attempt_dir.mkdir(parents=True, exist_ok=True)
             self.emit(
@@ -355,6 +593,9 @@ class Runner:
                 attempt=attempt,
             )
             result = await self._attempt(executor, ctx)
+            # The result file is written before the event that commits it, so a
+            # resumed run can always finish the visit from a finished attempt.
+            write_json_atomic(ctx.attempt_dir / "result.json", _result_json(result))
             self.emit(
                 "attempt_finished",
                 {"outcome": result.outcome, "error": result.error, **result.extra},
@@ -362,30 +603,46 @@ class Runner:
                 visit=ctx.visit,
                 attempt=attempt,
             )
-            write_json_atomic(
-                ctx.attempt_dir / "result.json",
-                {"outcome": result.outcome, "error": result.error, "fields": result.fields},
-            )
-            if result.outcome == "succeeded" or result.outcome in NEVER_RETRIED:
-                break
-            if result.outcome not in retry_on:
+            if result.outcome == "interrupted":
+                raise Detached
+            used += 1
+            if self._visit_ends(node, result.outcome, used):
                 break
         return result, attempt
 
+    def _visit_ends(self, node: Node, outcome: str, used: int) -> bool:
+        """Whether a visit ends after an attempt with `outcome`, `used` attempts in."""
+        retry = node.config.get("retry") or {}
+        if outcome == "succeeded" or outcome in NEVER_RETRIED:
+            return True
+        if outcome not in set(retry.get("on", RETRYABLE_DEFAULT)):
+            return True
+        return used >= int(retry.get("max_attempts", 1))
+
     async def _attempt(self, executor: Executor, ctx: VisitContext) -> AttemptResult:
         timeout = self.timeout_for(ctx.node, ctx.config)
+        handles_stop = bool(getattr(executor, "handles_timeout", False))
+        coroutine = executor.run(ctx)
+        if timeout is not None and not handles_stop:
+            coroutine = asyncio.wait_for(coroutine, timeout)
+        task: asyncio.Future[AttemptResult] = asyncio.ensure_future(coroutine)
+        self._current = (ctx, task, handles_stop)
         try:
-            if timeout is None or getattr(executor, "handles_timeout", False):
-                return await executor.run(ctx)
-            return await asyncio.wait_for(executor.run(ctx), timeout)
+            return await task
         except asyncio.TimeoutError:
             return AttemptResult(
                 "timed_out", {}, {"kind": "timeout", "message": f"timed out after {timeout:g}s"}
             )
+        except asyncio.CancelledError:
+            if self.shutting_down and task.cancelled():
+                return AttemptResult("interrupted")
+            raise
         except (ExprError, EvalError) as exc:
             return AttemptResult.failed("expression_error", str(exc))
         except RoutingError as exc:
             return AttemptResult.failed("expression_error", exc.message)
+        finally:
+            self._current = None
 
     def timeout_for(self, node: Node, config: Mapping[str, Any]) -> float | None:
         value = config.get("timeout", DEFAULT_TIMEOUTS.get(node.type))
@@ -433,7 +690,7 @@ class Runner:
         totals["active_s"] = round(active_seconds(self.state, iso(self.clock.now())), 3)
         return totals
 
-    # -- the expression namespace (§4.3) ----------------------------------------------------
+    # -- processes ------------------------------------------------------------------------
 
     def node_workdir(self, ctx: VisitContext) -> Path:
         """Where a node's process runs: the run workdir (worktrees come with workspaces)."""
@@ -458,6 +715,8 @@ class Runner:
             },
         )
 
+    # -- the expression namespace (§4.3) ----------------------------------------------------
+
     def allowed_env(self) -> dict[str, str]:
         return environment.allowed(self.environ, passthrough=self.config["env_passthrough"])
 
@@ -466,6 +725,8 @@ class Runner:
     ) -> dict[str, Any]:
         nodes = {node_id: self.state["nodes"].get(node_id) for node_id in self.flow.nodes}
         visits = {node_id: self.state["visits"].get(node_id, 0) for node_id in self.flow.nodes}
+        if node is not None and visit is not None:
+            visits[node.id] = max(visits[node.id], visit)  # counts the visit being started
         totals = self.state["totals"]
         run = {
             "id": self.meta["id"],
@@ -499,6 +760,36 @@ class Runner:
         if node is not None and routing:
             namespace["self"] = nodes[node.id]
         return namespace
+
+
+def _result_json(result: AttemptResult) -> dict[str, Any]:
+    decision = result.decision
+    return {
+        "outcome": result.outcome,
+        "error": result.error,
+        "fields": result.fields,
+        "decision": None
+        if decision is None
+        else {
+            "target": decision.target,
+            "case_index": decision.case_index,
+            "reason": decision.reason,
+        },
+    }
+
+
+def _read_result(attempt_dir: Path) -> AttemptResult:
+    data = json.loads((attempt_dir / "result.json").read_text())
+    decision = Decision(**data["decision"]) if data.get("decision") else None
+    return AttemptResult(data["outcome"], data["fields"], data["error"], decision=decision)
+
+
+def display_status(run: RunDir, state: State, clock: Clock) -> str:
+    """The status to show: a `running` run with no live runner is `interrupted` (§1.1)."""
+    status = str(state.get("status"))
+    if status == "running" and lock_state(run.lock, clock.now()) != "live":
+        return "interrupted"
+    return status
 
 
 def exit_status_code(status: str) -> int:

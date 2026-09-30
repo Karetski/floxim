@@ -70,13 +70,27 @@ def validate(
     return Report(path, flow, problems)
 
 
+# Features within implemented node types that the runner cannot execute yet.
+PENDING_FEATURES: dict[tuple[str, object], str] = {("on_resume", "ask"): "on_resume: ask"}
+
+
 def _not_implemented(flow: Flow) -> list[Problem]:
-    return [
-        node.origin.problem(
-            "E-NOT-IMPLEMENTED",
-            f"{node.type} nodes are not available in this version of Arcflow",
-            key=True,
-        )
-        for node in flow.nodes.values()
-        if node.type not in IMPLEMENTED_NODE_TYPES
-    ]
+    problems = []
+    for node in flow.nodes.values():
+        if node.type not in IMPLEMENTED_NODE_TYPES:
+            problems.append(
+                node.origin.problem(
+                    "E-NOT-IMPLEMENTED",
+                    f"{node.type} nodes are not available in this version of Arcflow",
+                    key=True,
+                )
+            )
+            continue
+        for (key, value), what in PENDING_FEATURES.items():
+            if node.config.get(key) == value:
+                problems.append(
+                    node.where(key).problem(
+                        "E-NOT-IMPLEMENTED", f"{what} is not available in this version of Arcflow"
+                    )
+                )
+    return problems

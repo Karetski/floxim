@@ -41,6 +41,7 @@ def initial_state() -> State:
         "failure": None,
         "cancel_requested": None,
         "runner": None,
+        "awaiting_route": None,  # a node whose visit finished but whose route is not recorded
         "active_since": None,
         "last_ts": None,
     }
@@ -104,6 +105,8 @@ def _runner_attached(state: State, event: Event, data: dict[str, Any], ts: str, 
     if state["runner"] is not None and state["last_ts"] is not None:
         _stop_active(state, state["last_ts"])  # the previous runner died without a word
     state["runner"] = {"pid": data.get("pid"), "host": data.get("host")}
+    if state["status"] in TERMINAL:
+        return
     if state["status"] in ("pending", "running"):
         state["status"] = "running"
         _start_active(state, ts)
@@ -127,6 +130,7 @@ def _visit_started(state: State, event: Event, data: dict[str, Any], ts: str, no
         "wake_at": data.get("wake_at"),
         "workspace": data.get("workspace"),
         "config_ref": data.get("config_ref"),
+        "data": data,
         "permission_denials": [],
         "attempts": [],
     }
@@ -173,11 +177,23 @@ def _visit_finished(state: State, event: Event, data: dict[str, Any], ts: str, n
     if progress is not None and progress.get("type") == "set" and result["outcome"] == "succeeded":
         state["vars"].update(result.get("values") or {})
     state["in_progress"] = None
-    state["totals"]["steps"] += 1
+    if result["outcome"] != "interrupted":
+        state["totals"]["steps"] += 1
+    state["awaiting_route"] = node
 
 
 def _route_taken(state: State, event: Event, data: dict[str, Any], ts: str, node: Any) -> None:
     state["current"] = data.get("to")
+    state["awaiting_route"] = None
+
+
+def _run_reopened(state: State, event: Event, data: dict[str, Any], ts: str, node: Any) -> None:
+    state["status"] = "running"
+    state["failure"] = None
+    state["finished_at"] = None
+    state["cancel_requested"] = None
+    if state["runner"] is not None:
+        _start_active(state, ts)
 
 
 def _budget_updated(state: State, event: Event, data: dict[str, Any], ts: str, node: Any) -> None:
@@ -227,6 +243,7 @@ def _finished(status: str) -> Any:
         state["runner"] = None
         state["pending_human"] = {}
         state["in_progress"] = None
+        state["awaiting_route"] = None
         if status == "succeeded":
             state["outputs"] = data.get("outputs")
         else:
@@ -258,6 +275,7 @@ _HANDLERS = {
     "run_waiting": _run_waiting,
     "human_responded": _human_responded,
     "cancel_requested": _cancel_requested,
+    "run_reopened": _run_reopened,
     "run_succeeded": _finished("succeeded"),
     "run_failed": _finished("failed"),
     "run_cancelled": _finished("cancelled"),

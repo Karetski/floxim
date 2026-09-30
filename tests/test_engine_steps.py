@@ -319,3 +319,26 @@ def test_given_visit_when_finished_then_state_exposes_common_result_fields(tmp_p
     assert set(count) >= {"attempts", "started_at", "finished_at", "duration_s", "error"}
     assert result.state["visits"] == {"count": 3, "check": 3, "nap": 2}
     assert (result.run.path / "nodes" / "count" / "1" / "visit.json").exists()
+
+
+def test_given_node_reading_its_own_visit_count_when_run_then_it_includes_the_current_visit(
+    tmp_path: Path,
+) -> None:
+    # Given
+    flow = """
+name: own-visits
+nodes:
+  loop:
+    type: condition
+    next:
+      - when: visits.loop == 3
+        to: end
+      - to: loop
+"""
+
+    # When
+    result = run_flow(tmp_path, flow)
+
+    # Then
+    assert result.status == "succeeded"
+    assert result.visited() == ["loop", "loop", "loop"]
