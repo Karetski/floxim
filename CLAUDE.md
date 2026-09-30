@@ -8,6 +8,7 @@ Arcflow is a terminal-first, harness-agnostic workflow orchestrator for AI codin
 |---|---|
 | `PROJECT_BRIEF.md` | Entry point: goals, design principles, non-goals, project plan and milestones (§15), working agreements (§16). Read it before starting work. |
 | `docs/spec.md` | The authoritative definition of behavior: flow format, expressions, node catalog, execution semantics, storage, adapters, CLI/TUI. |
+| `docs/milestones.md` | The v1 build plan: milestones in order, with scope, dependencies and acceptance criteria. Find the current milestone here. |
 | `docs/adr/` | Accepted decisions, indexed in `docs/adr/README.md`. |
 | `docs/research.md` | Background and evidence behind the ADRs, including tested harness behavior. |
 
