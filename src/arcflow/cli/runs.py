@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import os
 import signal
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -19,6 +20,7 @@ from arcflow.engine.respond import (
     AlreadyFinished,
     NotWaiting,
     cancel,
+    pending_node,
     respond,
     resume_due,
     spawn_detached,
@@ -121,6 +123,48 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
     cancel_parser.add_argument("--reason", help="why, recorded with the cancellation")
     cancel_parser.add_argument("--as", dest="by", help="who is cancelling (default: $USER)")
     cancel_parser.set_defaults(handler=cmd_cancel)
+
+    handoff = commands.add_parser(
+        "handoff",
+        parents=[common],
+        help="open a pending handoff session",
+        description="Open a pending handoff session here, then continue the run (spec §5.10).",
+    )
+    handoff.add_argument("run", help="run ID, unique prefix or suffix, @last or @last:<flow>")
+    handoff.add_argument("node", nargs="?", help="the handoff node (needed when several wait)")
+    handoff.add_argument(
+        "--no-continue", action="store_true", help="only open the session; do not continue the run"
+    )
+    handoff.set_defaults(handler=cmd_handoff, events=False, on_wait=None, detach=False)
+
+
+def cmd_handoff(args: argparse.Namespace) -> int:
+    context = project_context()
+    try:
+        run = RunDir(context.config.runs_dir / resolve_run(context.config.runs_dir, args.run))
+        node, prompt = pending_node(run, args.node)
+    except (RunNotFound, AmbiguousRun, NotWaiting) as exc:
+        return _fail(args, "E-NOT-FOUND", str(exc), ExitCode.NOT_FOUND)
+    if prompt.get("kind") != "handoff":
+        return _fail(args, "E-NOT-FOUND", f"{node!r} is not a handoff", ExitCode.NOT_FOUND)
+    command = [str(part) for part in prompt.get("command") or []]
+    stderr(f"→ {node}: {str(prompt.get('message') or '').strip()}")
+    stderr(f"  opening: {' '.join(command)}")
+    code = subprocess.run(command, cwd=context.root, check=False).returncode
+    answer = Answer(
+        acknowledged=True, responder=os.environ.get("USER"), via="handoff", exit_code=code
+    )
+    respond(run, node, answer, clock=Clock(), project_root=context.root, continue_run=False)
+    if args.no_continue:
+        return ExitCode.OK
+    runner = Runner(
+        run,
+        context.config,
+        Clock(),
+        on_event=EventPrinter(as_json=False, quiet=args.json),
+        on_wait=_on_wait(args),
+    )
+    return _drive(runner, run, args)
 
 
 def cmd_cancel(args: argparse.Namespace) -> int:

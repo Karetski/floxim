@@ -659,6 +659,42 @@ def harness_checks(
     return problems
 
 
+def handoff_checks(flow: Flow, root: Path | None = None) -> list[Problem]:
+    """A handoff's `from` is an agent node whose adapter can open sessions
+    interactively (spec §5.10, §8.1)."""
+    from arcflow.adapters import registry
+
+    problems: list[Problem] = []
+    for node in flow.nodes.values():
+        if node.type != "handoff":
+            continue
+        where = node.where("from")
+        source = flow.nodes.get(str(node.config.get("from")))
+        if source is None:
+            problems.append(
+                _unknown_problem(where, "node", str(node.config.get("from")), flow.nodes)
+            )
+            continue
+        if source.type != "agent":
+            problems.append(where.problem("E-SCHEMA", f"{source.id!r} is not an agent node"))
+            continue
+        harness = source.config.get("harness")
+        caps = registry.capabilities(str(harness), root) if isinstance(harness, str) else None
+        if caps is not None and not caps.interactive:
+            problems.append(
+                where.problem(
+                    "E-SCHEMA",
+                    f"the {harness} adapter cannot open sessions interactively",
+                )
+            )
+    return problems
+
+
+def _unknown_problem(where: Origin, what: str, name: str, options: Any) -> Problem:
+    code, message = _unknown(what, name, options)
+    return where.problem(code, message)
+
+
 def _session_source(flow: Flow, node: Node) -> list[Problem]:
     session = node.config.get("session")
     if not isinstance(session, dict):

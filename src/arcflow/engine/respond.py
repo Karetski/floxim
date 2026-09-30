@@ -13,6 +13,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from arcflow.clock import Clock, parse_iso
 from arcflow.engine.human import Answer, InvalidAnswer, check_answer
@@ -35,7 +36,7 @@ class Delivery:
     continued: bool  # a detached runner was started
 
 
-def pending_node(run: RunDir, node: str | None) -> tuple[str, dict[str, object]]:
+def pending_node(run: RunDir, node: str | None) -> tuple[str, dict[str, Any]]:
     pending = run.read_state()["pending_human"]
     if not pending:
         raise NotWaiting(f"run {run.id} is not waiting for an answer")

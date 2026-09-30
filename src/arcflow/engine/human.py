@@ -37,15 +37,19 @@ class Answer:
     acknowledged: bool = False
     responder: str | None = None
     via: str = "cli"
+    exit_code: int | None = None  # a handoff session's exit code
 
     def to_json(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "choice": self.choice,
             "text": self.text,
             "acknowledged": self.acknowledged,
             "responder": self.responder,
             "via": self.via,
         }
+        if self.exit_code is not None:
+            data["exit_code"] = self.exit_code
+        return data
 
 
 def choice_values(choices: list[Any] | None) -> list[str]:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from arcflow.engine.agent import AgentExecutor
+from arcflow.engine.handoff import HandoffExecutor
 from arcflow.engine.human import HumanExecutor
 from arcflow.engine.nodes import ConditionExecutor, Executor, SetExecutor, SleepExecutor
 from arcflow.engine.notify import NotifyExecutor
@@ -21,4 +22,5 @@ EXECUTORS: dict[str, Executor] = {
     "notify": NotifyExecutor(),
     "subflow": SubflowExecutor(),
     "map": MapExecutor(),
+    "handoff": HandoffExecutor(),
 }

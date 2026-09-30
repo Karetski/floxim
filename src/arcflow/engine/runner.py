@@ -738,6 +738,7 @@ class Runner:
                 bool(request.get("acknowledged")),
                 request.get("responder"),
                 str(request.get("via") or "cli"),
+                request.get("exit_code"),
             )
             try:
                 check_answer(prompt, answer)

@@ -11,6 +11,7 @@ from arcflow.adapters.registry import is_aap
 from arcflow.checks import (
     expression_checks,
     graph_checks,
+    handoff_checks,
     harness_checks,
     limit_checks,
     lint_checks,
@@ -26,7 +27,19 @@ from arcflow.problems import Problem
 # E-NOT-IMPLEMENTED for the others as its last stage; each milestone that makes a
 # node type runnable adds it here (docs/milestones.md).
 IMPLEMENTED_NODE_TYPES: frozenset[str] = frozenset(
-    {"condition", "sleep", "set", "shell", "python", "agent", "human", "notify", "subflow", "map"}
+    {
+        "condition",
+        "sleep",
+        "set",
+        "shell",
+        "python",
+        "agent",
+        "human",
+        "notify",
+        "subflow",
+        "map",
+        "handoff",
+    }
 )
 
 
@@ -65,6 +78,7 @@ def validate(
             lambda: limit_checks(flow),
             lambda: harness_checks(flow, config["prices"] if config else None, root),
             lambda: subflow_checks(flow),
+            lambda: handoff_checks(flow, root),
             lambda: workspace_checks(flow, workdir or path.parent),
             lambda: lint_checks(flow, graph, risky),
         ]

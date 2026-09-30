@@ -664,7 +664,7 @@ take_over:
   message: Tests keep failing. Over to you; exit the session to continue the flow.
 ```
 
-When the runner is in the foreground on a TTY, Arcflow prints the message and runs the adapter's interactive command (Claude `claude --resume <id>`, Codex `codex resume <id>`) attached to the terminal, then continues when it exits. Otherwise the run becomes `waiting` like a human node, and `arcflow handoff <run>` opens the session later. Result fields: `session_id`, `exit_code`. Requires adapter capability `interactive`.
+When the runner is in the foreground with a person at the terminal (`--on-wait prompt`, the default on a TTY), Arcflow prints the message and runs the adapter's interactive command (Claude `claude --resume <id>`, Codex `codex resume <id>`) attached to the terminal, in the `from` node's workspace, then continues when it exits. Otherwise the run becomes `waiting` like a human node (a `human_waiting` of `kind: "handoff"` carrying `session_id` and `command`), and `arcflow handoff <run> [<node>]` opens the session later, records its exit code (`human_responded` with `via: "handoff"`), and continues the run in the foreground (`--no-continue` to only open it). Result fields: `session_id`, `exit_code`. Requires adapter capability `interactive`; `validate` rejects a `from` that is not an agent node (`E-SCHEMA`), does not exist (`E-UNKNOWN-REF`), or uses an adapter without it (`E-SCHEMA`). A `from` node that has no session yet fails the visit.
 
 ### 5.11 `notify` (Core)
 
