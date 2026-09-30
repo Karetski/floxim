@@ -230,8 +230,9 @@ def _run_waiting(state: State, event: Event, data: dict[str, Any], ts: str, node
 
 def _human_responded(state: State, event: Event, data: dict[str, Any], ts: str, node: Any) -> None:
     pending = state["pending_human"].pop(node, None)
-    if state["in_progress"] is not None and pending is not None:
-        state["in_progress"]["response"] = {**data, "responded_at": ts}
+    progress = state["in_progress"]
+    if progress is not None and pending is not None and progress.get("node") == node:
+        progress["response"] = {**data, "responded_at": ts}
     if not state["pending_human"] and state["status"] == "waiting":
         state["status"] = "running"
         if state["runner"] is not None:

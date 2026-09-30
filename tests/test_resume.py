@@ -65,6 +65,29 @@ nodes:
 """
 
 
+APPROVAL = """
+name: approval
+nodes:
+  build:
+    type: shell
+    run: echo "$ARCFLOW_NODE_ID $ARCFLOW_VISIT" >> side-effects.txt
+    next: approve
+  approve:
+    type: human
+    message: Ship it?
+    choices: [ship, stop]
+    next:
+      - when: nodes.approve.choice == "ship"
+        to: ship
+      - to: end
+  ship:
+    type: set
+    vars: {shipped: true}
+outputs:
+  shipped: ${{ vars.shipped }}
+"""
+
+
 # -- helpers -------------------------------------------------------------------------
 
 
@@ -107,7 +130,11 @@ def _summary(run: RunDir) -> dict[str, Any]:
         node_id: {
             "outcome": result["outcome"],
             "visit": result["visit"],
-            **{k: result[k] for k in ("exit_code", "stdout", "values", "branch") if k in result},
+            **{
+                k: result[k]
+                for k in ("exit_code", "stdout", "values", "branch", "choice")
+                if k in result
+            },
         }
         for node_id, result in state["nodes"].items()
     }
@@ -135,13 +162,27 @@ def _assert_no_finished_visit_ran_twice(run: RunDir) -> None:
 # -- the crash matrix ----------------------------------------------------------------
 
 
-@pytest.mark.parametrize(("name", "flow"), [("counter", COUNTER), ("fix-loop", FIX_LOOP)])
+def _finish(project: Path, first: subprocess.CompletedProcess[str]) -> int:
+    """Drive a run to its end: answer each prompt it stops at, then resume it."""
+    code = first.returncode
+    for _ in range(5):
+        if code != 4:
+            return code
+        answered = _cli(project, "respond", "@last", "--choice", "ship", "--no-continue")
+        assert answered.returncode == 0, answered.stderr
+        code = _cli(project, "resume", "@last", "--on-wait", "exit").returncode
+    return code
+
+
+@pytest.mark.parametrize(
+    ("name", "flow"), [("counter", COUNTER), ("fix-loop", FIX_LOOP), ("approval", APPROVAL)]
+)
 def test_given_crash_at_every_event_boundary_when_resumed_then_the_run_ends_as_if_uncrashed(
     tmp_path: Path, name: str, flow: str
 ) -> None:
     # Given: an uncrashed run as the reference
     reference = _project(tmp_path, "reference", flow)
-    assert _cli(reference, "run", "flow.yaml").returncode in (0, 1)
+    assert _finish(reference, _cli(reference, "run", "flow.yaml", "--on-wait", "exit")) in (0, 1)
     expected = _summary(_latest(reference))
     events = read_log(_latest(reference).events).events
     boundaries = []
@@ -149,6 +190,8 @@ def test_given_crash_at_every_event_boundary_when_resumed_then_the_run_ends_as_i
     # run_created is written before the runner starts (see the pending-run test), and
     # crashing after the final event leaves nothing to resume.
     for event in events[1:-1]:
+        if event["type"] == "human_responded":
+            continue  # written by `arcflow respond`, not by a runner
         seen[event["type"]] += 1
         boundaries.append(f"{event['type']}:{seen[event['type']]}")
 
@@ -156,12 +199,15 @@ def test_given_crash_at_every_event_boundary_when_resumed_then_the_run_ends_as_i
         project = _project(tmp_path, f"crash-{index}", flow)
 
         # When
-        crashed = _cli(project, "run", "flow.yaml", crash_at=crash_at)
-        resumed = _cli(project, "resume", "@last")
+        crashed = _cli(project, "run", "flow.yaml", "--on-wait", "exit", crash_at=crash_at)
+        if crashed.returncode == 4:  # stopped at the prompt before reaching the crash point
+            _cli(project, "respond", "@last", "--choice", "ship", "--no-continue")
+            crashed = _cli(project, "resume", "@last", "--on-wait", "exit", crash_at=crash_at)
+        resumed = _finish(project, _cli(project, "resume", "@last", "--on-wait", "exit"))
 
         # Then
         assert crashed.returncode == 137, (crash_at, crashed.stderr)
-        assert resumed.returncode in (0, 1), (crash_at, resumed.stderr)
+        assert resumed in (0, 1), crash_at
         run = _latest(project)
         assert _summary(run) == expected, crash_at
         _assert_no_finished_visit_ran_twice(run)

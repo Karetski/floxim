@@ -83,6 +83,8 @@ class SleepExecutor(_Base):
     """Waits for a duration or until a time (§5.5). `wake_at` is recorded at visit
     start, so a resumed run sleeps only for the remainder."""
 
+    continues_waiting = True
+
     def prepare(self, ctx: VisitContext) -> dict[str, Any]:
         now = ctx.runner.clock.now()
         if "duration" in ctx.config:

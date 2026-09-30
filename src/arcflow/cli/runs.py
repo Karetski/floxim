@@ -6,13 +6,16 @@ import argparse
 import asyncio
 import os
 import signal
+import sys
 import time
 from pathlib import Path
 from typing import Any
 
 from arcflow.cli.common import EventPrinter, print_problems, project_context, stderr
 from arcflow.clock import Clock
+from arcflow.engine.human import Answer, InvalidAnswer
 from arcflow.engine.inputs import InputError, load_inputs_file, parse_assignments
+from arcflow.engine.respond import NotWaiting, respond, spawn_detached
 from arcflow.engine.runner import (
     FlowInvalid,
     FullPermissionsRefused,
@@ -49,6 +52,10 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
     run.add_argument(
         "--allow-full", action="store_true", help="allow agent nodes with permissions: full"
     )
+    _wait_options(run)
+    run.add_argument(
+        "--detach", action="store_true", help="run in the background and return at once"
+    )
     run.set_defaults(handler=cmd_run)
 
     resume = commands.add_parser(
@@ -68,7 +75,91 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
         "--recreate-workspaces", action="store_true", help="recreate deleted worktrees"
     )
     resume.add_argument("--events", action="store_true", help="stream events as JSON lines")
+    _wait_options(resume)
+    resume.add_argument(
+        "--detach", action="store_true", help="continue in the background and return at once"
+    )
     resume.set_defaults(handler=cmd_resume)
+
+    respond = commands.add_parser(
+        "respond",
+        parents=[common],
+        help="answer a waiting run",
+        description="Answer a pending human node (spec §5.4, §6.11).",
+    )
+    respond.add_argument("run", help="run ID, unique prefix or suffix, @last or @last:<flow>")
+    respond.add_argument("node", nargs="?", help="the human node (needed when several wait)")
+    answer = respond.add_mutually_exclusive_group(required=True)
+    answer.add_argument("--choice", help="one of the prompt's choices")
+    answer.add_argument("--text", help="a free-text answer")
+    answer.add_argument("--ack", action="store_true", help="acknowledge")
+    respond.add_argument("--comment", help="free text with a choice, when the prompt allows it")
+    respond.add_argument("--as", dest="responder", help="who is answering (default: $USER)")
+    respond.add_argument(
+        "--no-continue", action="store_true", help="only record the answer; do not continue the run"
+    )
+    respond.set_defaults(handler=cmd_respond)
+
+
+def _wait_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--on-wait",
+        choices=["prompt", "wait", "exit"],
+        help="at a human node: ask here, keep waiting, or exit with code 4 "
+        "(default: prompt on a terminal, else exit)",
+    )
+
+
+def _on_wait(args: argparse.Namespace) -> str:
+    if args.on_wait:
+        return str(args.on_wait)
+    if getattr(args, "detach", False) or not sys.stdin.isatty():
+        return "exit"
+    return "prompt"
+
+
+def cmd_respond(args: argparse.Namespace) -> int:
+    context = project_context()
+    try:
+        run = RunDir(context.config.runs_dir / resolve_run(context.config.runs_dir, args.run))
+    except (RunNotFound, AmbiguousRun) as exc:
+        return _fail(args, "E-NOT-FOUND", str(exc), ExitCode.NOT_FOUND)
+    answer = Answer(
+        choice=args.choice,
+        text=args.text if args.text is not None else args.comment,
+        acknowledged=args.ack,
+        responder=args.responder or os.environ.get("USER"),
+        via="cli",
+    )
+    try:
+        delivery = respond(
+            run,
+            args.node,
+            answer,
+            clock=Clock(),
+            project_root=context.root,
+            continue_run=not args.no_continue,
+        )
+    except NotWaiting as exc:
+        return _fail(args, "E-NOT-FOUND", str(exc), ExitCode.NOT_FOUND)
+    except InvalidAnswer as exc:
+        return _fail(args, "E-INVALID-ANSWER", str(exc), ExitCode.USAGE)
+    except LockHeld as exc:
+        return _fail(args, "E-LOCKED", str(exc), ExitCode.CONFLICT)
+    data = {
+        "run_id": run.id,
+        "node": delivery.node,
+        "delivered": "inbox" if delivery.via_inbox else "recorded",
+        "continued": delivery.continued,
+    }
+    if args.json:
+        emit_json(True, data=data)
+    else:
+        stderr(
+            f"answered {delivery.node} in {run.id}"
+            + (" (continuing)" if delivery.continued else "")
+        )
+    return ExitCode.OK
 
 
 def cmd_run(args: argparse.Namespace) -> int:
@@ -106,14 +197,30 @@ def cmd_run(args: argparse.Namespace) -> int:
     except FullPermissionsRefused as exc:
         return _fail(args, "E-FULL-PERMISSIONS", str(exc), ExitCode.INVALID)
     stderr(f"run {run.id}")
+    if args.detach:
+        return _detach(run, context.root, args)
     runner = Runner(
         run,
         context.config,
         clock,
         on_event=EventPrinter(as_json=args.events, quiet=args.json),
         crash_hook=crash_hook_from_env(os.environ),
+        on_wait=_on_wait(args),
     )
     return _drive(runner, run, args)
+
+
+def _detach(
+    run: RunDir, root: Path, args: argparse.Namespace, extra_args: list[str] | None = None
+) -> int:
+    pid = spawn_detached(run, root, extra_args)
+    if args.json:
+        emit_json(True, data={"run_id": run.id, "status": "started", "pid": pid})
+    else:
+        stderr(
+            f"running in the background (pid {pid}); follow it with: arcflow logs {run.id} --follow"
+        )
+    return ExitCode.OK
 
 
 def cmd_resume(args: argparse.Namespace) -> int:
@@ -137,11 +244,21 @@ def cmd_resume(args: argparse.Namespace) -> int:
             on_event=EventPrinter(as_json=args.events, quiet=args.json),
             crash_hook=crash_hook_from_env(os.environ),
             resume=options,
+            on_wait=_on_wait(args),
         )
         runner.check_resumable()
     except ResumeRefused as exc:
         return _fail(args, "E-RESUME-REFUSED", str(exc), ExitCode.USAGE)
     stderr(f"resuming {run.id}")
+    if args.detach:
+        extra = [
+            *(["--reload"] if args.reload else []),
+            *(["--from", args.from_node] if args.from_node else []),
+            *(["--rerun"] if args.rerun else []),
+            *(["--force"] if args.force else []),
+            *(["--recreate-workspaces"] if args.recreate_workspaces else []),
+        ]
+        return _detach(run, context.root, args, extra)
     try:
         return _drive(runner, run, args)
     except LockHeld as exc:

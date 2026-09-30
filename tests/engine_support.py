@@ -59,6 +59,7 @@ def run_flow(
     virtual: bool = True,
     grace: float = 10.0,
     config_text: str | None = None,
+    on_wait: str = "exit",
 ) -> Result:
     """Create and run a flow in a temporary project. `virtual` runs it on virtual
     time; flows with real child processes need real time (`virtual=False`)."""
@@ -82,6 +83,7 @@ def run_flow(
         heartbeat=False,
         environ=environ or {"PATH": "/usr/bin:/bin"},
         grace=grace,
+        on_wait=on_wait,
     )
     outcome = run_virtual(runner.run()) if virtual else asyncio.run(runner.run())
     return Result(outcome.status, run, outcome.state, read_log(run.events).events)

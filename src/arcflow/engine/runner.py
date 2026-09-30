@@ -25,6 +25,15 @@ from arcflow.adapters import registry as adapter_registry
 from arcflow.clock import Clock, iso, parse_iso
 from arcflow.config import Config
 from arcflow.engine import budget, environment, workspaces
+from arcflow.engine.human import (
+    INBOX_POLL_S,
+    Answer,
+    InvalidAnswer,
+    TerminalPrompt,
+    WaitReleased,
+    check_answer,
+    deadline_passed,
+)
 from arcflow.engine.inputs import resolve_inputs
 from arcflow.engine.nodes import AttemptResult, Executor, SleepError, VisitContext
 from arcflow.engine.process import Stop
@@ -35,6 +44,7 @@ from arcflow.flow import Flow, Node, load_flow
 from arcflow.flowspec import DEFAULT_TIMEOUTS, WORKSPACE_TYPES
 from arcflow.redact import Redactor
 from arcflow.rendering import render_config
+from arcflow.store import inbox
 from arcflow.store.events import Event, EventWriter, read_log
 from arcflow.store.ids import new_run_id
 from arcflow.store.lock import HEARTBEAT_S, RunLock, hostname, lock_state
@@ -165,7 +175,8 @@ class Detached(Exception):
 
 def crash_hook_from_env(environ: Mapping[str, str]) -> Callable[[Event], None] | None:
     """Fault injection for tests (spec §13): `ARCFLOW_TEST_CRASH_AT=<event type>:<n>`
-    kills the process right after the n-th event of that type is written."""
+    kills the process right after the n-th event of that type in the run's log is
+    written, counting events earlier processes wrote."""
     spec = environ.get("ARCFLOW_TEST_CRASH_AT")
     if not spec:
         return None
@@ -180,6 +191,11 @@ def crash_hook_from_env(environ: Mapping[str, str]) -> Callable[[Event], None] |
             if seen == target:
                 os._exit(137)
 
+    def seed(events: list[Event]) -> None:
+        nonlocal seen
+        seen = sum(1 for e in events if e["type"] == kind)
+
+    hook.seed = seed  # type: ignore[attr-defined]
     return hook
 
 
@@ -196,6 +212,7 @@ class Runner:
         crash_hook: Callable[[Event], None] | None = None,
         grace: float = DEFAULT_GRACE_S,
         resume: ResumeOptions | None = None,
+        on_wait: str = "exit",
     ) -> None:
         self.run_dir = run
         self.config = config
@@ -205,6 +222,7 @@ class Runner:
         self.heartbeat_enabled = heartbeat
         self.crash_hook = crash_hook
         self.grace = grace
+        self.on_wait = on_wait
         self.options = resume or ResumeOptions()
         self.redactor = Redactor(config["redact"])
         self.meta = run.meta()
@@ -260,6 +278,9 @@ class Runner:
                 redact=self.redactor.value if self.redactor else None,
             )
             self.state = reduce(self.writer.events)
+            seed = getattr(self.crash_hook, "seed", None)
+            if seed is not None:
+                seed(self.writer.events)
             if self.writer.torn_tail:
                 self.emit("warning", {"code": "W-TORN-LOG", "message": "ignored a torn last line"})
             if self.state["status"] == "pending":
@@ -273,7 +294,10 @@ class Runner:
                 status = await self._main()
             except Detached:
                 self.emit("runner_detached", {"pid": os.getpid(), "reason": "signal"})
-                status = "detached"
+                status = "detached" if self.state["status"] != "waiting" else "waiting"
+            except WaitReleased:
+                self.emit("runner_detached", {"pid": os.getpid(), "reason": "waiting"})
+                status = "waiting"
             self.run_dir.write_state(self.state)
             return RunOutcome(status, self.state)
         finally:
@@ -501,6 +525,13 @@ class Runner:
         visit = progress["visit"]
         attempts = progress["attempts"]
         last = attempts[-1] if attempts else None
+        if (
+            getattr(executor, "continues_waiting", False)
+            and not self.options.rerun
+            and last is not None
+            and "outcome" not in last
+        ):
+            return await self._continue_waiting(executor, node, progress, last)
         if last is not None and "outcome" not in last:
             self.emit(
                 "attempt_finished",
@@ -535,6 +566,93 @@ class Runner:
                 return self._finish_visit(ctx, finished, last["attempt"], started)
         result, count = await self._attempts(executor, ctx, first=first, used=used)
         return self._finish_visit(ctx, result, count, started)
+
+    async def _continue_waiting(
+        self, executor: Executor, node: Node, progress: dict[str, Any], last: dict[str, Any]
+    ) -> tuple[str, Decision | None]:
+        """Continue an open attempt of a node that waits (human, sleep): its wait
+        goes on where it stopped, with no new attempt (spec §7.5)."""
+        visit = progress["visit"]
+        ctx = VisitContext(self, node, visit, {}, dict(progress.get("data") or {}))
+        ctx.workspace = progress.get("workspace")
+        ctx.namespace = self.namespace(node, visit, last["attempt"])
+        ctx.config = json.loads((self.run_dir.path / progress["config_ref"]).read_text())
+        ctx.attempt = last["attempt"]
+        ctx.attempt_dir = self.run_dir.attempt_dir(node.id, visit, ctx.attempt)
+        ctx.attempt_dir.mkdir(parents=True, exist_ok=True)
+        started = parse_iso(progress["started_at"])
+        result = await self._attempt(executor, ctx)
+        write_json_atomic(ctx.attempt_dir / "result.json", _result_json(result))
+        self.emit(
+            "attempt_finished",
+            {"outcome": result.outcome, "error": result.error, **result.extra},
+            node=node.id,
+            visit=visit,
+            attempt=ctx.attempt,
+        )
+        if result.outcome == "interrupted":
+            raise Detached
+        used = (
+            sum(1 for a in progress["attempts"] if a.get("outcome") not in (None, "interrupted"))
+            + 1
+        )
+        if not self._visit_ends(node, result.outcome, used):
+            result, count = await self._attempts(executor, ctx, first=ctx.attempt + 1, used=used)
+            return self._finish_visit(ctx, result, count, started)
+        return self._finish_visit(ctx, result, ctx.attempt, started)
+
+    # -- human answers (§5.4, §6.11) -----------------------------------------------------
+
+    async def wait_for_answer(self, ctx: VisitContext) -> dict[str, Any]:
+        """Wait for an answer to the node's pending prompt: from the inbox (another
+        process), from the terminal (`--on-wait prompt`), or by the deadline. With
+        `--on-wait exit` the runner stops here and the run stays waiting."""
+        node = ctx.node.id
+        prompt = self.state["pending_human"][node]
+        terminal = TerminalPrompt(prompt, node) if self.on_wait == "prompt" else None
+        if terminal is not None:
+            terminal.start()
+        while True:
+            response = self._take_answer(node, prompt, terminal)
+            if response is not None:
+                return response
+            if deadline_passed(ctx.visit_data.get("deadline"), self.clock.now()):
+                default = prompt.get("default")
+                answer = Answer(choice=default, responder=None, via="timeout")
+                return self._record_answer(node, answer)
+            if self.on_wait == "exit":
+                raise WaitReleased
+            if ctx.stop.event.is_set() or self.shutting_down:
+                raise Detached
+            await self.clock.sleep(INBOX_POLL_S)
+
+    def _take_answer(
+        self, node: str, prompt: dict[str, Any], terminal: TerminalPrompt | None
+    ) -> dict[str, Any] | None:
+        for path, request in inbox.pending(self.run_dir.inbox):
+            if request.get("type") != "respond" or request.get("node") != node:
+                continue
+            inbox.consume(path)
+            answer = Answer(
+                request.get("choice"),
+                request.get("text"),
+                bool(request.get("acknowledged")),
+                request.get("responder"),
+                str(request.get("via") or "cli"),
+            )
+            try:
+                check_answer(prompt, answer)
+            except InvalidAnswer as exc:
+                self.emit("warning", {"code": "W-INVALID-ANSWER", "message": str(exc)}, node=node)
+                continue
+            return self._record_answer(node, answer)
+        if terminal is not None and terminal.answer is not None:
+            return self._record_answer(node, terminal.answer)
+        return None
+
+    def _record_answer(self, node: str, answer: Answer) -> dict[str, Any]:
+        event = self.emit("human_responded", answer.to_json(), node=node)
+        return {**answer.to_json(), "responded_at": event["ts"]}
 
     # -- visits and attempts --------------------------------------------------------------
 

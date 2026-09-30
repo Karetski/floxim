@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from arcflow.engine.agent import AgentExecutor
+from arcflow.engine.human import HumanExecutor
 from arcflow.engine.nodes import ConditionExecutor, Executor, SetExecutor, SleepExecutor
 from arcflow.engine.python import PythonExecutor
 from arcflow.engine.shell import ShellExecutor
@@ -14,4 +15,5 @@ EXECUTORS: dict[str, Executor] = {
     "shell": ShellExecutor(),
     "python": PythonExecutor(),
     "agent": AgentExecutor(),
+    "human": HumanExecutor(),
 }

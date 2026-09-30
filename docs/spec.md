@@ -585,6 +585,8 @@ approve:
 
 Result fields: `choice`, `text`, `acknowledged`, `responder` (from `--as`, else `$USER`), `responded_at`, `via` (`cli`, `tui`, `timeout`), `timed_out`.
 
+**Answers.** With `choices`, the answer must be one choice value; free text (`--comment`) is accepted alongside only with `input: text`. Without choices, `input: text` needs non-blank text. With `ack`, only an acknowledgement is accepted. A timeout is recorded as `human_responded` with `via: timeout` and the `default` as its choice (none without a default, and the visit's outcome is then `timed_out`). The visit's deadline is recorded in `visit_started`.
+
 **Waiting.** On entering a human node the runner records `human_waiting`, runs the `on_wait` hook (its failure is logged, never fatal; it runs detached with a 30 s timeout and receives `ARCFLOW_RUN_ID`, `ARCFLOW_NODE_ID`, `ARCFLOW_MESSAGE`, `ARCFLOW_RESPOND_CMD`), sets the run to `waiting`, and then either keeps the process alive or exits (§6.11). An answer arrives through `arcflow respond` or the TUI (§7.4). Validation of an answer (choice in list, text present) happens at `respond` time; an invalid answer is rejected with exit code 2 and changes nothing.
 
 ### 5.5 `sleep` (Core)
@@ -798,7 +800,9 @@ When a run reaches a human node (or a `handoff` without a TTY), what the runner 
 | `wait` | Keep the process alive, polling the run's inbox (§7.4) once per second, until answered. | — |
 | `exit` | Release the lock and exit with code **4** (`waiting`). | `--detach`, or no TTY |
 
-Whoever answers later (`arcflow respond`, the TUI) records the answer, and if no runner holds the lock, **starts a detached runner** to continue the run (`--no-continue` to only record). This is how a CI job or cron entry can start a flow, exit at an approval step, and have the flow finish after a person responds hours later, with no daemon (ADR 0008).
+Whoever answers later (`arcflow respond`, the TUI) records the answer, and if no runner holds the lock, **starts a detached runner** to continue the run (`--no-continue` to only record). A runner that exits at a wait records `runner_detached` with `reason: "waiting"`. A detached runner is `arcflow resume <run> --on-wait exit` in its own session, writing its output to `runner.log` in the run directory; `arcflow run --detach` and `arcflow resume --detach` start one and return at once. A resumed human or sleep visit continues its open attempt rather than starting a new one.
+
+`arcflow respond` prints `{run_id, node, delivered: "inbox" | "recorded", continued}` with `--json`; it exits 2 (`E-INVALID-ANSWER`) for an answer that does not fit, 6 when the run or node is not waiting, 7 when the lock is held but not live enough to take. This is how a CI job or cron entry can start a flow, exit at an approval step, and have the flow finish after a person responds hours later, with no daemon (ADR 0008).
 
 A human node's `timeout` is enforced by whichever runner holds the run; if none does, it is enforced when the next `arcflow status`, `list`, `respond`, `resume` or TUI refresh touches the run (lazy timeout). A scheduled `arcflow resume --due` (cron recipe in the docs) makes timeouts fire without a person touching the run.
 
@@ -1328,7 +1332,7 @@ Brief §16: tests first; engine tests use the fake adapter; unit tests never cal
 | Parser and validator | Every rule in §3–§5 and every code in Appendix C | A corpus `tests/flows/invalid/*.yaml`, each file annotated with its expected codes and positions (`# expect: E-UNKNOWN-TARGET @ 41:13`); `tests/flows/valid/*.yaml` including all Appendix A examples. The M1 acceptance criterion is this corpus. |
 | Expressions | Grammar, forbidden constructs, null-safety, functions, rendering rules | Table-driven tests plus property tests (Hypothesis, a dev-only dependency) that no accepted expression can reach builtins or dunders. |
 | Engine | Routing, loops, limits, retries, `on_error`, budgets, timeouts, cancellation, human waits, workspaces | Fake adapter scripts; assertions on the resulting **event log** (golden files, normalized for timestamps and IDs). Time is injected (fake clock) so sleeps and timeouts run instantly. |
-| Crash and resume | At-least-once guarantees, `on_resume` modes, torn last line, stale locks | A fault-injection hook (`ARCFLOW_TEST_CRASH_AT=<event type>:<n>`) that kills the runner right after a given event; for each example flow, crash at every event boundary, resume, and assert the final state equals the uncrashed run and no finished visit ran twice. |
+| Crash and resume | At-least-once guarantees, `on_resume` modes, torn last line, stale locks | A fault-injection hook (`ARCFLOW_TEST_CRASH_AT=<event type>:<n>`) that kills the runner right after the n-th event of that type in the run's log (counting events earlier processes wrote); for each example flow, crash at every event boundary, resume, and assert the final state equals the uncrashed run and no finished visit ran twice. |
 | Adapters (offline) | Stream parsing and outcome mapping for `claude`, `codex`, command adapters | Recorded fixtures per pinned harness version (§8.8). |
 | Adapters (live) | Real harness smoke tests | Marked `live`, excluded by default, run manually or in a scheduled CI job with a spend cap (`--max-budget-usd` plus Arcflow's budget) and secrets; never on pull requests from forks. |
 | CLI | Every command's `--json` shape and exit code | Snapshot tests against the published CLI schemas. |
