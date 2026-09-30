@@ -1,4 +1,4 @@
-# Project Brief: Loom (working name)
+# Project Brief: Arcflow
 
 > **Purpose of this document.** This is the single entry point for any person or AI agent joining the project. It explains what we're building, why, what we already know, what's decided, what's still open, and how work is organized. Read it fully before doing anything else. When this brief and a later document (spec, ADR) disagree, the later, more specific document wins. Update this brief when major decisions change.
 
@@ -11,14 +11,14 @@
 | Current stage | **Stage 2: Spec**. Stage 1 (Research) completed 2026-09-30: see `docs/research.md` and `docs/adr/` |
 | Spec | Draft 1 in `docs/spec.md` (2026-09-30), awaiting review |
 | Code | None |
-| Name | "Loom" is a placeholder; final name TBD |
+| Name | Arcflow (ADR 0013); CLI `arcflow`, short alias `arcf` |
 | Last updated | 2026-09-30 |
 
 ---
 
 ## 2. One-paragraph summary
 
-Loom is a **terminal-first, harness-agnostic workflow orchestrator for AI coding agents**. Users define **flows**: graphs of **nodes** (run an agent, run a shell command, branch on a condition, wait for a human, sleep, loop) connected by **edges**. Agent nodes don't call model APIs directly; they drive existing agent harnesses such as **Claude Code** and **OpenAI Codex CLI** in headless mode. Flows are plain text files that live in a repo, can be version-controlled, and run from bash. A **CLI** is the engine and the scripting surface; a **TUI** sits on top for running, monitoring, and managing flows interactively.
+Arcflow is a **terminal-first, harness-agnostic workflow orchestrator for AI coding agents**. Users define **flows**: graphs of **nodes** (run an agent, run a shell command, branch on a condition, wait for a human, sleep, loop) connected by **edges**. Agent nodes don't call model APIs directly; they drive existing agent harnesses such as **Claude Code** and **OpenAI Codex CLI** in headless mode. Flows are plain text files that live in a repo, can be version-controlled, and run from bash. A **CLI** is the engine and the scripting surface; a **TUI** sits on top for running, monitoring, and managing flows interactively.
 
 ---
 
@@ -48,14 +48,14 @@ A developer who lives in the terminal, already uses Claude Code and/or Codex, an
 ### 4.1 Libraries that call model APIs directly (not harnesses)
 
 - **LangChain:** open-source (MIT) toolkit for building LLM apps; chains steps together with integrations for models, tools, and data.
-- **LangGraph:** from the same team; models an app as a graph of nodes and edges over shared state, supporting loops, conditional edges, checkpoints/persistence, human-in-the-loop interrupts, and streaming. **This is the conceptual model closest to Loom**, but it orchestrates raw model API calls, not harness sessions, and it's a Python/JS library, not a CLI/TUI tool.
+- **LangGraph:** from the same team; models an app as a graph of nodes and edges over shared state, supporting loops, conditional edges, checkpoints/persistence, human-in-the-loop interrupts, and streaming. **This is the conceptual model closest to Arcflow**, but it orchestrates raw model API calls, not harness sessions, and it's a Python/JS library, not a CLI/TUI tool.
 - **Deep Agents** (LangChain): Claude Code-style agent built on LangGraph, still on raw APIs.
 
 **Takeaway:** borrow LangGraph's concepts (state, conditional edges, checkpoints, interrupts). Don't reimplement an agent.
 
 ### 4.2 Tools that sit on top of harnesses
 
-| Tool | What it does | Gap relative to Loom |
+| Tool | What it does | Gap relative to Arcflow |
 |---|---|---|
 | **Claude Code dynamic workflows** | JS scripts using `agent()`, `parallel()`, `pipeline()`, `phase()` to orchestrate Claude subagents. | Claude-only, runs inside Claude Code's private runtime, and is code rather than a declarative graph. |
 | **Claude Code Routines / scheduled tasks** | Saved prompt plus repo config with scheduled, API, or GitHub triggers (cloud); local scheduled tasks in Desktop; `/loop` in-session. | Claude-only; a single session per trigger, not a graph. |
@@ -66,7 +66,7 @@ A developer who lives in the terminal, already uses Claude Code and/or Codex, an
 | **Tembo, Copilot coding agent, Codex web** | Background or cloud agents triggered from Slack, Linear, or GitHub. | Hosted, ticket-driven, not user-defined graphs. |
 | **Temporal, Prefect, n8n** | General workflow engines. | Could wrap harnesses, but heavy and not agent-aware. Borrow ideas such as durable execution. |
 
-### 4.3 The gap Loom fills
+### 4.3 The gap Arcflow fills
 
 No tool found is **all** of the following:
 1. **Harness-agnostic:** Claude Code, Codex, and future harnesses through adapters.
@@ -77,7 +77,7 @@ No tool found is **all** of the following:
 
 ### 4.4 Competitive risk
 
-Anthropic and OpenAI are actively adding orchestration and scheduling to their own products. Loom's durable differentiators are **cross-harness, local, file-based, and scriptable**. Don't compete on features the vendors will ship natively.
+Anthropic and OpenAI are actively adding orchestration and scheduling to their own products. Arcflow's durable differentiators are **cross-harness, local, file-based, and scriptable**. Don't compete on features the vendors will ship natively.
 
 ---
 
@@ -85,7 +85,7 @@ Anthropic and OpenAI are actively adding orchestration and scheduling to their o
 
 1. **The flow file is the source of truth.** Everything (CLI, TUI, scheduler) reads the same file. The TUI never holds state that isn't expressible in the file.
 2. **The CLI is the engine; the TUI is a client.** Anything the TUI can do, the CLI can do. Every command supports `--json` output for scripting.
-3. **Don't build an agent.** Agent work is delegated to harnesses through adapters. Loom orchestrates.
+3. **Don't build an agent.** Agent work is delegated to harnesses through adapters. Arcflow orchestrates.
 4. **Structured data between nodes.** Agent nodes can be required to return JSON matching a schema. Branching uses fields, never free-text parsing.
 5. **Durable by default.** State is checkpointed after every node transition. Any run can be resumed.
 6. **Bounded by default.** Loops, retries, timeouts, and cost budgets always have limits, and defaults exist even when the user doesn't set them.
@@ -218,7 +218,7 @@ Open questions this example raises: YAML vs TOML vs other; template syntax; expr
              │  (runner)   │
              └──┬───────┬──┘
      ┌──────────▼┐     ┌▼────────────┐
-     │ Node types │     │ Store       │  .loom/runs/<id>/
+     │ Node types │     │ Store       │  .arcflow/runs/<id>/
      │ (registry) │     │ (state,     │    state.json
      └─────┬──────┘     │  events)    │    events.jsonl
            │            └─────────────┘    nodes/<node>/…
@@ -251,16 +251,16 @@ The **fake adapter** returns scripted responses so the engine can be tested dete
 ## 10. CLI sketch (draft)
 
 ```
-loom validate <flow>                 # check syntax, graph, schemas
-loom graph <flow> [--mermaid]        # render graph
-loom run <flow> [--input k=v ...]    # start a run (foreground or --detach)
-loom resume <run-id>                 # continue from last checkpoint
-loom status [<run-id>]               # show run state
-loom list [--flow X] [--status Y]    # list runs
-loom logs <run-id> [--follow]        # event log
-loom respond <run-id> <node> --choice merge   # answer a human node
-loom cancel <run-id>
-loom tui                             # open TUI
+arcflow validate <flow>                 # check syntax, graph, schemas
+arcflow graph <flow> [--mermaid]        # render graph
+arcflow run <flow> [--input k=v ...]    # start a run (foreground or --detach)
+arcflow resume <run-id>                 # continue from last checkpoint
+arcflow status [<run-id>]               # show run state
+arcflow list [--flow X] [--status Y]    # list runs
+arcflow logs <run-id> [--follow]        # event log
+arcflow respond <run-id> <node> --choice merge   # answer a human node
+arcflow cancel <run-id>
+arcflow tui                             # open TUI
 ```
 
 All commands support `--json`. Exit codes are documented and stable.
@@ -332,7 +332,7 @@ Produce `docs/milestones.md`. Each milestone is sized for roughly one agent sess
 | # | Milestone | Done when |
 |---|---|---|
 | M0 | Repo skeleton, CI, lint, `CLAUDE.md`/`AGENTS.md` | CI green on an empty project |
-| M1 | Flow parsing and validation | `loom validate` catches the invalid-flow test suite |
+| M1 | Flow parsing and validation | `arcflow validate` catches the invalid-flow test suite |
 | M2 | Runner with shell, sleep, and condition nodes, plus checkpoints | Example flows run; a killed run resumes correctly |
 | M3 | Fake adapter, then Claude and Codex adapters | Engine tests pass with fake; smoke tests pass with real harnesses |
 | M4 | Human node, pause, and `respond` | Flow pauses, is answered via CLI, and continues |
@@ -342,7 +342,7 @@ Produce `docs/milestones.md`. Each milestone is sized for roughly one agent sess
 | M8 | Docs, examples, first release | Installable binary; README quickstart works |
 
 ### Stage 4: Build
-Per milestone: plan (Claude Code plan mode) → implement against spec, tests first → independent review in a fresh session or a different harness → merge → update docs. After M4, use Loom to orchestrate its own build loop (dogfooding).
+Per milestone: plan (Claude Code plan mode) → implement against spec, tests first → independent review in a fresh session or a different harness → merge → update docs. After M4, use Arcflow to orchestrate its own build loop (dogfooding).
 
 ---
 
@@ -360,7 +360,7 @@ Per milestone: plan (Claude Code plan mode) → implement against spec, tests fi
 
 ## 17. Glossary
 
-- **Harness:** a complete agent application (Claude Code, Codex CLI) that manages its own loop, tools, and context. Loom drives harnesses; it isn't one.
+- **Harness:** a complete agent application (Claude Code, Codex CLI) that manages its own loop, tools, and context. Arcflow drives harnesses; it isn't one.
 - **Headless mode:** running a harness non-interactively from a script with machine-readable output.
 - **Human-in-the-loop:** a point where a flow pauses for a person to approve, choose, or take over.
 - **Durable execution:** persisting progress so work survives crashes and can resume.

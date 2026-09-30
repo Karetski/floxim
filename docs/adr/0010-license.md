@@ -7,7 +7,7 @@
 
 ## Decision
 
-Loom is released under the MIT license.
+Arcflow is released under the MIT license.
 
 ## Consequences
 

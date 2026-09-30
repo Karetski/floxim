@@ -7,10 +7,10 @@
 
 ## Decision
 
-- Each run lives in `.loom/runs/<run-id>/`: `events.jsonl` (append-only, the source of truth), `state.json` (derived snapshot, rebuildable from events), and `nodes/<id>/<visit>/` for prompts, raw harness streams, stdout/stderr and artifacts.
+- Each run lives in `.arcflow/runs/<run-id>/`: `events.jsonl` (append-only, the source of truth), `state.json` (derived snapshot, rebuildable from events), and `nodes/<id>/<visit>/` for prompts, raw harness streams, stdout/stderr and artifacts.
 - State is checkpointed after every node transition.
 - Node visits are **at-least-once**. A completed visit is never rerun on resume. An in-flight agent visit resumes its harness session by default when a session ID was recorded; `on_resume: restart` reruns it instead.
-- Human nodes are their own node type, so nothing reruns around a pending answer; `loom respond` appends an event.
+- Human nodes are their own node type, so nothing reruns around a pending answer; `arcflow respond` appends an event.
 
 ## Consequences
 

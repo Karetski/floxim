@@ -7,7 +7,7 @@
 
 ## Decision
 
-In v1, pending human nodes are answered through the CLI (`loom respond`) and the TUI. A flow or node may set an `on_wait` shell command hook that Loom runs when a human node starts waiting, for notifications (desktop, Slack, email) without built-in integrations.
+In v1, pending human nodes are answered through the CLI (`arcflow respond`) and the TUI. A flow or node may set an `on_wait` shell command hook that Arcflow runs when a human node starts waiting, for notifications (desktop, Slack, email) without built-in integrations.
 
 ## Consequences
 

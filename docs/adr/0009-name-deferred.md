@@ -1,6 +1,6 @@
 # 0009. Project name deferred
 
-- Status: Accepted
+- Status: Superseded by [0013](0013-name-arcflow.md)
 - Date: 2026-09-30
 - Decided by: Alexey (accepted the research.md §6 proposals when closing Stage 1)
 - Context: research.md §6 row 9

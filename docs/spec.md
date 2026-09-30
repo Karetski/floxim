@@ -1,4 +1,4 @@
-# Loom Specification
+# Arcflow Specification
 
 | | |
 |---|---|
@@ -6,16 +6,16 @@
 | Date | 2026-09-30 |
 | Stage | 2 (Spec), per PROJECT_BRIEF.md §15 |
 | Inputs | PROJECT_BRIEF.md, docs/research.md, ADRs 0001–0012 |
-| Format version | `loom: 1` |
+| Format version | `arcflow: 1` |
 
-This document is the authoritative definition of Loom v1. Where it disagrees with the brief or research.md, this document wins; where it disagrees with an ADR, the ADR wins until the conflict is raised and resolved (see §15). Every choice the ADRs left open is made here with a default and listed in §14 as an open question, so implementation is never blocked on it.
+This document is the authoritative definition of Arcflow v1. Where it disagrees with the brief or research.md, this document wins; where it disagrees with an ADR, the ADR wins until the conflict is raised and resolved (see §15). Every choice the ADRs left open is made here with a default and listed in §14 as an open question, so implementation is never blocked on it.
 
-Keywords: **must**, **must not**, **should** and **may** have their RFC 2119 meanings. "Loom" is a working name (ADR 0009); the command `loom`, the directory `.loom/` and the Python package `loom` are renamed together before M8.
+Keywords: **must**, **must not**, **should** and **may** have their RFC 2119 meanings. The project is named Arcflow (ADR 0013): the command `arcflow` (with the short alias `arcf`), the directory `.arcflow/`, the `ARCFLOW_*` environment variables and the Python package `arcflow`.
 
 **Tiers.** Every feature carries one of three tiers:
 
 - **Core**: required for the v1 release (milestones M0–M8 in the brief).
-- **Planned**: fully specified here so the format and state model leave room for it, and the validator recognizes it, but it is scheduled after the core milestones unless Stage 3 pulls it in. Until implemented, `loom validate` reports `E-NOT-IMPLEMENTED` for it.
+- **Planned**: fully specified here so the format and state model leave room for it, and the validator recognizes it, but it is scheduled after the core milestones unless Stage 3 pulls it in. Until implemented, `arcflow validate` reports `E-NOT-IMPLEMENTED` for it.
 - **Future**: named only, to reserve the word.
 
 ## Contents
@@ -55,9 +55,9 @@ Appendix A: example flows. Appendix B: event reference. Appendix C: validation e
 | **State** | Everything expressions can read during a run: inputs, node results, visit counts, variables and run metadata (§4.3, ADR 0003). |
 | **Event** | One line of `events.jsonl`. The event log is the source of truth for a run; state is derived from it (ADR 0012). |
 | **Checkpoint** | The durable point after each recorded transition. Because events are appended and flushed before the runner moves on, every event boundary is a checkpoint. |
-| **Harness** | A complete agent application (Claude Code, Codex CLI) that Loom drives headlessly. Loom is not a harness and never calls model APIs itself. |
-| **Adapter** | The module that drives one harness through Loom's adapter contract (§8, ADR 0011). |
-| **Workspace** | The directory a node's process runs in: the run's shared working directory, or a Loom-managed git worktree (§6.9, ADR 0004). |
+| **Harness** | A complete agent application (Claude Code, Codex CLI) that Arcflow drives headlessly. Arcflow is not a harness and never calls model APIs itself. |
+| **Adapter** | The module that drives one harness through Arcflow's adapter contract (§8, ADR 0011). |
+| **Workspace** | The directory a node's process runs in: the run's shared working directory, or a Arcflow-managed git worktree (§6.9, ADR 0004). |
 | **Artifact** | A file a node writes into its visit's artifact directory, for later nodes or the user (§6.10). |
 | **Runner** | The process that executes a run. At most one runner holds a run at a time (§7.4). |
 | **Template** | A named, reusable partial node definition inside a flow file that nodes `extends` (§3.6). |
@@ -73,7 +73,7 @@ Appendix A: example flows. Appendix B: event reference. Appendix C: validation e
 | `failed` | Reached `fail`, an unhandled node error, a limit, or an engine error. | yes |
 | `cancelled` | Cancelled by a user. | yes |
 
-`interrupted` is a **derived display status**, not a stored one: a run whose stored status is `running` but whose runner lock is stale (§7.4) is shown as `interrupted` by `loom status`, `loom list` and the TUI, and can be resumed.
+`interrupted` is a **derived display status**, not a stored one: a run whose stored status is `running` but whose runner lock is stale (§7.4) is shown as `interrupted` by `arcflow status`, `arcflow list` and the TUI, and can be resumed.
 
 ```
 pending → running ⇄ waiting
@@ -89,7 +89,7 @@ A `failed` or `cancelled` run can be resumed only with an explicit override (§7
 
 ### 2.1 Project root
 
-The **project root** is the nearest ancestor of the current directory containing a `.loom/` directory; failing that, the root of the enclosing git repository; failing that, the current directory. `loom init` creates `.loom/` with a starter `config.yaml` and a `.gitignore`.
+The **project root** is the nearest ancestor of the current directory containing a `.arcflow/` directory; failing that, the root of the enclosing git repository; failing that, the current directory. `arcflow init` creates `.arcflow/` with a starter `config.yaml` and a `.gitignore`.
 
 ```
 <project root>/
@@ -97,12 +97,12 @@ The **project root** is the nearest ancestor of the current directory containing
     implement-feature.yaml
     schemas/plan.json         # referenced by flows, relative to the flow file
     prompts/plan.md
-  .loom/
+  .arcflow/
     config.yaml               # project configuration (committed)
     harnesses/<name>.yaml     # command adapters (committed, §8.5)
     .gitignore                # ignores runs/ and worktrees/
     runs/<run-id>/            # one directory per run (§7)
-    worktrees/<run-id>/<name> # Loom-managed worktrees (§6.9)
+    worktrees/<run-id>/<name> # Arcflow-managed worktrees (§6.9)
 ```
 
 A flow file may live anywhere; `flows/` is only where discovery looks by default. All relative paths inside a flow file (`prompt_file`, `output_schema`, `subflow.flow`, …) resolve against **the flow file's directory**, never the current directory. Process working directories resolve against the **run workdir** (§6.9).
@@ -111,12 +111,12 @@ A flow file may live anywhere; `flows/` is only where discovery looks by default
 
 Configuration never changes what a flow means; it describes the environment the flow runs in (binaries, credentials pass-through, prices, notification hooks). Anything that changes behaviour lives in the flow file (brief principle 1).
 
-Precedence, lowest to highest: built-in defaults → user config (`$XDG_CONFIG_HOME/loom/config.yaml`, default `~/.config/loom/config.yaml`) → project config (`.loom/config.yaml`) → environment variables (`LOOM_*`) → command-line flags.
+Precedence, lowest to highest: built-in defaults → user config (`$XDG_CONFIG_HOME/arcflow/config.yaml`, default `~/.config/arcflow/config.yaml`) → project config (`.arcflow/config.yaml`) → environment variables (`ARCFLOW_*`) → command-line flags.
 
 ```yaml
-# .loom/config.yaml
-flow_paths: [flows]            # discovery roots for `loom list-flows` and the TUI
-runs_dir: .loom/runs           # relative to the project root
+# .arcflow/config.yaml
+flow_paths: [flows]            # discovery roots for `arcflow list-flows` and the TUI
+runs_dir: .arcflow/runs           # relative to the project root
 harnesses:
   claude:
     command: claude            # binary; may be an absolute path
@@ -127,9 +127,9 @@ env_passthrough: [AWS_PROFILE, NPM_TOKEN]   # extra variables allowed into nodes
 prices:                        # optional; used to estimate USD where a harness reports only tokens
   codex:
     gpt-5-codex: { input_per_mtok: 1.25, cached_input_per_mtok: 0.125, output_per_mtok: 10.0 }
-on_wait: 'notify-send "Loom" "$LOOM_MESSAGE"'   # default human-node hook (§5.4); values arrive as env vars
-retention: { keep_days: 30 }   # used by `loom gc`
-redact: ['sk-[A-Za-z0-9_-]{20,}']  # regexes masked in logs Loom writes (§12.4)
+on_wait: 'notify-send "Arcflow" "$ARCFLOW_MESSAGE"'   # default human-node hook (§5.4); values arrive as env vars
+retention: { keep_days: 30 }   # used by `arcflow gc`
+redact: ['sk-[A-Za-z0-9_-]{20,}']  # regexes masked in logs Arcflow writes (§12.4)
 ```
 
 The config file is validated against a published JSON Schema like flow files; unknown keys are errors.
@@ -144,7 +144,7 @@ The config file is validated against a published JSON Schema like flow files; un
 - **Strict:** unknown keys are errors, except keys starting with `x-`, which are preserved and ignored (for tools and comments that need structure).
 - Anchors, aliases and merge keys (`<<:`) are **rejected**. They make round-trip editing ambiguous; use `templates` instead (§3.6).
 - Duplicate keys are errors.
-- A **published JSON Schema** (`loom schema flow`) describes the file for editors (yaml-language-server) and authoring agents. The schema and this section must stay in sync; the schema is generated from the same dataclasses the parser uses.
+- A **published JSON Schema** (`arcflow schema flow`) describes the file for editors (yaml-language-server) and authoring agents. The schema and this section must stay in sync; the schema is generated from the same dataclasses the parser uses.
 - **Durations** are strings of one or more `<int><unit>` groups with units `s`, `m`, `h`, `d` (`90s`, `1h30m`, `3d`), or a bare integer meaning seconds. `none` is accepted where this spec says so.
 - **Identifiers** (node IDs, template names, input names, variable names) match `^[a-z][a-z0-9_]{0,63}$`. Node IDs must not be a reserved word: `end`, `fail`, `self`, `inputs`, `nodes`, `visits`, `vars`, `run`, `env`, `node`, `item`.
 
@@ -152,7 +152,7 @@ The config file is validated against a published JSON Schema like flow files; un
 
 | Key | Type | Required | Description |
 |---|---|---|---|
-| `loom` | integer | no (default `1`) | Format version. Loom refuses files with a higher major version than it supports. |
+| `arcflow` | integer | no (default `1`) | Format version. Arcflow refuses files with a higher major version than it supports. |
 | `name` | identifier-ish string (`^[a-z0-9][a-z0-9_-]*$`) | yes | Flow name, used in run IDs and listings. Need not match the file name. |
 | `description` | string | no | One or more sentences; shown in listings and given to authoring agents. |
 | `inputs` | map name → input spec | no | Run inputs (§3.3). |
@@ -162,7 +162,7 @@ The config file is validated against a published JSON Schema like flow files; un
 | `include` | list of paths | no | **Planned.** Template fragments shared between flows (§3.7). |
 | `start` | node ID | no | Entry node. Default: the first key under `nodes`. |
 | `nodes` | map ID → node | yes | The graph. Key order is preserved and meaningful only for the default `start` and for display. |
-| `outputs` | map name → template string | no | Values computed when the run reaches `end`, stored as the run's outputs and returned by `loom run --json` and to a parent `subflow` node. |
+| `outputs` | map name → template string | no | Values computed when the run reaches `end`, stored as the run's outputs and returned by `arcflow run --json` and to a parent `subflow` node. |
 | `on_wait` | string (shell command) | no | Hook run when any human node in this flow starts waiting (§5.4). Overrides config. |
 | `x-*` | any | no | Ignored extension keys. |
 
@@ -234,7 +234,7 @@ limits:
     tokens: 3_000_000   # input + output tokens across all agent visits
 ```
 
-A limit may be set to `none` to disable it; `loom validate` warns when it is (`W-UNBOUNDED`). Budget enforcement is defined in §6.8.
+A limit may be set to `none` to disable it; `arcflow validate` warns when it is (`W-UNBOUNDED`). Budget enforcement is defined in §6.8.
 
 ### 3.6 Templates and `extends`
 
@@ -306,7 +306,7 @@ next:                             # conditional: first matching case wins
 - A target is a node ID or one of the reserved targets **`end`** (the run succeeds) and **`fail`** (the run fails).
 - A case may add `reason:` (template string), recorded in the `route_taken` event; for `to: fail` it becomes the run's failure message.
 - Cases are evaluated in order; the first whose `when` is true is taken. A default case must be last and there may be only one.
-- If no case matches and there is no default, the run fails with `E-NO-ROUTE` at run time; `loom validate` warns (`W-NO-DEFAULT-ROUTE`) when a list has no default.
+- If no case matches and there is no default, the run fails with `E-NO-ROUTE` at run time; `arcflow validate` warns (`W-NO-DEFAULT-ROUTE`) when a list has no default.
 - `when` is an expression (§4). It must evaluate to a boolean; any other type is a run-time error (no truthiness).
 - Omitting `next` is equivalent to `next: end`.
 - Targets are static strings, never templates, so the graph is known without running anything.
@@ -317,7 +317,7 @@ next:                             # conditional: first matching case wins
 
 ### 4.1 Expression language
 
-Expressions are a **restricted subset of Python expression syntax** (ADR 0002), parsed with Python's `ast` module and evaluated by Loom's own whitelist evaluator (no `eval`, no builtins, no imports).
+Expressions are a **restricted subset of Python expression syntax** (ADR 0002), parsed with Python's `ast` module and evaluated by Arcflow's own whitelist evaluator (no `eval`, no builtins, no imports).
 
 Allowed:
 
@@ -388,12 +388,12 @@ Strings in templated fields (marked "T" in §5) may contain `${{ expression }}`.
 - **Interpolation rule.** Otherwise each `${{ }}` is replaced by its value rendered as text: strings as-is, `None` as the empty string, booleans as `true`/`false`, numbers as JSON, lists and objects as indented JSON (`json(x)`).
 - `$${{` produces a literal `${{`.
 - Templates are rendered **once, at the start of each visit** (and again for each retry attempt), and the rendered values are recorded (§7.2), so resume never re-renders a finished visit.
-- Brief-style `{{ x | filter }}` syntax is not supported; `loom validate` flags `{{` without `$` as `W-JINJA-LIKE` since it is almost always a mistake.
+- Brief-style `{{ x | filter }}` syntax is not supported; `arcflow validate` flags `{{` without `$` as `W-JINJA-LIKE` since it is almost always a mistake.
 - `prompt_file`, `instructions_file` and `message_file` contents are templates too.
 
 ### 4.5 Static checks on expressions
 
-`loom validate` parses every expression and template and checks each reference:
+`arcflow validate` parses every expression and template and checks each reference:
 
 - `inputs.x`: `x` is a declared input.
 - `nodes.x`: `x` is a node ID. `nodes.x.<field>`: the field exists for that node's type (§5). `nodes.x.output.<path>`: when `x` has an `output_schema`, the path exists in it (following `properties`, `items`, and `$ref` within the same file); when it has none, access to `output` is allowed but unchecked (`I-UNCHECKED-OUTPUT`).
@@ -441,7 +441,7 @@ plan:
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `harness` | string | `defaults.agent.harness`, else required | Adapter name: `claude`, `codex`, `fake`, or a custom adapter (§8). |
-| `model` | string T | harness default | Passed through; Loom does not interpret model names. |
+| `model` | string T | harness default | Passed through; Arcflow does not interpret model names. |
 | `effort` | `low` \| `medium` \| `high` \| `max` | harness default | Mapped by the adapter when supported, else `W-IGNORED-OPTION`. |
 | `prompt` / `prompt_file` | string T / path | exactly one required | The task. Sent on stdin (Claude, Codex) or as the adapter requires. |
 | `instructions` / `instructions_file` | string T / path | — | Extra system instructions (Claude `--append-system-prompt-file`; Codex: prepended to the prompt under a heading, since `codex exec` has no equivalent flag). |
@@ -467,7 +467,7 @@ plan:
 | `harness`, `harness_version`, `model` | string | As reported by the harness. |
 | `usage` | object | `input_tokens`, `cached_input_tokens`, `output_tokens`, `reasoning_tokens`, `total_tokens` (missing counters are 0). |
 | `cost_usd` | number or `None` | This visit's spend. |
-| `cost_estimated` | boolean | `true` when computed from Loom's price table or reported by the harness as a client-side estimate (always true in v1: see research §1.2). |
+| `cost_estimated` | boolean | `true` when computed from Arcflow's price table or reported by the harness as a client-side estimate (always true in v1: see research §1.2). |
 | `num_turns` | integer or `None` | |
 | `permission_denials` | list | `{tool, reason}` entries reported by the harness (ADR 0005). |
 | `schema_errors` | list | Remaining validation errors when outcome is `schema_invalid`. |
@@ -483,8 +483,8 @@ Flows that care whether the agent really did the work should require a `status` 
 #### 5.1.2 Structured output
 
 - The schema file is loaded and checked as a valid JSON Schema at validate time.
-- If the adapter declares native structured output, the schema is passed to the harness (Claude `--json-schema`, Codex `--output-schema`). Loom validates the result again with `fastjsonschema` in all cases.
-- Without native support, Loom appends an instruction to reply with only a JSON object matching the schema, extracts the last fenced or bare JSON object from the final text, and validates it.
+- If the adapter declares native structured output, the schema is passed to the harness (Claude `--json-schema`, Codex `--output-schema`). Arcflow validates the result again with `fastjsonschema` in all cases.
+- Without native support, Arcflow appends an instruction to reply with only a JSON object matching the schema, extracts the last fenced or bare JSON object from the final text, and validates it.
 - On failure, if `schema_retries` remain: the adapter resumes the same session (when it can) with a message listing the validation errors and asking for corrected JSON only; otherwise it re-runs the prompt with the errors appended. Each fix counts toward the visit's budget but not toward `retry.max_attempts`.
 - For `harness: codex`, `validate` warns (`W-CODEX-STRICT-SCHEMA`) when the schema lacks `additionalProperties: false` on objects or does not list every property in `required`, pending the M3 contract test (research §7.3).
 
@@ -492,7 +492,7 @@ Flows that care whether the agent really did the work should require a `status` 
 
 | `session` | Behaviour |
 |---|---|
-| `new` | A fresh session. Adapters that let the caller choose IDs (Claude) receive a new UUIDv4 from Loom. |
+| `new` | A fresh session. Adapters that let the caller choose IDs (Claude) receive a new UUIDv4 from Arcflow. |
 | `continue` | On the node's second and later visits, resume the session of its own previous visit, so a fix loop keeps its context. First visit behaves as `new`. |
 | `{resume: <id>}` | Resume the latest session of node `<id>`, which must use the same harness (`E-SESSION-HARNESS`). The harness's view of the session changes. |
 | `{fork: <id>}` | Start a copy of node `<id>`'s latest session (Claude `--resume … --fork-session --session-id <new>`; Codex `exec fork`). Falls back to `resume` with a warning when the adapter lacks `fork`. |
@@ -526,7 +526,7 @@ test:
 
 Result fields: `exit_code` (integer, or `None` if killed), `signal` (name or `None`), `stdout`, `stderr` (tails), `stdout_file`, `stderr_file` (absolute paths), `stdout_truncated`, `stderr_truncated`, `output`, `workspace`, `artifacts_dir`.
 
-Behaviour: the command runs in its own process group with the node environment (§12.3) plus `LOOM_RUN_ID`, `LOOM_RUN_DIR`, `LOOM_NODE_ID`, `LOOM_VISIT`, `LOOM_ATTEMPT`, `LOOM_ARTIFACTS_DIR`. An exit code outside `ok_codes` is outcome `failed` with error kind `exit_code`. Timeouts and cancellation stop the whole process group (§6.7).
+Behaviour: the command runs in its own process group with the node environment (§12.3) plus `ARCFLOW_RUN_ID`, `ARCFLOW_RUN_DIR`, `ARCFLOW_NODE_ID`, `ARCFLOW_VISIT`, `ARCFLOW_ATTEMPT`, `ARCFLOW_ARTIFACTS_DIR`. An exit code outside `ok_codes` is outcome `failed` with error kind `exit_code`. Timeouts and cancellation stop the whole process group (§6.7).
 
 ### 5.3 `condition` (Core)
 
@@ -573,7 +573,7 @@ approve:
 
 Result fields: `choice`, `text`, `acknowledged`, `responder` (from `--as`, else `$USER`), `responded_at`, `via` (`cli`, `tui`, `timeout`), `timed_out`.
 
-**Waiting.** On entering a human node the runner records `human_waiting`, runs the `on_wait` hook (its failure is logged, never fatal; it runs detached with a 30 s timeout and receives `LOOM_RUN_ID`, `LOOM_NODE_ID`, `LOOM_MESSAGE`, `LOOM_RESPOND_CMD`), sets the run to `waiting`, and then either keeps the process alive or exits (§6.11). An answer arrives through `loom respond` or the TUI (§7.4). Validation of an answer (choice in list, text present) happens at `respond` time; an invalid answer is rejected with exit code 2 and changes nothing.
+**Waiting.** On entering a human node the runner records `human_waiting`, runs the `on_wait` hook (its failure is logged, never fatal; it runs detached with a 30 s timeout and receives `ARCFLOW_RUN_ID`, `ARCFLOW_NODE_ID`, `ARCFLOW_MESSAGE`, `ARCFLOW_RESPOND_CMD`), sets the run to `waiting`, and then either keeps the process alive or exits (§6.11). An answer arrives through `arcflow respond` or the TUI (§7.4). Validation of an answer (choice in list, text present) happens at `respond` time; an invalid answer is rejected with exit code 2 and changes nothing.
 
 ### 5.5 `sleep` (Core)
 
@@ -584,7 +584,7 @@ wait_for_ci:
   # until: ${{ inputs.start_at }}   # ISO 8601 timestamp; past times return at once
 ```
 
-Exactly one of `duration` (duration, T) or `until` (timestamp, T). The runner records `wake_at` in the `visit_started` event, so a resumed run sleeps only for the remainder. A sleep longer than the remaining `limits.max_duration` fails validation when static and fails the visit at run time otherwise. Result fields: `woke_at`. While sleeping the run stays `running`; `loom run --detach` is the way to leave a long sleep unattended.
+Exactly one of `duration` (duration, T) or `until` (timestamp, T). The runner records `wake_at` in the `visit_started` event, so a resumed run sleeps only for the remainder. A sleep longer than the remaining `limits.max_duration` fails validation when static and fails the visit at run time otherwise. Result fields: `woke_at`. While sleeping the run stays `running`; `arcflow run --detach` is the way to leave a long sleep unattended.
 
 ### 5.6 `set` (Planned)
 
@@ -610,9 +610,9 @@ coverage_ok:
   output_schema: schemas/coverage.json
 ```
 
-- Runs in a **child process** (`<interpreter> -m loom.pycall`), not in the runner, so timeouts and cancellation work and a crash cannot corrupt the runner. The node's `interpreter:` key selects the Python executable (default: the one running Loom); the project root is on `sys.path`.
+- Runs in a **child process** (`<interpreter> -m arcflow.pycall`), not in the runner, so timeouts and cancellation work and a crash cannot corrupt the runner. The node's `interpreter:` key selects the Python executable (default: the one running Arcflow); the project root is on `sys.path`.
 - The function receives `args` as keyword arguments (JSON values) and a read-only `ctx` keyword with `run_id`, `node_id`, `visit`, `artifacts_dir`, `workdir`. It returns a JSON-serializable value, which becomes `output`. An exception is outcome `failed` with kind `exception` and the traceback in the visit directory.
-- Loom never reads or edits the function body; the TUI shows `call` as a reference that opens the module in `$EDITOR` (research §8.2).
+- Arcflow never reads or edits the function body; the TUI shows `call` as a reference that opens the module in `$EDITOR` (research §8.2).
 
 ### 5.8 `subflow` (Planned)
 
@@ -624,7 +624,7 @@ triage_one:
     issue: ${{ nodes.fetch.output[0] }}
 ```
 
-Starts a **child run** of the referenced flow with its own run directory, linked by `parent` in `run.json` and by `child_run` in the parent's events. The parent's remaining budget and `max_duration` are passed down as the child's limits (the smaller of the two wins). Result fields: `run_id`, `status`, `outputs` (the child flow's `outputs`), and `output` (alias of `outputs`). A failed child is outcome `failed`. Cancelling the parent cancels the child. A human node in the child makes the parent `waiting` as well, and `loom respond` accepts the parent's run ID (it forwards to the child). Recursion depth is limited to 8.
+Starts a **child run** of the referenced flow with its own run directory, linked by `parent` in `run.json` and by `child_run` in the parent's events. The parent's remaining budget and `max_duration` are passed down as the child's limits (the smaller of the two wins). Result fields: `run_id`, `status`, `outputs` (the child flow's `outputs`), and `output` (alias of `outputs`). A failed child is outcome `failed`. Cancelling the parent cancels the child. A human node in the child makes the parent `waiting` as well, and `arcflow respond` accepts the parent's run ID (it forwards to the child). Recursion depth is limited to 8.
 
 ### 5.9 `map` (Planned)
 
@@ -650,7 +650,7 @@ take_over:
   message: Tests keep failing. Over to you; exit the session to continue the flow.
 ```
 
-When the runner is in the foreground on a TTY, Loom prints the message and runs the adapter's interactive command (Claude `claude --resume <id>`, Codex `codex resume <id>`) attached to the terminal, then continues when it exits. Otherwise the run becomes `waiting` like a human node, and `loom handoff <run>` opens the session later. Result fields: `session_id`, `exit_code`. Requires adapter capability `interactive`.
+When the runner is in the foreground on a TTY, Arcflow prints the message and runs the adapter's interactive command (Claude `claude --resume <id>`, Codex `codex resume <id>`) attached to the terminal, then continues when it exits. Otherwise the run becomes `waiting` like a human node, and `arcflow handoff <run>` opens the session later. Result fields: `session_id`, `exit_code`. Requires adapter capability `interactive`.
 
 ### 5.11 `notify` (Planned)
 
@@ -658,11 +658,11 @@ When the runner is in the foreground on a TTY, Loom prints the message and runs 
 tell_me:
   type: notify
   message: "Review finished: ${{ nodes.review.output.verdict }}"
-  command: 'notify-send "Loom" "$LOOM_MESSAGE"'        # or:
+  command: 'notify-send "Arcflow" "$ARCFLOW_MESSAGE"'        # or:
   # webhook: { url: "${{ env.SLACK_WEBHOOK }}", body: { text: "${{ node.message }}" } }
 ```
 
-Keys: `message` (T, required; passed to `command` as `LOOM_MESSAGE` and available as `node.message`), exactly one of `command` (run like `on_wait`, 30 s timeout) or `webhook` (`{url, method: POST, headers, body}`, JSON body, 10 s timeout), and `required` (default `false`). Fire-and-forget: a failure is logged and the node still succeeds unless `required: true`.
+Keys: `message` (T, required; passed to `command` as `ARCFLOW_MESSAGE` and available as `node.message`), exactly one of `command` (run like `on_wait`, 30 s timeout) or `webhook` (`{url, method: POST, headers, body}`, JSON body, 10 s timeout), and `required` (default `false`). Fire-and-forget: a failure is logged and the node still succeeds unless `required: true`.
 
 ---
 
@@ -675,7 +675,7 @@ Keys: `message` (T, required; passed to `command` as `LOOM_MESSAGE` and availabl
 3. **Step loop** (§6.2) until a terminal target, a wait, a cancel, or a limit.
 4. **Finish.** Evaluate `outputs` on `end` (an error there fails the run), append `run_succeeded`/`run_failed`/`run_cancelled`, release the lock.
 
-A run always executes the **snapshot**, never the live flow file, so editing a flow in the TUI or by an agent never changes a run in progress. `loom resume --reload` is the explicit way to continue with an edited flow (§7.6).
+A run always executes the **snapshot**, never the live flow file, so editing a flow in the TUI or by an agent never changes a run in progress. `arcflow resume --reload` is the explicit way to continue with an edited flow (§7.6).
 
 ### 6.2 The step loop
 
@@ -692,13 +692,13 @@ Every append in steps 2, 4 and 5 is flushed and `fsync`ed before the runner cont
 
 ### 6.3 Data passing
 
-Nodes communicate only through state (§4.3) and the filesystem (the workspace and artifact directories). There are no implicit inputs: an agent sees another node's output only if its prompt references it. Rendered templates are recorded, so the exact text each agent received is always inspectable (`loom logs --node plan --prompt`).
+Nodes communicate only through state (§4.3) and the filesystem (the workspace and artifact directories). There are no implicit inputs: an agent sees another node's output only if its prompt references it. Rendered templates are recorded, so the exact text each agent received is always inspectable (`arcflow logs --node plan --prompt`).
 
 **Size limits in state.** String result fields are capped: `stdout`/`stderr` by `max_output` (tail kept), agent `text` at 256 KiB (head kept, full text in the visit directory), and `output` objects at 1 MiB serialized (larger output is outcome `failed`, kind `output_too_large`). This keeps `state.json` and prompts bounded.
 
 ### 6.4 Loops and visit limits
 
-Cycles are ordinary edges back to an earlier node. Each node allows `max_visits` visits per run (default 10); the run allows `limits.max_steps` visits in total (default 200). Exceeding either fails the run, naming the node, so an unguarded loop always terminates. Flows should guard loops with `visits.<id>` in a `when:` so they can route somewhere useful (an escalation node) before the hard limit; `loom validate` warns (`W-UNGUARDED-CYCLE`) for a cycle in which no `when:` references `visits` of a node in the cycle.
+Cycles are ordinary edges back to an earlier node. Each node allows `max_visits` visits per run (default 10); the run allows `limits.max_steps` visits in total (default 200). Exceeding either fails the run, naming the node, so an unguarded loop always terminates. Flows should guard loops with `visits.<id>` in a `when:` so they can route somewhere useful (an escalation node) before the hard limit; `arcflow validate` warns (`W-UNGUARDED-CYCLE`) for a cycle in which no `when:` references `visits` of a node in the cycle.
 
 ### 6.5 Errors and `on_error`
 
@@ -713,7 +713,7 @@ A visit whose final attempt is not `succeeded` is an **error**. `on_error` decid
 
 `cancelled` is never routed: cancellation stops the run. `interrupted` exists only for visits cut off by a runner crash and is handled by resume (§7.5), not by `on_error`.
 
-`loom validate` warns (`W-ERROR-NEVER-ROUTED`) when a node's `next` references its own `exit_code` or `outcome` but `on_error` is `fail`, since the failing branch could never be taken. This is the typical mistake with a test step in a fix loop; Appendix A shows the right pattern (`on_error: continue`).
+`arcflow validate` warns (`W-ERROR-NEVER-ROUTED`) when a node's `next` references its own `exit_code` or `outcome` but `on_error` is `fail`, since the failing branch could never be taken. This is the typical mistake with a test step in a fix loop; Appendix A shows the right pattern (`on_error: continue`).
 
 Error kinds (`nodes.<id>.error.kind`): `exit_code`, `harness_error`, `no_result`, `timeout`, `budget`, `schema`, `output_parse`, `output_too_large`, `expression_error`, `exception`, `spawn_failed`, `workspace_error`, `limit`.
 
@@ -735,8 +735,8 @@ retry:
 
 - `timeout` limits one attempt's wall-clock time. The runner enforces it; harness timeouts are never relied on (ADR 0011).
 - **Stopping a process** (timeout, cancel, runner shutdown): send `SIGINT` to the process group; wait up to 10 s (configurable per adapter as `grace`) for the adapter to report a final result; then `SIGTERM`; after 5 more seconds `SIGKILL`. The visit records which step ended it (`stopped_by`). A result that arrives during the grace period is kept (partial usage and cost still count toward the budget).
-- **Cancel** (`loom cancel`, TUI) stops the current attempt as above, records outcome `cancelled`, skips routing and ends the run `cancelled`. A waiting run is cancelled immediately.
-- **Runner signals.** `SIGINT`/`SIGTERM` to a foreground `loom run` stops the current attempt and leaves the run **resumable** (`runner_detached` event, status stays `running`, displayed as `interrupted`), rather than cancelling it. A second `SIGINT` within 3 s skips the grace period. Use `loom cancel` to end a run for good.
+- **Cancel** (`arcflow cancel`, TUI) stops the current attempt as above, records outcome `cancelled`, skips routing and ends the run `cancelled`. A waiting run is cancelled immediately.
+- **Runner signals.** `SIGINT`/`SIGTERM` to a foreground `arcflow run` stops the current attempt and leaves the run **resumable** (`runner_detached` event, status stays `running`, displayed as `interrupted`), rather than cancelling it. A second `SIGINT` within 3 s skips the grace period. Use `arcflow cancel` to end a run for good.
 - On Windows (unsupported in v1, §15 Q10) process groups are replaced by job objects.
 
 ### 6.8 Budgets and cost
@@ -745,34 +745,34 @@ Budgets exist at two levels: the run (`limits.budget`) and the agent visit (`bud
 
 - **Accounting.** After every agent attempt, its `usage` and `cost_usd` are added to the run's totals (`budget_updated` event). USD comes from the harness where it reports it (Claude `total_cost_usd`, delta on resume), otherwise from `prices` in config (§2.2), otherwise it is unknown.
 - **Before a visit starts:** if either run total has reached its limit, the run fails with `budget_exceeded` (not routed; the run budget is a hard stop).
-- **During a visit:** the adapter receives the remaining allowance, `min(node budget, run budget − spent)`, and passes it to the harness when it has a budget cap (Claude `--max-budget-usd`) as a backstop. Loom also watches streamed usage and stops the attempt (§6.7) when the node or run budget is crossed. Overshoot of one model response is expected (research §1.4) and reported.
+- **During a visit:** the adapter receives the remaining allowance, `min(node budget, run budget − spent)`, and passes it to the harness when it has a budget cap (Claude `--max-budget-usd`) as a backstop. Arcflow also watches streamed usage and stops the attempt (§6.7) when the node or run budget is crossed. Overshoot of one model response is expected (research §1.4) and reported.
 - **Unknown USD.** When a node has a `usd` budget but its adapter reports no cost and no price is configured, `validate` warns (`W-USD-UNENFORCEABLE`) and only the `tokens` budget is enforced for that node.
 - **Estimates.** All USD figures are labelled estimates in the CLI and TUI (`~$1.24`). Subscription users can budget in tokens only by setting `usd: none`.
 
 ### 6.9 Workspaces
 
-The **run workdir** is the directory given by `loom run --workdir`, default the project root. Nodes with `workspace: shared` (the default) run there, and see each other's changes (ADR 0004).
+The **run workdir** is the directory given by `arcflow run --workdir`, default the project root. Nodes with `workspace: shared` (the default) run there, and see each other's changes (ADR 0004).
 
-`workspace: worktree` gives a node a **Loom-managed git worktree** (ADR 0004):
+`workspace: worktree` gives a node a **Arcflow-managed git worktree** (ADR 0004):
 
 ```yaml
 workspace: worktree                 # a worktree private to this node, reused by all its visits
 workspace:
   worktree: feature                 # a named worktree, shared by every node that names it in this run
   base: ${{ inputs.base_branch }}   # commit-ish to branch from (default: HEAD of the run workdir at run start)
-  branch: loom/${{ run.id }}/feature  # default: loom/<run-id>/<name>
+  branch: arcflow/${{ run.id }}/feature  # default: arcflow/<run-id>/<name>
   keep: true                        # default true; false removes it when the run succeeds
 ```
 
-- Created on first use with `git worktree add -b <branch> .loom/worktrees/<run-id>/<name> <base>`. `<name>` defaults to the node ID. Base commit and branch are recorded (`workspace_created`) so resume reuses the same worktree.
+- Created on first use with `git worktree add -b <branch> .arcflow/worktrees/<run-id>/<name> <base>`. `<name>` defaults to the node ID. Base commit and branch are recorded (`workspace_created`) so resume reuses the same worktree.
 - The run workdir must be inside a git repository, otherwise `E-WORKSPACE-NO-GIT` at validate/run start.
-- Loom never merges, pushes or deletes branches by itself; flows do that with shell nodes (Appendix A, example 2). `loom gc` removes worktrees of finished runs older than `retention.keep_days` whose `keep` is false or whose branch is fully merged.
+- Arcflow never merges, pushes or deletes branches by itself; flows do that with shell nodes (Appendix A, example 2). `arcflow gc` removes worktrees of finished runs older than `retention.keep_days` whose `keep` is false or whose branch is fully merged.
 - Harness-native worktree flags (`claude -w`, `codex --worktree`) are not used.
 - Result fields `workspace.path` and `workspace.branch` let later nodes (including `shared` ones) refer to a worktree.
 
 ### 6.10 Artifacts
 
-Each visit has `nodes/<id>/<visit>/artifacts/` in the run directory, exposed as `node.artifacts_dir` in templates, `LOOM_ARTIFACTS_DIR` in the environment, and `nodes.<id>.artifacts_dir` to later nodes. Agents are told the path only if the prompt mentions it. `loom artifacts <run-id> [--node N]` lists them; the TUI shows them in the node inspector. Artifacts are never deleted before the run directory itself.
+Each visit has `nodes/<id>/<visit>/artifacts/` in the run directory, exposed as `node.artifacts_dir` in templates, `ARCFLOW_ARTIFACTS_DIR` in the environment, and `nodes.<id>.artifacts_dir` to later nodes. Agents are told the path only if the prompt mentions it. `arcflow artifacts <run-id> [--node N]` lists them; the TUI shows them in the node inspector. Artifacts are never deleted before the run directory itself.
 
 ### 6.11 Waiting for humans and the runner process
 
@@ -780,13 +780,13 @@ When a run reaches a human node (or a `handoff` without a TTY), what the runner 
 
 | `--on-wait` | Behaviour | Default when |
 |---|---|---|
-| `prompt` | Ask on the terminal inline (the same answer `loom respond` would record), while also accepting answers from other clients. | foreground run with a TTY on stdin |
+| `prompt` | Ask on the terminal inline (the same answer `arcflow respond` would record), while also accepting answers from other clients. | foreground run with a TTY on stdin |
 | `wait` | Keep the process alive, polling the run's inbox (§7.4) once per second, until answered. | — |
 | `exit` | Release the lock and exit with code **4** (`waiting`). | `--detach`, or no TTY |
 
-Whoever answers later (`loom respond`, the TUI) records the answer, and if no runner holds the lock, **starts a detached runner** to continue the run (`--no-continue` to only record). This is how a CI job or cron entry can start a flow, exit at an approval step, and have the flow finish after a person responds hours later, with no daemon (ADR 0008).
+Whoever answers later (`arcflow respond`, the TUI) records the answer, and if no runner holds the lock, **starts a detached runner** to continue the run (`--no-continue` to only record). This is how a CI job or cron entry can start a flow, exit at an approval step, and have the flow finish after a person responds hours later, with no daemon (ADR 0008).
 
-A human node's `timeout` is enforced by whichever runner holds the run; if none does, it is enforced when the next `loom status`, `list`, `respond`, `resume` or TUI refresh touches the run (lazy timeout). A scheduled `loom resume --due` (cron recipe in the docs) makes timeouts fire without a person touching the run.
+A human node's `timeout` is enforced by whichever runner holds the run; if none does, it is enforced when the next `arcflow status`, `list`, `respond`, `resume` or TUI refresh touches the run (lazy timeout). A scheduled `arcflow resume --due` (cron recipe in the docs) makes timeouts fire without a person touching the run.
 
 ---
 
@@ -799,8 +799,8 @@ A human node's `timeout` is enforced by whichever runner holds the run; if none 
 ### 7.2 Run directory
 
 ```
-.loom/runs/<run-id>/
-  run.json              # immutable: id, flow name, flow path, flow SHA-256, loom version,
+.arcflow/runs/<run-id>/
+  run.json              # immutable: id, flow name, flow path, flow SHA-256, arcflow version,
                         #   inputs, workdir, created_at, parent run (subflow), host, user
   snapshot/             # the flow file and every file it references, as run
   events.jsonl          # append-only source of truth (ADR 0012)
@@ -830,7 +830,7 @@ Each line is a JSON object with at least:
 
 - `seq` increases by one per event; a gap or duplicate is corruption.
 - `branch` is always `"main"` in v1; it is the key that parallel branches will use (ADR 0007).
-- A final line that is not valid JSON (torn write after a crash) is ignored and reported as a warning; any other invalid line is corruption and blocks resume until repaired (`loom doctor <run>`).
+- A final line that is not valid JSON (torn write after a crash) is ignored and reported as a warning; any other invalid line is corruption and blocks resume until repaired (`arcflow doctor <run>`).
 - Event types are listed in Appendix B. The set is versioned by `v`; readers must ignore unknown types, so new ones can be added without a version bump.
 
 `state.json` contains `{status, current, nodes, visits, vars, totals, pending_human, last_seq}` and is valid iff its `last_seq` equals the last event's `seq`; otherwise readers rebuild it from events.
@@ -839,13 +839,13 @@ Each line is a JSON object with at least:
 
 - **Single writer.** Only the process holding the run lock appends to `events.jsonl`.
 - **Lock.** `lock` is created with `O_CREAT|O_EXCL` and holds `{pid, host, started_at, heartbeat_at}`; the holder refreshes `heartbeat_at` every 5 s. A lock is **stale** when its host is this host and the PID is gone, or when `heartbeat_at` is older than 30 s. Taking over a stale lock is recorded (`runner_takeover`).
-- **Inbox.** Other processes (`loom respond`, `loom cancel`, the TUI) never append events while a runner is live. They write a request file into `inbox/` (atomic rename, named `<ts>-<random>.json`); the runner consumes it within one second, appends the resulting event, and deletes the file. If no live runner exists, the requesting process takes the lock itself, applies the request, and (for `respond`) starts a detached runner unless told not to.
+- **Inbox.** Other processes (`arcflow respond`, `arcflow cancel`, the TUI) never append events while a runner is live. They write a request file into `inbox/` (atomic rename, named `<ts>-<random>.json`); the runner consumes it within one second, appends the resulting event, and deletes the file. If no live runner exists, the requesting process takes the lock itself, applies the request, and (for `respond`) starts a detached runner unless told not to.
 - **Readers** (status, logs, TUI) need no lock: they read `state.json` and tail `events.jsonl`.
-- Run directories on network filesystems are unsupported (lock semantics); `loom doctor` warns.
+- Run directories on network filesystems are unsupported (lock semantics); `arcflow doctor` warns.
 
 ### 7.5 Resume
 
-`loom resume <run>` takes the lock, rebuilds state from events, and continues:
+`arcflow resume <run>` takes the lock, rebuilds state from events, and continues:
 
 - **Finished visits are never rerun** (ADR 0012). Their recorded results and routing decisions are reused as is.
 - **A visit that started but did not finish** is `interrupted`. What happens depends on its node's `on_resume`:
@@ -874,7 +874,7 @@ Each line is a JSON object with at least:
 
 ### 7.7 Retention
 
-Nothing is deleted automatically. `loom gc [--older-than 30d] [--status succeeded,cancelled] [--dry-run]` deletes finished run directories and their worktrees (§6.9 rules). Runs with status `waiting` or a live lock are never collected.
+Nothing is deleted automatically. `arcflow gc [--older-than 30d] [--status succeeded,cancelled] [--dry-run]` deletes finished run directories and their worktrees (§6.9 rules). Runs with status `waiting` or a live lock are never collected.
 
 ---
 
@@ -895,8 +895,8 @@ class Adapter(Protocol):
     def interactive_command(self, session_id: str, cwd: str) -> list[str] | None: ...
 ```
 
-- **`run`** starts the harness, emits normalized events while it runs, and returns the result. The brief's `start`/`stream`/`result` are this one coroutine; **cancellation** is `asyncio` task cancellation, on which the adapter must perform the stop sequence of §6.7 and then return (not raise) an `AgentResult` with outcome `cancelled` or `timed_out` as the engine instructs through `req.stop_reason`. Adapters built on `loom.adapters.ProcessAdapter` get the process-group handling for free.
-- **`emit`** must be called with `SessionStarted` **as soon as** the session ID is known (Claude: before spawning, since Loom chose it; Codex: on `thread.started`). The engine writes it to the event log and `fsync`s before anything else, so a crash after that point can resume the session.
+- **`run`** starts the harness, emits normalized events while it runs, and returns the result. The brief's `start`/`stream`/`result` are this one coroutine; **cancellation** is `asyncio` task cancellation, on which the adapter must perform the stop sequence of §6.7 and then return (not raise) an `AgentResult` with outcome `cancelled` or `timed_out` as the engine instructs through `req.stop_reason`. Adapters built on `arcflow.adapters.ProcessAdapter` get the process-group handling for free.
+- **`emit`** must be called with `SessionStarted` **as soon as** the session ID is known (Claude: before spawning, since Arcflow chose it; Codex: on `thread.started`). The engine writes it to the event log and `fsync`s before anything else, so a crash after that point can resume the session.
 
 ```python
 @dataclass
@@ -912,7 +912,7 @@ class Capabilities:
     turn_cap: bool
     permission_profiles: frozenset[str]   # subset of {"read-only", "edit", "full"}
     tool_rules: bool              # honours allow_tools/deny_tools
-    permission_hook: bool         # can route permission prompts to Loom (Future)
+    permission_hook: bool         # can route permission prompts to Arcflow (Future)
     streaming: bool               # emits progress during the run
 
 @dataclass
@@ -968,7 +968,7 @@ class AgentResult:
 | `fork` | Falls back to `resume` with a warning. |
 | `cost_usd` | Uses `prices` if configured, else token budgets only (§6.8). |
 | `tokens` | Only wall-clock limits apply; `validate` warns for any node budget. |
-| `budget_cap` / `turn_cap` | Loom-side enforcement only (always present anyway). |
+| `budget_cap` / `turn_cap` | Arcflow-side enforcement only (always present anyway). |
 | a permission profile | `E-PERMISSION-UNSUPPORTED` at validate time. |
 | `interactive` | `handoff` nodes naming it fail validation. |
 
@@ -989,7 +989,7 @@ claude -p [--bare] --session-id <uuid> \
   [--resume <id> [--fork-session]]
 ```
 
-Capabilities: all true except `permission_hook` (Future). Maps result `subtype`/`terminal_reason` to outcomes (`error_max_budget_usd` → `budget_exceeded`, `error_during_execution` after Loom's SIGINT → `cancelled`/`timed_out` per `stop_reason`, other errors → `failed`). Requires `ANTHROPIC_API_KEY` for `bare: true`; otherwise uses whatever auth the Claude Code install has.
+Capabilities: all true except `permission_hook` (Future). Maps result `subtype`/`terminal_reason` to outcomes (`error_max_budget_usd` → `budget_exceeded`, `error_during_execution` after Arcflow's SIGINT → `cancelled`/`timed_out` per `stop_reason`, other errors → `failed`). Requires `ANTHROPIC_API_KEY` for `bare: true`; otherwise uses whatever auth the Claude Code install has.
 
 **`codex`** (tier 1). Invocation (research §1.3):
 
@@ -1042,7 +1042,7 @@ The exact flag sets are fixed in M3 by contract tests against the pinned version
 
 ### 8.5 Tier 2: command adapters
 
-A YAML file `.loom/harnesses/<name>.yaml` defines an adapter for any CLI with JSON-lines output, without code (research §8.1):
+A YAML file `.arcflow/harnesses/<name>.yaml` defines an adapter for any CLI with JSON-lines output, without code (research §8.1):
 
 ```yaml
 name: gemini
@@ -1070,11 +1070,11 @@ tested_versions: ">=0.9"
 
 ### 8.6 Tier 3: plugin adapters
 
-- **Python entry points.** A package declares `[project.entry-points."loom.adapters"] myharness = "mypkg.adapter:MyAdapter"`. Loom loads entry points lazily, only when a flow names that harness (keeps CLI start fast). Plugins are trusted code (§12.6).
-- **Loom Adapter Protocol (LAP)** (Planned). An executable in any language, declared in `.loom/harnesses/<name>.yaml` with `protocol: lap` and `command: [...]`. JSON-lines over stdio:
-  - Loom → adapter: `{"type":"hello","lap":1}`, `{"type":"run","request":{AgentRequest as JSON}}`, `{"type":"cancel","reason":"timeout"}`.
-  - Adapter → Loom: `{"type":"hello","lap":1,"capabilities":{…},"version":"…"}`, `{"type":"event","event":{AdapterEvent}}`, `{"type":"result","result":{AgentResult}}`.
-  - Exactly one `run` per process. Stderr is logged. Loom still owns the process group and the stop sequence.
+- **Python entry points.** A package declares `[project.entry-points."arcflow.adapters"] myharness = "mypkg.adapter:MyAdapter"`. Arcflow loads entry points lazily, only when a flow names that harness (keeps CLI start fast). Plugins are trusted code (§12.6).
+- **Arcflow Adapter Protocol (AAP)** (Planned). An executable in any language, declared in `.arcflow/harnesses/<name>.yaml` with `protocol: aap` and `command: [...]`. JSON-lines over stdio:
+  - Arcflow → adapter: `{"type":"hello","aap":1}`, `{"type":"run","request":{AgentRequest as JSON}}`, `{"type":"cancel","reason":"timeout"}`.
+  - Adapter → Arcflow: `{"type":"hello","aap":1,"capabilities":{…},"version":"…"}`, `{"type":"event","event":{AdapterEvent}}`, `{"type":"result","result":{AgentResult}}`.
+  - Exactly one `run` per process. Stderr is logged. Arcflow still owns the process group and the stop sequence.
 
 ### 8.7 Tier 4: ACP (Planned)
 
@@ -1082,9 +1082,9 @@ A generic adapter for agents speaking the Agent Client Protocol (`session/new`, 
 
 ### 8.8 Conformance kit
 
-`loom adapter test <name> [--live]` runs the published conformance suite against an adapter:
+`arcflow adapter test <name> [--live]` runs the published conformance suite against an adapter:
 
-- **Offline** (default): feeds recorded fixture streams (success, structured output, schema failure, budget stop, SIGINT result, SIGTERM without result, auth failure, missing result) through the adapter's parser, or, for command/LAP adapters, through a stub executable that replays them, and checks the normalized results.
+- **Offline** (default): feeds recorded fixture streams (success, structured output, schema failure, budget stop, SIGINT result, SIGTERM without result, auth failure, missing result) through the adapter's parser, or, for command/AAP adapters, through a stub executable that replays them, and checks the normalized results.
 - **Live** (`--live`, opt-in, costs money): runs a small prompt set with a spend cap and checks session IDs, resume, schema output, cancel within the grace period, and env isolation.
 
 Built-in adapters ship fixtures per tested harness version (`fixtures/<harness>-<version>/`). A version bump in `tested_versions` requires re-recording them.
@@ -1098,9 +1098,10 @@ The CLI is the engine's scripting surface; the TUI calls the same library functi
 ### 9.1 Conventions
 
 - **`--json`** on every command prints exactly one JSON document to stdout: `{"ok": true, "data": …}` or `{"ok": false, "error": {"code": "E-…", "message": "…", "details": …}}`. Human-readable progress goes to stderr, so `--json` output is always parseable. `--events` (on `run`, `resume`, `logs --follow`) instead streams event JSON lines to stdout.
+- The command is `arcflow`; the package also installs `arcf` as a short alias for the same entry point (ADR 0013).
 - Global flags: `--project <dir>`, `--config <file>`, `--quiet`, `--verbose`, `--no-color` (also `NO_COLOR`), `--as <name>` (responder identity).
 - Run arguments accept the forms of §7.1 (`@last`, prefixes).
-- The JSON shapes of every command are part of the public interface, published as JSON Schemas (`loom schema cli`), and versioned with the format.
+- The JSON shapes of every command are part of the public interface, published as JSON Schemas (`arcflow schema cli`), and versioned with the format.
 
 ### 9.2 Exit codes
 
@@ -1123,31 +1124,31 @@ Stable and documented (ADR 0008):
 
 | Command | Tier | Description |
 |---|---|---|
-| `loom init` | Core | Create `.loom/` with config, `.gitignore`, and an example flow. |
-| `loom validate <flow>… [--strict]` | Core | Check files (§9.4). `--strict` turns warnings into errors. |
-| `loom graph <flow> [--format ascii\|mermaid\|dot\|json]` | Core | Render the graph; `json` gives nodes and edges with conditions, for tools. |
-| `loom run <flow> [--input k=v]… [--inputs-file f] [--workdir d] [--detach] [--on-wait prompt\|wait\|exit] [--events]` | Core | Create and start a run. Foreground by default. `--input k=@file` reads a value from a file. Prints the run ID first on stderr (and in `--json`). |
-| `loom resume <run> [options of §7.6]` | Core | Continue a run. |
-| `loom wait <run> [--timeout d]` | Core | Block until the run is terminal or waiting; exit code by status. For scripts that used `--detach`. |
-| `loom status [<run>]` | Core | One run in detail (current node, visits, pending human prompt, totals); without an argument, active runs. |
-| `loom list [--flow X] [--status S] [--since d] [--limit n]` | Core | Runs, newest first. |
-| `loom logs <run> [--node N] [--visit n] [--follow] [--raw] [--prompt]` | Core | Human-readable event log; `--raw` prints the harness stream; `--prompt` the rendered prompt. |
-| `loom respond <run> [<node>] (--choice X \| --text T \| --ack) [--no-continue]` | Core | Answer a pending human node (node optional when only one is pending). |
-| `loom cancel <run> [--reason T]` | Core | Cancel. |
-| `loom flows` | Core | Flow files found under `flow_paths`, with name, description and validity. |
-| `loom schema flow\|config\|cli\|harness` | Core | Print JSON Schemas. |
-| `loom adapters [--probe]` | Core | Installed adapters, capabilities, and with `--probe` binary versions and auth hints. |
-| `loom artifacts <run> [--node N]` | Core | List artifact files. |
-| `loom tui [<flow>\|<run>]` | Core | Open the TUI (§10). |
-| `loom gc` | Core | §7.7. |
-| `loom doctor [<run>]` | Core | Check environment (Python, git, harness versions, pure-Python deps, filesystem); with a run, check and repair its event log and state. |
-| `loom new <path> "<description>" [--harness h]` | Planned | Agent-authored flow (§11). |
-| `loom edit <flow> "<instruction>" [--harness h] [--yes]` | Planned | Agent edit of an existing flow (§11). |
-| `loom flow <op> <flow> …` | Planned | Structured edits (§10.4): `add-node`, `rm-node`, `rename-node`, `set`, `unset`, `connect`, `disconnect`. |
-| `loom handoff <run> [<node>]` | Planned | Open a pending handoff session interactively. |
-| `loom adapter test <name> [--live]` | Planned | Conformance kit (§8.8). |
+| `arcflow init` | Core | Create `.arcflow/` with config, `.gitignore`, and an example flow. |
+| `arcflow validate <flow>… [--strict]` | Core | Check files (§9.4). `--strict` turns warnings into errors. |
+| `arcflow graph <flow> [--format ascii\|mermaid\|dot\|json]` | Core | Render the graph; `json` gives nodes and edges with conditions, for tools. |
+| `arcflow run <flow> [--input k=v]… [--inputs-file f] [--workdir d] [--detach] [--on-wait prompt\|wait\|exit] [--events]` | Core | Create and start a run. Foreground by default. `--input k=@file` reads a value from a file. Prints the run ID first on stderr (and in `--json`). |
+| `arcflow resume <run> [options of §7.6]` | Core | Continue a run. |
+| `arcflow wait <run> [--timeout d]` | Core | Block until the run is terminal or waiting; exit code by status. For scripts that used `--detach`. |
+| `arcflow status [<run>]` | Core | One run in detail (current node, visits, pending human prompt, totals); without an argument, active runs. |
+| `arcflow list [--flow X] [--status S] [--since d] [--limit n]` | Core | Runs, newest first. |
+| `arcflow logs <run> [--node N] [--visit n] [--follow] [--raw] [--prompt]` | Core | Human-readable event log; `--raw` prints the harness stream; `--prompt` the rendered prompt. |
+| `arcflow respond <run> [<node>] (--choice X \| --text T \| --ack) [--no-continue]` | Core | Answer a pending human node (node optional when only one is pending). |
+| `arcflow cancel <run> [--reason T]` | Core | Cancel. |
+| `arcflow flows` | Core | Flow files found under `flow_paths`, with name, description and validity. |
+| `arcflow schema flow\|config\|cli\|harness` | Core | Print JSON Schemas. |
+| `arcflow adapters [--probe]` | Core | Installed adapters, capabilities, and with `--probe` binary versions and auth hints. |
+| `arcflow artifacts <run> [--node N]` | Core | List artifact files. |
+| `arcflow tui [<flow>\|<run>]` | Core | Open the TUI (§10). |
+| `arcflow gc` | Core | §7.7. |
+| `arcflow doctor [<run>]` | Core | Check environment (Python, git, harness versions, pure-Python deps, filesystem); with a run, check and repair its event log and state. |
+| `arcflow new <path> "<description>" [--harness h]` | Planned | Agent-authored flow (§11). |
+| `arcflow edit <flow> "<instruction>" [--harness h] [--yes]` | Planned | Agent edit of an existing flow (§11). |
+| `arcflow flow <op> <flow> …` | Planned | Structured edits (§10.4): `add-node`, `rm-node`, `rename-node`, `set`, `unset`, `connect`, `disconnect`. |
+| `arcflow handoff <run> [<node>]` | Planned | Open a pending handoff session interactively. |
+| `arcflow adapter test <name> [--live]` | Planned | Conformance kit (§8.8). |
 
-### 9.4 `loom validate`
+### 9.4 `arcflow validate`
 
 Checks, in order, stopping at the first stage with errors: YAML syntax; schema (types, unknown keys, required keys); identifiers and reserved words; templates (`extends` resolution, cycles); referenced files exist (`prompt_file`, schemas, subflows, `python` modules are *not* imported); JSON Schemas valid; graph (targets exist, `start` exists, reachability from `start` (`W-UNREACHABLE`), a path to `end` or `fail` from every node (`E-NO-EXIT`), default routes, unguarded cycles); expressions parse and references resolve (§4.5); harness known and `harness_options` valid; capability checks (§8.1); security lints (§12). Each problem has a stable code (Appendix C), a severity, a message, the file, line and column (from `ruamel.yaml` positions) and a JSON pointer:
 
@@ -1179,7 +1180,7 @@ Human prompts: a pending prompt shows as a banner in every screen and as a modal
 - Layered (Sugiyama) layout with `grandalf` (pure Python), drawn with box-drawing characters: nodes as boxes labelled `id` and type icon, forward edges downward, back edges (loops) routed on the side in a distinct style, edge labels showing a shortened `when`.
 - Node status colours in run detail: not visited, running (animated), succeeded, failed, waiting, skipped path; visit counts as a badge (`×3`).
 - Graphs larger than the viewport pan and zoom (two zoom levels: full boxes, compact dots). Above 60 nodes, or when layout takes more than 200 ms, the view falls back to a vertical list in topological order with edges shown as "→ target" lines (research §4).
-- `loom graph --format ascii` uses the same renderer, so the CLI and TUI never disagree.
+- `arcflow graph --format ascii` uses the same renderer, so the CLI and TUI never disagree.
 
 ### 10.3 Live two-way sync with the file
 
@@ -1191,7 +1192,7 @@ Alexey's requirement: one YAML file edited equally from the TUI, by agents and b
 
 ### 10.4 Structured edits (Planned)
 
-All edits, from the TUI or from `loom flow <op>`, go through one library, `loom.edit`, which:
+All edits, from the TUI or from `arcflow flow <op>`, go through one library, `arcflow.edit`, which:
 
 1. Reads the file with `ruamel.yaml` round-trip mode and records its SHA-256.
 2. Applies the operation to the round-trip tree, preserving comments, key order, quoting and block styles of everything it does not touch.
@@ -1224,17 +1225,17 @@ Every action has a key binding and appears in a command palette (`ctrl+p`); mous
 
 Flows are data, so agents can author and edit them with the same safety as a person (research §8.2).
 
-**`loom new <path> "<description>"`** runs a built-in flow shipped inside Loom (`builtin:author-flow`, itself a normal flow file, so Loom dogfoods its own format). Its agent node:
+**`arcflow new <path> "<description>"`** runs a built-in flow shipped inside Arcflow (`builtin:author-flow`, itself a normal flow file, so Arcflow dogfoods its own format). Its agent node:
 
 - gets as instructions a bundled authoring guide: the flow JSON Schema, the node catalog (§5, generated from the same source as the schema), the expression function list, the example flows from Appendix A, the project's existing flows and schemas list, and the installed adapters with capabilities;
-- has permission profile `edit` limited to writing `<path>` and new files under the flow's directory (prompt and schema files), plus running `loom validate --json <path>`;
+- has permission profile `edit` limited to writing `<path>` and new files under the flow's directory (prompt and schema files), plus running `arcflow validate --json <path>`;
 - loops: write → validate → fix, up to 5 validation rounds (a guarded cycle in the built-in flow), then ends with a human node showing the file and the final validation result: `accept`, `revise` (asks for feedback text and loops), `discard`.
 
-**`loom edit <flow> "<instruction>"`** and the TUI's **"Edit with agent"** do the same against an existing file: Loom snapshots the file, the agent edits it in place (the TUI graph updates live as it saves, §10.3), and at the end the person sees a diff and chooses accept or revert. Revert restores the snapshot byte for byte. If the person also edited the file during the agent's run, Loom shows a three-way view and never silently drops either change.
+**`arcflow edit <flow> "<instruction>"`** and the TUI's **"Edit with agent"** do the same against an existing file: Arcflow snapshots the file, the agent edits it in place (the TUI graph updates live as it saves, §10.3), and at the end the person sees a diff and chooses accept or revert. Revert restores the snapshot byte for byte. If the person also edited the file during the agent's run, Arcflow shows a three-way view and never silently drops either change.
 
 **Never run automatically.** Neither command runs the resulting flow. A flow written by an agent is reviewed like code (§12.1).
 
-Authoring agents can also be used outside Loom: `loom schema flow` plus `loom validate --json` is the whole interface an external agent needs.
+Authoring agents can also be used outside Arcflow: `arcflow schema flow` plus `arcflow validate --json` is the whole interface an external agent needs.
 
 ---
 
@@ -1242,14 +1243,14 @@ Authoring agents can also be used outside Loom: `loom schema flow` plus `loom va
 
 ### 12.1 Threat model
 
-- **A flow file is code.** It runs shell commands and agents with the user's privileges. Running an untrusted flow is like running an untrusted Makefile. Loom does not sandbox shell or python nodes. The docs say this plainly, and `loom run` of a flow file that is not tracked by git or was modified by `loom new/edit` in the last session prints a one-line notice (not a prompt).
-- **Agent output is untrusted input.** Agents read repositories, issues and web pages that may contain prompt injections, and their outputs flow into later prompts, shell commands and human prompts. Loom's defences: permission profiles (§8.4), safe interpolation rules (§12.5), structured outputs validated against schemas, and human nodes before risky steps (a documented pattern, and a lint, §12.7).
+- **A flow file is code.** It runs shell commands and agents with the user's privileges. Running an untrusted flow is like running an untrusted Makefile. Arcflow does not sandbox shell or python nodes. The docs say this plainly, and `arcflow run` of a flow file that is not tracked by git or was modified by `arcflow new/edit` in the last session prints a one-line notice (not a prompt).
+- **Agent output is untrusted input.** Agents read repositories, issues and web pages that may contain prompt injections, and their outputs flow into later prompts, shell commands and human prompts. Arcflow's defences: permission profiles (§8.4), safe interpolation rules (§12.5), structured outputs validated against schemas, and human nodes before risky steps (a documented pattern, and a lint, §12.7).
 - **Out of scope:** multi-user isolation, protecting run directories from the local user, authenticating responders (`responder` is informational: anyone who can write the run directory can answer).
 
 ### 12.2 Agent autonomy
 
 - Default profile `edit`, prompts auto-denied (ADR 0005). Nested orchestration denied (Claude `Workflow` tool).
-- `permissions: full` produces a validate warning (`W-FULL-PERMISSIONS`) and `loom run` refuses it unless the flow is run with `--allow-full` or the project config sets `allow_full: true`.
+- `permissions: full` produces a validate warning (`W-FULL-PERMISSIONS`) and `arcflow run` refuses it unless the flow is run with `--allow-full` or the project config sets `allow_full: true`.
 - Permission denials are recorded per visit and can be routed on.
 
 ### 12.3 Environment control
@@ -1260,7 +1261,7 @@ Harness and command processes start from an **empty environment** plus:
 2. auth variables each adapter declares (`claude`: `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_BASE_URL`, cloud-provider variables for Bedrock/Vertex; `codex`: `CODEX_API_KEY`, `OPENAI_API_KEY`, `OPENAI_BASE_URL`);
 3. `env_passthrough` from config;
 4. the flow's and node's `env` (templated);
-5. `LOOM_*` run variables.
+5. `ARCFLOW_*` run variables.
 
 Always removed, even if listed above: `CLAUDECODE`, `CLAUDE_CODE_SESSION_ID`, `CLAUDE_CODE_CHILD_SESSION`, `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_AUTO_BACKGROUND_TASKS`, `CODEX_THREAD_ID`, `CODEX_SANDBOX*`, and any other variable matching the adapters' declared session denylist (research §1.4, §1.5.4). The denylist is refined in M3 (§15 Q7).
 
@@ -1268,20 +1269,20 @@ Templates see `env.X` only for variables allowed by 1–3.
 
 ### 12.4 Secrets and logs
 
-- Loom never writes environment values to events, `visit.json` or logs; `env` entries are recorded by name only.
-- Rendered prompts and harness streams are stored as is, because they are the audit trail. They can contain secrets that agents printed; run directories are `0700`, and `.loom/.gitignore` excludes `runs/` and `worktrees/`.
-- `redact` patterns from config are applied to everything Loom writes itself (events, `stdout.log`, `stderr.log`, TUI display). Raw `stream.jsonl` is redacted too unless `redact_streams: false` (keeping byte-exact fixtures for adapter debugging).
+- Arcflow never writes environment values to events, `visit.json` or logs; `env` entries are recorded by name only.
+- Rendered prompts and harness streams are stored as is, because they are the audit trail. They can contain secrets that agents printed; run directories are `0700`, and `.arcflow/.gitignore` excludes `runs/` and `worktrees/`.
+- `redact` patterns from config are applied to everything Arcflow writes itself (events, `stdout.log`, `stderr.log`, TUI display). Raw `stream.jsonl` is redacted too unless `redact_streams: false` (keeping byte-exact fixtures for adapter debugging).
 
 ### 12.5 Injection-safe interpolation
 
-- `shell.run` is a shell script: interpolating agent output into it can execute attacker-chosen commands. `loom validate` warns (`W-SHELL-INTERPOLATION`) whenever `run` contains `${{ }}` that references `nodes.*` or `vars.*` without wrapping it in `shq(…)`. The recommended forms are `args:` (no shell) or passing values through `env:` and referring to `"$VAR"` in the script.
+- `shell.run` is a shell script: interpolating agent output into it can execute attacker-chosen commands. `arcflow validate` warns (`W-SHELL-INTERPOLATION`) whenever `run` contains `${{ }}` that references `nodes.*` or `vars.*` without wrapping it in `shq(…)`. The recommended forms are `args:` (no shell) or passing values through `env:` and referring to `"$VAR"` in the script.
 - Human `message` rendering in the TUI escapes Textual markup; terminal control sequences in any displayed agent text are stripped.
 - Command adapters substitute placeholders per argv element, never through a shell (§8.5).
-- `on_wait` hooks receive values through `LOOM_*` environment variables, not interpolation.
+- `on_wait` hooks receive values through `ARCFLOW_*` environment variables, not interpolation.
 
 ### 12.6 Extensions
 
-Entry-point plugins, `python` nodes and command adapters run with full user privileges; installing one is trusting it. `loom adapters` shows each adapter's source (built-in, file path, or package and version).
+Entry-point plugins, `python` nodes and command adapters run with full user privileges; installing one is trusting it. `arcflow adapters` shows each adapter's source (built-in, file path, or package and version).
 
 ### 12.7 Lints
 
@@ -1298,15 +1299,15 @@ Brief §16: tests first; engine tests use the fake adapter; unit tests never cal
 | Parser and validator | Every rule in §3–§5 and every code in Appendix C | A corpus `tests/flows/invalid/*.yaml`, each file annotated with its expected codes and positions (`# expect: E-UNKNOWN-TARGET @ 41:13`); `tests/flows/valid/*.yaml` including all Appendix A examples. The M1 acceptance criterion is this corpus. |
 | Expressions | Grammar, forbidden constructs, null-safety, functions, rendering rules | Table-driven tests plus property tests (Hypothesis, a dev-only dependency) that no accepted expression can reach builtins or dunders. |
 | Engine | Routing, loops, limits, retries, `on_error`, budgets, timeouts, cancellation, human waits, workspaces | Fake adapter scripts; assertions on the resulting **event log** (golden files, normalized for timestamps and IDs). Time is injected (fake clock) so sleeps and timeouts run instantly. |
-| Crash and resume | At-least-once guarantees, `on_resume` modes, torn last line, stale locks | A fault-injection hook (`LOOM_TEST_CRASH_AT=<event type>:<n>`) that kills the runner right after a given event; for each example flow, crash at every event boundary, resume, and assert the final state equals the uncrashed run and no finished visit ran twice. |
+| Crash and resume | At-least-once guarantees, `on_resume` modes, torn last line, stale locks | A fault-injection hook (`ARCFLOW_TEST_CRASH_AT=<event type>:<n>`) that kills the runner right after a given event; for each example flow, crash at every event boundary, resume, and assert the final state equals the uncrashed run and no finished visit ran twice. |
 | Adapters (offline) | Stream parsing and outcome mapping for `claude`, `codex`, command adapters | Recorded fixtures per pinned harness version (§8.8). |
-| Adapters (live) | Real harness smoke tests | Marked `live`, excluded by default, run manually or in a scheduled CI job with a spend cap (`--max-budget-usd` plus Loom's budget) and secrets; never on pull requests from forks. |
+| Adapters (live) | Real harness smoke tests | Marked `live`, excluded by default, run manually or in a scheduled CI job with a spend cap (`--max-budget-usd` plus Arcflow's budget) and secrets; never on pull requests from forks. |
 | CLI | Every command's `--json` shape and exit code | Snapshot tests against the published CLI schemas. |
 | TUI | Screens render and actions work | Textual's `App.run_test()` pilot and SVG snapshot tests, against run directories produced by fake-adapter runs. |
 | Round-trip editing | Comments, order and formatting preserved; rename rewrites all references | For a corpus of hand-formatted flows: apply each operation and assert that the diff touches only the expected lines; round-trip with no operation is byte-identical. |
 | Packaging | Pure-Python rule (ADR 0001) | CI builds the wheel and zipapp and fails if any runtime dependency (transitively) ships a non-`py3-none-any` wheel; install tests on Python 3.10–3.13, Linux and macOS. |
 
-Dogfooding (brief §15, after M4): Loom's own build loop runs as a Loom flow, which serves as a long-running integration test.
+Dogfooding (brief §15, after M4): Arcflow's own build loop runs as a Arcflow flow, which serves as a long-running integration test.
 
 ---
 
@@ -1334,12 +1335,12 @@ Each item names the default this spec uses, so work can proceed. Resolving one e
 | Q1 | ADR 0003 names a node field `status`; the spec calls it `outcome` so it does not collide with `output.status` in agent schemas. Amend ADR 0003? | `outcome` (§4.3). |
 | Q2 | Expression syntax: accept `true/false/null` aliases next to Python's `True/False/None`? | Accepted (§4.1). |
 | Q3 | ADR 0002 lists `include` of "shared fragments". To keep the graph in one file, the spec limits `include` to templates. Accept the narrowing? | Templates only, Planned (§3.7). |
-| Q4 | Which Planned features belong in v1 (M0–M8) versus after? Alexey's goals (agent authoring, live two-way editor) are beyond the brief's milestones. | Core = brief's M0–M8 scope plus the live read-only graph; editing, `loom new/edit`, `set`, `subflow`, `map`, `python`, `handoff`, `notify` are Planned, to be placed in Stage 3. |
+| Q4 | Which Planned features belong in v1 (M0–M8) versus after? Alexey's goals (agent authoring, live two-way editor) are beyond the brief's milestones. | Core = brief's M0–M8 scope plus the live read-only graph; editing, `arcflow new/edit`, `set`, `subflow`, `map`, `python`, `handoff`, `notify` are Planned, to be placed in Stage 3. |
 | Q5 | Default run budget. | `usd: 25`, `tokens: 10M` (§3.4). |
 | Q6 | Exact Claude flag set per permission profile (especially Bash in `edit` and read tools in `read-only`). | Intent fixed in §8.4; flags fixed by M3 contract tests. |
 | Q7 | Full env denylist for nested agent sessions (research §7.6). | The list in §12.3, refined in M3. |
 | Q8 | Codex behaviours: signals, exit codes, default sandbox, schema subset (research §7.1–7.4). | Treated conservatively (§8.3); M3 contract tests decide. |
-| Q9 | Human node timeout default. | 7 days with lazy enforcement and `loom resume --due` (§6.11). |
+| Q9 | Human node timeout default. | 7 days with lazy enforcement and `arcflow resume --due` (§6.11). |
 | Q10 | Windows support. | Not in v1; Linux and macOS only. Process-group code is kept behind one module so Windows (job objects) can be added. |
 | Q11 | Does `respond` auto-start a detached runner? | Yes, unless `--no-continue` (§6.11). |
 | Q12 | Price table for Codex/others: ship built-in prices (go stale) or config only? | Config only; no built-in prices. |
@@ -1361,7 +1362,8 @@ Each item names the default this spec uses, so work can proceed. Resolving one e
 | 0006 Human node delivery | §5.4, §6.11 |
 | 0007 No parallelism | §5.9, §7.3 (`branch` key), §14 |
 | 0008 External scheduling | §6.11, §9.2, Appendix A example 2 |
-| 0009 Name deferred | Header note: `loom`, `.loom/` and the package are renamed together |
+| 0009 Name deferred | Superseded by 0013 |
+| 0013 Name: Arcflow | Header note; §9.1 (`arcf` alias) |
 | 0010 MIT | No spec impact |
 | 0011 Adapters | §8 |
 | 0012 Run storage and resume | §7 |
@@ -1377,7 +1379,7 @@ All four are part of the valid-flow test corpus (§13); the first three use only
 The brief's example in final syntax. Shows structured output with a `status` field, `session: continue` in a fix loop, the `on_error: continue` test pattern, visit guards, a human approval, and `to: fail`.
 
 ```yaml
-loom: 1
+arcflow: 1
 name: implement-feature
 description: Plan with Claude, implement with Codex, loop on tests, ask before merging.
 
@@ -1487,10 +1489,10 @@ nodes:
 
 ### A.2 `nightly-deps`: scheduled upgrade in a worktree with cross-harness review
 
-Run from cron, CI or a systemd timer (ADR 0008): `loom run flows/nightly-deps.yaml --on-wait exit --json`. Shows `output: json`, `ok_codes`, templates, a named worktree shared by several nodes, a reviewer on a different harness, `args` for safe interpolation, and a fully unattended design: instead of waiting on a person, it opens a PR that a person reviews.
+Run from cron, CI or a systemd timer (ADR 0008): `arcflow run flows/nightly-deps.yaml --on-wait exit --json`. Shows `output: json`, `ok_codes`, templates, a named worktree shared by several nodes, a reviewer on a different harness, `args` for safe interpolation, and a fully unattended design: instead of waiting on a person, it opens a PR that a person reviews.
 
 ```yaml
-loom: 1
+arcflow: 1
 name: nightly-deps
 description: Upgrade outdated npm dependencies in a worktree, test, review with a second agent, open a PR.
 
@@ -1595,7 +1597,7 @@ nodes:
 Shows `sleep` in a polling loop bounded by `max_visits`, JSON from a CLI, token budgets for a harness without USD, an agent `status` of `blocked` routed to a person, and a free-text human answer fed back to the agent.
 
 ```yaml
-loom: 1
+arcflow: 1
 name: babysit-pr
 description: Watch a pull request's CI; when it fails, have an agent fix it; ask a person when the agent is stuck.
 
@@ -1666,7 +1668,7 @@ nodes:
 Shows `include`, `python`, `map` over a subflow, and `set`. Not runnable until those land; it is in the corpus to lock the format.
 
 ```yaml
-loom: 1
+arcflow: 1
 name: triage-issues
 description: Label and answer new GitHub issues, one subflow run per issue.
 
@@ -1711,7 +1713,7 @@ nodes:
 
   report:
     type: notify
-    command: 'notify-send "Loom triage" "$LOOM_MESSAGE"'
+    command: 'notify-send "Arcflow triage" "$ARCFLOW_MESSAGE"'
     message: "${{ vars.failed }} of ${{ vars.triaged + vars.failed }} issues failed triage."
 
 outputs:
@@ -1722,7 +1724,7 @@ outputs:
 `triage-one.yaml` (the subflow body):
 
 ```yaml
-loom: 1
+arcflow: 1
 name: triage-one
 include: [shared/templates.yaml]
 inputs:
@@ -1759,7 +1761,7 @@ All events carry `v`, `seq`, `ts`, `type`, and where relevant `branch`, `node`, 
 
 | Type | Data |
 |---|---|
-| `run_created` | `flow`, `flow_sha256`, `inputs`, `workdir`, `loom_version`, `parent` |
+| `run_created` | `flow`, `flow_sha256`, `inputs`, `workdir`, `arcflow_version`, `parent` |
 | `run_started` | `pid`, `host`, `on_wait` |
 | `runner_attached` / `runner_detached` / `runner_takeover` | `pid`, `host`, `reason` |
 | `flow_reloaded` | `old_sha256`, `new_sha256`, `snapshot` |
@@ -1798,7 +1800,7 @@ Severity prefix: `E` error, `W` warning, `I` info. The list is stable; codes are
 | `E-DUPLICATE-KEY` | Duplicate mapping key |
 | `E-SCHEMA` | Type or structure does not match the flow schema |
 | `E-UNKNOWN-KEY` | Key not allowed here |
-| `E-VERSION` | `loom:` version not supported |
+| `E-VERSION` | `arcflow:` version not supported |
 | `E-BAD-ID` / `E-RESERVED-ID` | Identifier malformed / reserved |
 | `E-UNKNOWN-TEMPLATE` / `E-TEMPLATE-CYCLE` / `E-TEMPLATE-ROUTING` | `extends` problems; routing keys in a template |
 | `E-UNKNOWN-TARGET` / `E-UNKNOWN-START` | Edge or start target does not exist |

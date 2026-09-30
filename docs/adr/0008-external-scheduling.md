@@ -7,8 +7,8 @@
 
 ## Decision
 
-Loom has no scheduler or daemon in v1. Scheduling uses cron, systemd timers or CI. Loom supports this with stable, documented exit codes, `--json` output on every command, and documentation recipes for each scheduler.
+Arcflow has no scheduler or daemon in v1. Scheduling uses cron, systemd timers or CI. Arcflow supports this with stable, documented exit codes, `--json` output on every command, and documentation recipes for each scheduler.
 
 ## Consequences
 
-Matches brief principle 7. A `loom schedule` helper that generates crontab or systemd units may come later.
+Matches brief principle 7. A `arcflow schedule` helper that generates crontab or systemd units may come later.
