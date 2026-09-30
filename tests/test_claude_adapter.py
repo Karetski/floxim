@@ -15,8 +15,9 @@ from engine_support import Result, run_flow
 from arcflow.adapters import AgentRequest, SessionSpec
 from arcflow.adapters.claude import ClaudeAdapter, ClaudeStream
 from arcflow.adapters.process import parse_lines, version_in_range
+from arcflow.conformance import FIXTURES_DIR
 
-FIXTURES = Path(__file__).parent / "fixtures" / "claude-2.1.285"
+FIXTURES = FIXTURES_DIR / "claude-2.1.285"
 SESSION = "11111111-2222-4333-8444-555555555555"
 
 

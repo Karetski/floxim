@@ -1,16 +1,19 @@
 """Finding adapters by name (spec §8.1–8.6).
 
-Built-in adapters are always known. Plugin adapters are Python entry points in
-the `arcflow.adapters` group, loaded only when a flow names them, so the CLI
-starts fast.
+Names resolve in this order: built-in adapters, then command adapters declared
+in the project's `.arcflow/harnesses/<name>.yaml`, then Python entry points in
+the `arcflow.adapters` group. Entry points load only when a flow names them, so
+the CLI starts fast.
 """
 
 from __future__ import annotations
 
 from importlib import metadata
+from pathlib import Path
 from typing import Any
 
 from arcflow.adapters import Adapter, Capabilities
+from arcflow.problems import Problem
 
 BUILT_IN = ("claude", "codex", "fake")
 # Built-in adapters whose milestone has not landed (docs/milestones.md).
@@ -26,15 +29,60 @@ def _entry_points() -> dict[str, metadata.EntryPoint]:
     return {ep.name: ep for ep in metadata.entry_points(group=ENTRY_POINT_GROUP)}
 
 
-def names() -> list[str]:
-    return sorted({*BUILT_IN, *_entry_points()})
+def _command_file(name: str, root: Path | None) -> Path | None:
+    if root is None:
+        return None
+    from arcflow.adapters.command import find
+
+    return find(root, name)
 
 
-def is_known(name: str) -> bool:
-    return name in BUILT_IN or name in _entry_points()
+def names(root: Path | None = None) -> list[str]:
+    from arcflow.adapters.command import list_names
+
+    return sorted({*BUILT_IN, *(list_names(root) if root else []), *_entry_points()})
 
 
-def load(name: str) -> Adapter:
+def is_known(name: str, root: Path | None = None) -> bool:
+    return name in BUILT_IN or _command_file(name, root) is not None or name in _entry_points()
+
+
+def source(name: str, root: Path | None = None) -> str:
+    """Where an adapter comes from, for `arcflow adapters` (spec §12.6)."""
+    if name in BUILT_IN:
+        return "built-in"
+    path = _command_file(name, root)
+    if path is not None:
+        return str(path)
+    entry = _entry_points().get(name)
+    if entry is not None:
+        dist = entry.dist
+        return f"{entry.value} ({dist.name} {dist.version})" if dist else entry.value
+    return "unknown"
+
+
+def is_aap(name: str, root: Path | None = None) -> bool:
+    """A harness file declaring the Arcflow Adapter Protocol (Planned, spec §8.6)."""
+    path = _command_file(name, root)
+    if path is None:
+        return False
+    from arcflow.yamlio import load_file
+
+    doc, _ = load_file(path)
+    return bool(doc and isinstance(doc.data, dict) and doc.data.get("protocol") == "aap")
+
+
+def file_problems(name: str, root: Path | None = None) -> list[Problem]:
+    """Problems in a command adapter's harness file."""
+    path = _command_file(name, root)
+    if path is None:
+        return []
+    from arcflow.adapters.command import load_spec
+
+    return load_spec(path)[1]
+
+
+def load(name: str, root: Path | None = None) -> Adapter:
     """A fresh adapter instance. Raises UnknownAdapter."""
     if name == "fake":
         from arcflow.adapters.fake import FakeAdapter
@@ -48,8 +96,17 @@ def load(name: str) -> Adapter:
         from arcflow.adapters.codex import CodexAdapter
 
         return CodexAdapter()
-    if name in PENDING:
-        raise UnknownAdapter(f"the {name} adapter is not available in this version of Arcflow")
+    path = _command_file(name, root)
+    if path is not None:
+        if is_aap(name, root):
+            raise UnknownAdapter(f"{name}: the Arcflow Adapter Protocol is not available yet")
+        from arcflow.adapters.command import CommandAdapter, load_spec
+
+        spec, problems = load_spec(path)
+        if spec is None:
+            raise UnknownAdapter(f"{path}: {problems[0].message if problems else 'invalid'}")
+        command_adapter: Adapter = CommandAdapter(spec)
+        return command_adapter
     entry = _entry_points().get(name)
     if entry is None:
         raise UnknownAdapter(f"no adapter named {name!r}")
@@ -58,9 +115,9 @@ def load(name: str) -> Adapter:
     return adapter
 
 
-def capabilities(name: str) -> Capabilities | None:
+def capabilities(name: str, root: Path | None = None) -> Capabilities | None:
     """Capabilities of an adapter, or None when it cannot be loaded here."""
     try:
-        return load(name).capabilities()
+        return load(name, root).capabilities()
     except UnknownAdapter:
         return None

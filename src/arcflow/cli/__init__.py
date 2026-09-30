@@ -50,10 +50,15 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
 
 def _cmd_schema(args: argparse.Namespace) -> int:
+    from arcflow.adapters.command import harness_json_schema
     from arcflow.config import config_json_schema
     from arcflow.flowspec import flow_json_schema
 
-    schema = {"flow": flow_json_schema, "config": config_json_schema}[args.which]()
+    schema = {
+        "flow": flow_json_schema,
+        "config": config_json_schema,
+        "harness": harness_json_schema,
+    }[args.which]()
     if args.json:
         emit_json(True, data=schema)
     else:
@@ -82,12 +87,16 @@ def build_parser() -> argparse.ArgumentParser:
     schema = commands.add_parser(
         "schema", parents=[common], help="print a JSON Schema", description="Print a JSON Schema."
     )
-    schema.add_argument("which", choices=["flow", "config"], help="which schema")
+    schema.add_argument("which", choices=["flow", "config", "harness"], help="which schema")
     schema.set_defaults(handler=_cmd_schema)
 
     from arcflow.cli import runs
 
     runs.add_parsers(commands, common)
+
+    from arcflow.cli import adapters
+
+    adapters.add_parsers(commands, common)
     return parser
 
 

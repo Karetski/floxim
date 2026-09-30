@@ -240,7 +240,7 @@ def test_given_adapter_without_resume_when_session_continue_then_each_visit_star
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Given
-    monkeypatch.setattr(registry, "load", lambda name: _Limited())
+    monkeypatch.setattr(registry, "load", lambda name, root=None: _Limited())
 
     # When
     result = run_flow(tmp_path, agent_flow(LOOP.format(session="continue")))

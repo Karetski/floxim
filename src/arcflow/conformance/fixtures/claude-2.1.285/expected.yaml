@@ -1,0 +1,33 @@
+# Normalized results each fixture must produce (spec §8.8).
+cases:
+  success:
+    outcome: succeeded
+    session_id: 11111111-2222-4333-8444-555555555555
+    text: "Done: the README has a title."
+    usage: {input_tokens: 2620, cached_input_tokens: 2300, output_tokens: 65}
+    cost_usd: 0.0123
+  structured-output:
+    outcome: succeeded
+    output: {status: ready, summary: Plan}
+  schema-failure:
+    outcome: schema_invalid
+    error_kind: schema
+  budget-stop:
+    outcome: budget_exceeded
+    error_kind: budget
+  sigint-result:
+    outcome: failed
+    error_kind: harness_error
+    cost_usd: 0.004
+  sigterm-no-result:
+    outcome: failed
+    error_kind: no_result
+  auth-failure:
+    outcome: failed
+    error_kind: harness_error
+  permission-denied:
+    outcome: succeeded
+    permission_denials: [Bash]
+  missing-result:
+    outcome: failed
+    error_kind: no_result

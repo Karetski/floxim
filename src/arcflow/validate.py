@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from arcflow.adapters.registry import PENDING as PENDING_ADAPTERS
+from arcflow.adapters.registry import is_aap
 from arcflow.checks import (
     expression_checks,
     graph_checks,
@@ -15,7 +16,7 @@ from arcflow.checks import (
     lint_checks,
     workspace_checks,
 )
-from arcflow.config import DEFAULT_RISKY_COMMANDS, Config
+from arcflow.config import DEFAULT_RISKY_COMMANDS, Config, find_project_root
 from arcflow.flow import Flow, load_flow
 from arcflow.graph import build_graph
 from arcflow.problems import Problem
@@ -56,16 +57,17 @@ def validate(
     if flow is not None:
         graph = build_graph(flow)
         risky = list(config["risky_commands"]) if config else list(DEFAULT_RISKY_COMMANDS)
+        root = config.root if config else find_project_root(path.parent)
         stages: list[Callable[[], list[Problem]]] = [
             lambda: graph_checks(flow, graph),
             lambda: expression_checks(flow, graph),
             lambda: limit_checks(flow),
-            lambda: harness_checks(flow, config["prices"] if config else None),
+            lambda: harness_checks(flow, config["prices"] if config else None, root),
             lambda: workspace_checks(flow, workdir or path.parent),
             lambda: lint_checks(flow, graph, risky),
         ]
         if implementation_gate:
-            stages.append(lambda: _not_implemented(flow))
+            stages.append(lambda: _not_implemented(flow, root))
         for stage in stages:
             found = stage()
             problems += found
@@ -79,7 +81,7 @@ def validate(
 PENDING_FEATURES: dict[tuple[str, object], str] = {("on_resume", "ask"): "on_resume: ask"}
 
 
-def _not_implemented(flow: Flow) -> list[Problem]:
+def _not_implemented(flow: Flow, root: Path | None = None) -> list[Problem]:
     problems = []
     for node in flow.nodes.values():
         if node.type not in IMPLEMENTED_NODE_TYPES:
@@ -97,6 +99,13 @@ def _not_implemented(flow: Flow) -> list[Problem]:
                 node.where("harness").problem(
                     "E-NOT-IMPLEMENTED",
                     f"the {harness} adapter is not available in this version of Arcflow",
+                )
+            )
+        elif node.type == "agent" and isinstance(harness, str) and is_aap(harness, root):
+            problems.append(
+                node.where("harness").problem(
+                    "E-NOT-IMPLEMENTED",
+                    f"{harness} uses the Arcflow Adapter Protocol, which is not available yet",
                 )
             )
         for (key, value), what in PENDING_FEATURES.items():

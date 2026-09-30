@@ -563,7 +563,9 @@ def workspace_checks(flow: Flow, workdir: Path) -> list[Problem]:
 # -- harnesses and capabilities (§8.1, §8.2) -------------------------------------
 
 
-def harness_checks(flow: Flow, prices: dict[str, Any] | None = None) -> list[Problem]:
+def harness_checks(
+    flow: Flow, prices: dict[str, Any] | None = None, root: Path | None = None
+) -> list[Problem]:
     from arcflow import jsonschemas
     from arcflow.adapters import registry
 
@@ -576,8 +578,8 @@ def harness_checks(flow: Flow, prices: dict[str, Any] | None = None) -> list[Pro
         if not isinstance(harness, str):
             continue
         where = node.where("harness")
-        if not registry.is_known(harness):
-            hint = closest(harness, registry.names())
+        if not registry.is_known(harness, root):
+            hint = closest(harness, registry.names(root))
             problems.append(
                 where.problem(
                     "E-UNKNOWN-HARNESS",
@@ -587,9 +589,13 @@ def harness_checks(flow: Flow, prices: dict[str, Any] | None = None) -> list[Pro
             )
             continue
         problems += _session_source(flow, node)
-        if harness in registry.PENDING:
+        if harness in registry.PENDING or registry.is_aap(harness, root):
             continue  # reported as E-NOT-IMPLEMENTED by the last stage
-        adapter = registry.load(harness)
+        file_problems = registry.file_problems(harness, root)
+        problems += file_problems
+        if any(p.is_error for p in file_problems):
+            continue
+        adapter = registry.load(harness, root)
         caps = adapter.capabilities()
         options = config.get("harness_options") or {}
         error = jsonschemas.validation_error(

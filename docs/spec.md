@@ -1091,7 +1091,8 @@ tested_versions: ">=0.9"
 ```
 
 - Placeholders (`{prompt}`, `{prompt_file}`, `{schema_file}`, `{session_id}`, `{cwd}`, `{model}`, `{attempt_dir}`) are substituted **per argv element** (never through a shell). An element whose placeholder resolves to empty/None is dropped along with a preceding flag element when written as `["-m", "{model}"]` pairs (documented rule: an argv pair `[flag, "{x}"]` is omitted when `x` is unset).
-- Mapping expressions use the §4 language with `event` bound to the parsed JSON line.
+- Mapping expressions use the §4 language with `event` bound to the parsed JSON line; `event` is the only name available.
+- `name` must match the file name. `prompt_via` defaults to `stdin`; `{prompt}` is set only with `prompt_via: argv` and `{prompt_file}` only with `file`. The keys of `permissions` are the profiles the adapter supports (a node asking for another is `E-PERMISSION-UNSUPPORTED`). Optional keys: `interactive_command` (for `handoff`), `version_command` (default `[<command>, --version]`), `grace`, `usage.cached_input_tokens`, `usage.cost_usd`, `result.output`. `protocol: aap` marks an AAP executable (Planned). `arcflow schema harness` publishes the file's JSON Schema, and a flow's validation reports problems in the harness files it uses.
 - Command adapters get the process handling, env filtering, JSON extraction and budget/timeouts of the engine for free.
 
 ### 8.6 Tier 3: plugin adapters
@@ -1113,7 +1114,7 @@ A generic adapter for agents speaking the Agent Client Protocol (`session/new`, 
 - **Offline** (default): feeds recorded fixture streams (success, structured output, schema failure, budget stop, SIGINT result, SIGTERM without result, auth failure, missing result) through the adapter's parser, or, for command/AAP adapters, through a stub executable that replays them, and checks the normalized results.
 - **Live** (`--live`, opt-in, costs money): runs a small prompt set with a spend cap and checks session IDs, resume, schema output, cancel within the grace period, and env isolation.
 
-Built-in adapters ship fixtures per tested harness version (`fixtures/<harness>-<version>/`). A version bump in `tested_versions` requires re-recording them.
+Built-in adapters ship fixtures per tested harness version inside the package (`arcflow/conformance/fixtures/<harness>-<version>/`); a command adapter keeps its own in `.arcflow/harnesses/<name>/fixtures/`. Each set has one `<case>.jsonl` stream per case and an `expected.yaml` giving the normalized result each must produce (`outcome`, `error_kind`, `session_id`, `text`, `output`, `cost_usd`, `usage.*`, `permission_denials`). The command exits 0 when every case passes, 1 otherwise, 6 for an unknown adapter. A version bump in `tested_versions` requires re-recording them. The fixtures shipped for Claude Code 2.1.285 and Codex 0.147.0 are synthetic, written from the documented stream formats; the live suite is how they get replaced with recordings.
 
 ---
 

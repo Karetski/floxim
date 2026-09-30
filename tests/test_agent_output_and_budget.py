@@ -89,7 +89,7 @@ def test_given_adapter_without_native_output_when_run_then_json_is_asked_for_and
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Given
-    monkeypatch.setattr(registry, "load", lambda name: _NoNativeOutput())
+    monkeypatch.setattr(registry, "load", lambda name, root=None: _NoNativeOutput())
     nodes = f"""  plan:
     prompt: Plan.
     output_schema: {SCHEMA}
@@ -179,7 +179,7 @@ def test_given_adapter_without_cost_when_prices_configured_then_usd_is_estimated
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Given
-    monkeypatch.setattr(registry, "load", lambda name: _NoCost())
+    monkeypatch.setattr(registry, "load", lambda name, root=None: _NoCost())
     nodes = """  work:
     prompt: Work.
     model: m1
@@ -199,7 +199,7 @@ def test_given_usd_budget_on_adapter_without_cost_or_price_when_validated_then_w
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Given
-    monkeypatch.setattr(registry, "load", lambda name: _NoCost())
+    monkeypatch.setattr(registry, "load", lambda name, root=None: _NoCost())
     path = tmp_path / "flow.yaml"
     path.write_text(flow("  work:\n    prompt: W.\n    budget: {usd: 1}\n"))
 

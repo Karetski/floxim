@@ -17,9 +17,10 @@ from arcflow.adapters import AgentRequest, SessionSpec
 from arcflow.adapters.codex import CodexAdapter, CodexStream
 from arcflow.adapters.process import parse_lines
 from arcflow.checks import strict_schema_problem
+from arcflow.conformance import FIXTURES_DIR
 from arcflow.validate import validate
 
-FIXTURES = Path(__file__).parent / "fixtures" / "codex-0.147.0"
+FIXTURES = FIXTURES_DIR / "codex-0.147.0"
 THREAD = "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee"
 
 

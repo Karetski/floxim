@@ -1,0 +1,20 @@
+# Normalized results each fixture must produce (spec §8.8).
+cases:
+  success:
+    outcome: succeeded
+    session_id: 0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee
+    text: Fixed the failing test.
+    usage: {input_tokens: 24763, cached_input_tokens: 24448, output_tokens: 122}
+  structured-output:
+    outcome: succeeded
+    output: {status: fixed, summary: Updated the import}
+    schema: {type: object}
+  turn-failed:
+    outcome: failed
+    error_kind: harness_error
+  error-event:
+    outcome: failed
+    error_kind: harness_error
+  missing-result:
+    outcome: failed
+    error_kind: no_result
