@@ -1,4 +1,4 @@
-"""The adapter conformance kit, `floxim adapter test` (spec §8.8).
+"""The adapter conformance kit, `floxim adapter test`.
 
 Offline (default), it replays recorded streams and compares the normalized
 results with each fixture set's `expected.yaml`: built-in adapters parse the

@@ -1,4 +1,4 @@
-"""`init`, `adapters`, `gc` and `doctor` (spec §9.3, §7.7)."""
+"""`init`, `adapters`, `gc` and `doctor`."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ from floxim.store.rundir import RunDir
 from floxim.store.state import TERMINAL, reduce
 from floxim.units import parse_duration
 
-CONFIG_TEMPLATE = """# Floxim project configuration (spec §2.2). It describes the environment flows
+CONFIG_TEMPLATE = """# Floxim project configuration. It describes the environment flows
 # run in; what a flow does lives in the flow file.
 flow_paths: [flows]
 # env_passthrough: [NPM_TOKEN]      # extra variables allowed into nodes
@@ -84,7 +84,7 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
 
     gc = commands.add_parser(
         "gc", parents=[common], help="delete old finished runs",
-        description="Delete finished run directories and their worktrees (spec §7.7).",
+        description="Delete finished run directories and their worktrees.",
     )  # fmt: skip
     gc.add_argument("--older-than", help="only runs finished this long ago (default: retention)")
     gc.add_argument(
@@ -352,7 +352,7 @@ def environment_checks(context: Any) -> list[dict[str, str]]:
 
 
 def run_checks(run: RunDir, truncate: bool) -> list[dict[str, str]]:
-    """Check a run's log and state, repairing what is safe to repair (§7.3)."""
+    """Check a run's log and state, repairing what is safe to repair."""
     checks = []
     try:
         log = read_log(run.events)

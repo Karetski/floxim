@@ -1,4 +1,4 @@
-"""Reading flow YAML into plain data with source positions (spec §3.1)."""
+"""Reading flow YAML into plain data with source positions."""
 
 from __future__ import annotations
 

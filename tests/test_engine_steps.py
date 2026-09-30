@@ -1,4 +1,4 @@
-"""The step loop with condition, sleep and set nodes (spec §6.1–6.6, §5.3, §5.5, §5.6)."""
+"""The step loop with condition, sleep and set nodes."""
 
 from pathlib import Path
 from typing import Any

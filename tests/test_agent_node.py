@@ -1,4 +1,4 @@
-"""The agent node through the fake adapter (spec §5.1, §8.1, §8.3)."""
+"""The agent node through the fake adapter."""
 
 from __future__ import annotations
 

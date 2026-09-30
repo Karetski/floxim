@@ -1,4 +1,4 @@
-"""`subflow` and `map`: child runs of another flow file (spec §5.8, §5.9).
+"""`subflow` and `map`: child runs of another flow file.
 
 A child run has its own run directory, linked to the parent by `parent` in its
 run.json and by `child_run` in the parent's events. It runs in the parent's
@@ -116,7 +116,7 @@ class ChildDriver:
             heartbeat=parent.heartbeat_enabled,
             grace=parent.grace,
             on_wait=parent.on_wait,
-            # Tests crash inside child runs with FLOXIM_TEST_CRASH_CHILD_AT (spec §13).
+            # Tests crash inside child runs with FLOXIM_TEST_CRASH_CHILD_AT.
             crash_hook=crash_hook_from_env(
                 {"FLOXIM_TEST_CRASH_AT": os.environ.get("FLOXIM_TEST_CRASH_CHILD_AT", "")}
             ),
@@ -172,7 +172,7 @@ class ChildDriver:
         )
 
     def _forward(self, event: Event) -> None:
-        """Mirror a child's waits and answers in the parent (spec §5.8)."""
+        """Mirror a child's waits and answers in the parent."""
         ctx = self.ctx
         parent = ctx.runner
         node = ctx.node.id

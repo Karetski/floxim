@@ -1,4 +1,4 @@
-"""Drawing a flow's graph as text (spec §10.2).
+"""Drawing a flow's graph as text.
 
 A layered (Sugiyama) layout from `grandalf` decides which layer each node sits in
 and the order within layers; boxes are drawn with box-drawing characters,

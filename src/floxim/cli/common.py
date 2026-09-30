@@ -17,7 +17,7 @@ from floxim.store.events import Event
 
 @dataclass
 class GlobalOptions:
-    """Flags every command accepts (spec §9.1), set once by `main`."""
+    """Flags every command accepts, set once by `main`."""
 
     project: Path | None = None
     config: Path | None = None

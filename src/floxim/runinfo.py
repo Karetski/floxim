@@ -1,6 +1,6 @@
 """Reading runs and flows for people and scripts: the library behind `status`,
-`list`, `logs`, `artifacts`, `flows` and `graph` (spec §9.3). The TUI uses the
-same functions (brief principle 2)."""
+`list`, `logs`, `artifacts`, `flows` and `graph`. The TUI uses the
+same functions."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ PROGRESS_FIELDS = ("node", "visit", "type", "attempt", "session_id", "wake_at")
 
 
 def display_status(run: RunDir, state: State, clock: Clock) -> str:
-    """The status to show: a `running` run with no live runner is `interrupted` (§1.1)."""
+    """The status to show: a `running` run with no live runner is `interrupted`."""
     status = str(state.get("status"))
     if status == "running" and lock_state(run.lock, clock.now()) != "live":
         return "interrupted"

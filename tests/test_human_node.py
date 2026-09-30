@@ -1,4 +1,4 @@
-"""The human node, waiting and answers (spec §5.4, §6.11, §7.4, ADR 0006)."""
+"""The human node, waiting and answers."""
 
 from __future__ import annotations
 

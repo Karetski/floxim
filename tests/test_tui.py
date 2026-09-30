@@ -1,4 +1,4 @@
-"""The terminal UI, driven with Textual's pilot (spec §10, §13)."""
+"""The terminal UI, driven with Textual's pilot."""
 
 from __future__ import annotations
 

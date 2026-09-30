@@ -1,4 +1,4 @@
-# Template fragment included by triage-issues.yaml and triage-one.yaml (spec §3.7).
+# Template fragment included by triage-issues.yaml and triage-one.yaml.
 templates:
   triager:
     type: agent

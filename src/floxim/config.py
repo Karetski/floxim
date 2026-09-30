@@ -1,4 +1,4 @@
-"""Project root and configuration (spec §2.1, §2.2).
+"""Project root and configuration.
 
 Configuration describes the environment a flow runs in, never what the flow
 means. Files merge in precedence order: built-in defaults, user config,
@@ -19,7 +19,7 @@ from floxim.yamlio import load_file
 
 PROJECT_DIR = ".floxim"
 
-# Shell commands that `W-NO-HUMAN-BEFORE-RISKY` looks for (spec §12.7), as regexes.
+# Shell commands that `W-NO-HUMAN-BEFORE-RISKY` looks for, as regexes.
 DEFAULT_RISKY_COMMANDS = (
     r"\bgit\s+push\b",
     r"\bgh\s+pr\s+merge\b",

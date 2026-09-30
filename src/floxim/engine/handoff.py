@@ -1,4 +1,4 @@
-"""The `handoff` node: hand an agent session to a person (spec §5.10).
+"""The `handoff` node: hand an agent session to a person.
 
 In the foreground with a person at the terminal (`--on-wait prompt`), Floxim
 prints the message and runs the adapter's interactive command for the session,

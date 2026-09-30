@@ -1,4 +1,4 @@
-"""Whether installed distributions are pure Python (ADR 0001).
+"""Whether installed distributions are pure Python.
 
 Used by `floxim doctor` for Floxim's own dependencies and by the CI check
 (tools/check_pure_python.py) for a whole environment.

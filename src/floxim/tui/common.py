@@ -13,7 +13,7 @@ from textual.widgets import Static
 from floxim.flow import Flow
 from floxim.render import Picture, render
 
-# Status → (marker, style). The marker carries the meaning; colour only helps (§10.5).
+# Status → (marker, style). The marker carries the meaning; colour only helps.
 STATUS = {
     "succeeded": ("✓", "green"),
     "failed": ("✗", "red"),
@@ -102,7 +102,7 @@ class FileStamp:
 
 
 class FileWatcher:
-    """Polls a file: cheap mtime and size checks first, a hash when they change (§10.3)."""
+    """Polls a file: cheap mtime and size checks first, a hash when they change."""
 
     def __init__(self, path: Path) -> None:
         self.path = path

@@ -1,4 +1,4 @@
-"""The `floxim` command line (spec §9)."""
+"""The `floxim` command line."""
 
 from __future__ import annotations
 
@@ -69,7 +69,7 @@ def _cmd_schema(args: argparse.Namespace) -> int:
 
 
 def _global_flags(parser: argparse.ArgumentParser) -> None:
-    """Flags every command accepts, before or after its name (spec §9.1)."""
+    """Flags every command accepts, before or after its name."""
     group = parser.add_argument_group("global options")
     quiet = argparse.SUPPRESS
     group.add_argument("--project", metavar="DIR", default=quiet, help="project root")

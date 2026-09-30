@@ -1,4 +1,4 @@
-"""The runner lock: one writer per run (spec §7.4).
+"""The runner lock: one writer per run.
 
 `lock` is created with O_CREAT|O_EXCL and holds `{pid, host, started_at,
 heartbeat_at}`. The holder refreshes `heartbeat_at` every few seconds. A lock is

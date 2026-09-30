@@ -3,7 +3,7 @@
 A process adapter builds a command line, feeds the prompt on stdin, saves the
 raw stream to `stream.jsonl` byte for byte, turns each JSON line into adapter
 events with its parser, and builds the result when the process ends. On
-cancellation it runs the §6.7 stop sequence on the process group while still
+cancellation it runs the stop sequence on the process group while still
 reading the stream, so a final result that arrives during the grace period is
 kept.
 """
@@ -80,7 +80,7 @@ class ProcessAdapter:
         self.settings: dict[str, Any] = {}
 
     def configure(self, settings: dict[str, Any]) -> None:
-        """Environment settings from config `harnesses.<name>` (§2.2)."""
+        """Environment settings from config `harnesses.<name>`."""
         self.settings = dict(settings)
 
     @property
@@ -206,7 +206,7 @@ class ProcessAdapter:
 
 def _stopped_outcome(req: AgentRequest, result: AgentResult) -> AgentResult:
     """After Floxim stopped the harness, the outcome follows why it stopped it,
-    keeping any usage and cost the harness reported (§6.7)."""
+    keeping any usage and cost the harness reported."""
     if result.outcome == "succeeded":
         return result  # the result arrived before the stop took effect
     outcome = {"timeout": "timed_out", "budget": "budget_exceeded"}.get(
@@ -279,7 +279,7 @@ async def _feed(process: asyncio.subprocess.Process, text: str | None) -> None:
 
 
 def parse_lines(parser: StreamParser, lines: Sequence[str]) -> list[AdapterEvent]:
-    """Feed recorded lines through a parser (offline fixtures, §8.8)."""
+    """Feed recorded lines through a parser (offline fixtures)."""
     events: list[AdapterEvent] = []
     for line in lines:
         _dispatch(line.encode("utf-8"), parser, events.append)

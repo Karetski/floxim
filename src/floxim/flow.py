@@ -1,4 +1,4 @@
-"""Loading a flow file into its effective form, in the stages of spec §9.4.
+"""Loading a flow file into its effective form, in the stages of `floxim validate`.
 
 Stages, stopping after the first one that reports an error:
 
@@ -7,7 +7,7 @@ Stages, stopping after the first one that reports an error:
    the `include` fragments it names.
 3. Identifiers and reserved words.
 4. Templates: `extends` resolution and cycles, then the effective node of every
-   node (defaults, templates and its own keys merged, §3.4, §3.6) checked
+   node (defaults, templates and its own keys merged) checked
    against its type.
 5. Referenced files exist, and JSON Schemas are valid.
 
@@ -62,7 +62,7 @@ class Origin:
 
 @dataclass
 class Node:
-    """A node after defaults and templates are applied (spec §3.6)."""
+    """A node after defaults and templates are applied."""
 
     id: str
     type: str
@@ -100,7 +100,7 @@ class Flow:
         return self.schemas.get((origin.doc.file, origin.pointer))
 
     def files(self, _seen: set[Path] | None = None) -> list[Path]:
-        """The flow file and every file it references, for run snapshots (§6.1),
+        """The flow file and every file it references, for run snapshots,
         including the files of subflows it calls."""
         seen = _seen if _seen is not None else set()
         seen.add(self.path.resolve())
@@ -435,7 +435,7 @@ class _Loader:
         if node.type == "map" and node.config.get("concurrency", 1) != 1:
             self.problems.append(
                 node.where("concurrency").problem(
-                    "E-SCHEMA", "concurrency is reserved and must be 1 in this version (ADR 0007)"
+                    "E-SCHEMA", "concurrency is reserved and must be 1 in this version"
                 )
             )
 
@@ -525,7 +525,7 @@ def _merge_layer(
 
 
 def merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    """The §3.6 merge rule: mappings merge recursively, anything else replaces,
+    """The template merge rule: mappings merge recursively, anything else replaces,
     and `null` removes the inherited key."""
     out = dict(base)
     for key, value in override.items():

@@ -1,5 +1,5 @@
 """The Codex adapter, offline: stream parsing, command lines, the process path
-through a stub executable, and the strict-schema lint (spec §8.3, §8.4, §5.1.2)."""
+through a stub executable, and the strict-schema lint."""
 
 from __future__ import annotations
 

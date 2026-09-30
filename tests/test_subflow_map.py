@@ -1,4 +1,4 @@
-"""Subflow and map nodes: child runs (spec §5.8, §5.9)."""
+"""Subflow and map nodes: child runs."""
 
 from __future__ import annotations
 

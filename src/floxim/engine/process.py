@@ -1,10 +1,9 @@
-"""Child processes: process groups, output capture and the stop sequence (spec §6.7).
+"""Child processes: process groups, output capture and the stop sequence.
 
 Every child runs in its own session, so its whole process tree can be signalled.
 Stopping sends SIGINT to the group, waits up to the grace period for it to exit,
 then SIGTERM, then after five more seconds SIGKILL; the result records which
-step ended it. This is the only module with platform-specific process code
-(spec §15 Q10).
+step ended it. This is the only module with platform-specific process code.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""`floxim adapter test` (spec §8.8)."""
+"""`floxim adapter test`."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
         "test",
         parents=[common],
         help="run the conformance suite against an adapter",
-        description="Run the adapter conformance suite (spec §8.8).",
+        description="Run the adapter conformance suite.",
     )
     test.add_argument("name", help="adapter name")
     test.add_argument(

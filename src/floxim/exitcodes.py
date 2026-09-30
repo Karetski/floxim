@@ -1,4 +1,4 @@
-"""Process exit codes, stable and documented (spec §9.2)."""
+"""Process exit codes, stable and documented."""
 
 from enum import IntEnum
 

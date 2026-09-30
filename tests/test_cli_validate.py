@@ -1,4 +1,4 @@
-"""`floxim validate` and `floxim schema flow` on the command line (spec §9.1, §9.4)."""
+"""`floxim validate` and `floxim schema flow` on the command line."""
 
 import json
 from pathlib import Path

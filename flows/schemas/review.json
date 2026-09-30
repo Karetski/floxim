@@ -1,9 +1,0 @@
-{
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["verdict", "issues"],
-  "properties": {
-    "verdict": { "enum": ["approve", "changes"] },
-    "issues": { "type": "array", "items": { "type": "string" } }
-  }
-}

@@ -1,4 +1,4 @@
-"""Run inputs: parsing `--input k=v`, coercion to declared types, defaults (spec §3.3)."""
+"""Run inputs: parsing `--input k=v`, coercion to declared types, defaults."""
 
 from __future__ import annotations
 

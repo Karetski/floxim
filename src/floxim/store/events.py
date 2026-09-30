@@ -1,4 +1,4 @@
-"""The append-only event log, `events.jsonl` (spec §7.3, ADR 0012).
+"""The append-only event log, `events.jsonl`.
 
 Each line is one JSON event. Only the process holding the run lock appends. A
 checkpoint event is flushed and `fsync`ed before the writer returns; progress
@@ -19,9 +19,9 @@ from typing import Any
 from floxim.clock import Clock, iso
 
 EVENT_VERSION = 1
-BRANCH = "main"  # the only branch in v1 (ADR 0007)
+BRANCH = "main"  # the only branch in v1
 
-# Events that are flushed but not fsynced (spec §6.2).
+# Events that are flushed but not fsynced.
 NON_DURABLE = frozenset({"progress"})
 
 Event = dict[str, Any]

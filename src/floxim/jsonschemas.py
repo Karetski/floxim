@@ -1,7 +1,7 @@
-"""JSON Schema checking with `fastjsonschema` (pure Python, ADR 0001).
+"""JSON Schema checking with `fastjsonschema` (pure Python).
 
 fastjsonschema implements JSON Schema up to draft-07, so that is the dialect
-flow files use for `output_schema` and input schemas (spec §5.1.2). Remote
+flow files use for `output_schema` and input schemas. Remote
 `$ref`s are never fetched.
 """
 

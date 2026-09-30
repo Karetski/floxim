@@ -1,4 +1,4 @@
-# Normalized results each fixture must produce (spec §8.8).
+# Normalized results each fixture must produce.
 cases:
   success:
     outcome: succeeded

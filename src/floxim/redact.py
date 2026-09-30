@@ -1,4 +1,4 @@
-"""Masking secrets in everything Floxim writes itself (spec §12.4)."""
+"""Masking secrets in everything Floxim writes itself."""
 
 from __future__ import annotations
 

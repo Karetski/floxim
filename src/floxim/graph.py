@@ -1,4 +1,4 @@
-"""The routing graph of a flow (spec §3.9, §6.5).
+"""The routing graph of a flow.
 
 Edges exist only in `next` and `on_error`. A node without `next` routes to
 `end`; `on_error` defaults to `fail`, and `on_error: continue` routes with

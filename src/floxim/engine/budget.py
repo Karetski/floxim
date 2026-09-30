@@ -1,4 +1,4 @@
-"""Budgets and cost (spec §6.8)."""
+"""Budgets and cost."""
 
 from __future__ import annotations
 

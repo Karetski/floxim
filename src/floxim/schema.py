@@ -1,6 +1,6 @@
 """A small type language for flow files.
 
-One declaration drives two things that must never disagree (spec §3.1): the
+One declaration drives two things that must never disagree: the
 validator that reports `E-SCHEMA` / `E-UNKNOWN-KEY` problems with positions,
 and the JSON Schema published by `floxim schema flow` for editors and agents.
 """
@@ -293,7 +293,7 @@ class Struct(Type):
     fields: dict[str, Field]
     doc: str = ""
     extra_keys: Callable[[str], bool] = field(default=lambda key: key.startswith("x-"))
-    # Partial nodes and templates: `null` removes an inherited value (spec §3.6).
+    # Partial nodes and templates: `null` removes an inherited value.
     null_removes: bool = False
 
     def kinds(self) -> set[str]:

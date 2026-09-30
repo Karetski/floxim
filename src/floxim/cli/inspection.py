@@ -1,4 +1,4 @@
-"""`status`, `list`, `logs`, `wait`, `artifacts`, `flows` and `graph` (spec §9.3)."""
+"""`status`, `list`, `logs`, `wait`, `artifacts`, `flows` and `graph`."""
 
 from __future__ import annotations
 
@@ -95,7 +95,7 @@ def _run(args: argparse.Namespace) -> tuple[RunDir | None, int]:
         run = RunDir(runs / resolve_run(runs, args.run))
     except (RunNotFound, AmbiguousRun) as exc:
         return None, _fail(args, "E-NOT-FOUND", str(exc), ExitCode.NOT_FOUND)
-    # Touching a waiting run applies a passed human deadline (lazy timeouts, §6.11).
+    # Touching a waiting run applies a passed human deadline (lazy timeouts).
     enforce_timeouts(run, clock=Clock(), project_root=context.root)
     return run, ExitCode.OK
 

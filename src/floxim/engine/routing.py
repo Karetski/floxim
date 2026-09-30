@@ -1,4 +1,4 @@
-"""Evaluating `next` and `on_error` (spec §3.9, §6.5)."""
+"""Evaluating `next` and `on_error`."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ class Decision:
 
 
 class RoutingError(Exception):
-    """The graph cannot route: `reason` is a run_failed reason (Appendix B)."""
+    """The graph cannot route: `reason` is a run_failed reason."""
 
     def __init__(self, reason: str, message: str) -> None:
         super().__init__(message)

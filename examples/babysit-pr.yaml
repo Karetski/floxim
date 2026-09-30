@@ -47,7 +47,7 @@ nodes:
       If you cannot fix it without a decision from a person, set status to "blocked" and ask your question in summary.
     permissions: edit
     harness_options:
-      network: true                # pushing needs network (§8.3)
+      network: true                # pushing needs network
     output_schema: schemas/fix.json    # {status: fixed|blocked, summary}
     next:
       - when: nodes.fix.output.status == "fixed"

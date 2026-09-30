@@ -1,4 +1,4 @@
-"""The TUI's screens (spec §10.1)."""
+"""The TUI's screens."""
 
 from __future__ import annotations
 
@@ -142,7 +142,7 @@ class RunControl(Screen[None]):
 
 
 class RunsScreen(RunControl):
-    """Active and recent runs; pending prompts first (§10.1)."""
+    """Active and recent runs; pending prompts first."""
 
     BINDINGS = [
         Binding("enter", "open", "Open"),
@@ -220,7 +220,7 @@ class RunsScreen(RunControl):
 
 
 class FlowsScreen(Screen[None]):
-    """Flow files under flow_paths (§10.1)."""
+    """Flow files under flow_paths."""
 
     BINDINGS = [
         Binding("enter", "open", "Graph"),
@@ -304,7 +304,7 @@ class FlowsScreen(Screen[None]):
 
 
 class RunDetailScreen(RunControl):
-    """One run: live graph, visit timeline, inspector, gauges (§10.1)."""
+    """One run: live graph, visit timeline, inspector, gauges."""
 
     BINDINGS = [
         Binding("escape", "app.pop_screen", "Back"),
@@ -378,7 +378,7 @@ class RunDetailScreen(RunControl):
         return "\n".join(diff)
 
     def _reload_problem(self) -> str | None:
-        """Why `resume --reload` cannot continue this run with the edited flow (§7.6)."""
+        """Why `resume --reload` cannot continue this run with the edited flow."""
         status = runinfo.display_status(self.run, self.run.read_state(), Clock())
         if status not in ("interrupted", "waiting"):
             return f"the run is {status}"
@@ -598,7 +598,7 @@ class RunDetailScreen(RunControl):
 
 
 class FlowGraphScreen(Screen[None]):
-    """A flow's graph, live-synced with its file (§10.3), and its editor (§10.4)."""
+    """A flow's graph, live-synced with its file, and its editor."""
 
     BINDINGS = [
         Binding("escape", "app.pop_screen", "Back"),
@@ -701,7 +701,7 @@ class FlowGraphScreen(Screen[None]):
     def _apply(
         self, operation: Any, based_on: str, *, draft: bool = False, allow_invalid: bool = False
     ) -> None:
-        """Write one edit. When the file changed meanwhile, reload and ask (§10.4);
+        """Write one edit. When the file changed meanwhile, reload and ask;
         when a free-text edit would make the flow invalid, offer to keep it as a draft."""
         from floxim.tui.editor import ConfirmModal, apply, file_sha
 

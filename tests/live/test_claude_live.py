@@ -1,4 +1,4 @@
-"""Live contract tests against a real Claude Code install (spec §8.8, §13).
+"""Live contract tests against a real Claude Code install.
 
 They spend money, so they are marked `live`, excluded by default, and run only
 with FLOXIM_LIVE=1: `FLOXIM_LIVE=1 uv run pytest -m live tests/live`. Each

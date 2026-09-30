@@ -1,4 +1,4 @@
-"""Structured edits of flow files (spec §10.4)."""
+"""Structured edits of flow files."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""`${{ }}` templates (spec §4.4)."""
+"""`${{ }}` templates."""
 
 from typing import Any
 

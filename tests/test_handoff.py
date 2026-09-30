@@ -1,4 +1,4 @@
-"""The handoff node (spec §5.10)."""
+"""The handoff node."""
 
 from __future__ import annotations
 

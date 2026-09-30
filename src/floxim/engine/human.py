@@ -1,4 +1,4 @@
-"""The `human` node and answers to it (spec §5.4, §6.11, ADR 0006)."""
+"""The `human` node and answers to it."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def choice_values(choices: list[Any] | None) -> list[str]:
 
 
 def check_answer(prompt: dict[str, Any], answer: Answer) -> None:
-    """Raise InvalidAnswer unless the answer fits the prompt (spec §5.4)."""
+    """Raise InvalidAnswer unless the answer fits the prompt."""
     values = choice_values(prompt.get("choices"))
     if prompt.get("ack"):
         if not answer.acknowledged:
@@ -148,7 +148,7 @@ def _fields(recorded: dict[str, Any], *, timed_out: bool) -> dict[str, Any]:
 
 async def run_hook(runner: Runner, ctx: VisitContext, command: str, message: str) -> None:
     """Run an `on_wait` hook in its own session with a 30 s timeout; its failure is
-    recorded, never fatal (spec §5.4). Values arrive as environment variables."""
+    recorded, never fatal. Values arrive as environment variables."""
     env = runner.process_env(ctx)
     env.update(
         {

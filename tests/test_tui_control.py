@@ -1,4 +1,4 @@
-"""Run control and human prompts from the TUI (spec §10.1, §12.5)."""
+"""Run control and human prompts from the TUI."""
 
 from __future__ import annotations
 

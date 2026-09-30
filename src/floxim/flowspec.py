@@ -1,4 +1,4 @@
-"""The flow file format as data (spec §3 and §5).
+"""The flow file format as data.
 
 `FLOW` is the declaration the validator checks against and from which
 `floxim schema flow` is generated.
@@ -90,10 +90,10 @@ CASE = Struct(
         "reason": Field(TEMPLATE_STR),
     }
 )
-NEXT = OneOf((TARGET, ListOf(CASE, min_items=1)), doc="Where to go after success (§3.9).")
+NEXT = OneOf((TARGET, ListOf(CASE, min_items=1)), doc="Where to go after success.")
 ON_ERROR = OneOf(
     (TARGET, ListOf(CASE, min_items=1)),
-    doc="`fail`, `continue`, a node ID, or a list of cases (§6.5).",
+    doc="`fail`, `continue`, a node ID, or a list of cases.",
 )
 
 RETRY = Struct(
@@ -115,7 +115,7 @@ WORKSPACE = OneOf(
             }
         ),
     ),
-    doc="`shared`, `worktree`, or a named worktree (§6.9).",
+    doc="`shared`, `worktree`, or a named worktree.",
 )
 BUDGET = Struct(
     {
@@ -124,7 +124,7 @@ BUDGET = Struct(
     }
 )
 
-# Keys every node accepts (§3.8). `workspace` and `env` are further limited by type.
+# Keys every node accepts. `workspace` and `env` are further limited by type.
 COMMON: dict[str, Field] = {
     "type": Field(Str(enum=NODE_TYPES)),
     "description": Field(Str()),
@@ -145,7 +145,7 @@ SESSION = OneOf(
         Struct({"resume": Field(Str(), required=True)}),
         Struct({"fork": Field(Str(), required=True)}),
     ),
-    doc="§5.1.3",
+    doc="`new`, `continue`, `{resume: <node>}` or `{fork: <node>}`.",
 )
 CHOICE = OneOf(
     (Str(), Struct({"value": Field(Str(), required=True), "label": Field(Str())})),
@@ -262,7 +262,7 @@ EXACTLY_ONE: dict[str, tuple[tuple[str, ...], ...]] = {
 AT_MOST_ONE: dict[str, tuple[tuple[str, ...], ...]] = {
     "agent": (("instructions", "instructions_file"),),
 }
-# Keys holding paths to files, resolved against the flow file's directory (§2.1).
+# Keys holding paths to files, resolved against the flow file's directory.
 FILE_KEYS: dict[str, tuple[str, ...]] = {
     "agent": ("prompt_file", "instructions_file", "output_schema"),
     "shell": ("output_schema",),
@@ -395,7 +395,7 @@ def flow_json_schema() -> dict[str, Any]:
     }
 
 
-# Result fields readable as `nodes.<id>.<field>` (spec §4.3 and §5).
+# Result fields readable as `nodes.<id>.<field>`.
 COMMON_RESULT_FIELDS = frozenset(
     {"outcome", "visit", "attempts", "started_at", "finished_at", "duration_s", "error", "visits"}
 )
@@ -451,7 +451,7 @@ RUN_FIELDS = frozenset({"id", "flow", "flow_file", "started_at", "workdir", "bud
 BUDGET_FIELDS = frozenset({"usd_spent", "tokens_spent", "usd_left", "tokens_left"})
 NODE_CONTEXT_FIELDS = frozenset({"id", "visit", "attempt", "artifacts_dir", "workdir", "message"})
 
-# Built-in attempt timeouts by node type (spec §3.4); other types have none.
+# Built-in attempt timeouts by node type; other types have none.
 DEFAULT_TIMEOUTS: dict[str, str] = {"agent": "30m", "shell": "10m", "human": "7d"}
-# The longest sleep, unless limits.max_duration is longer (spec §3.4).
+# The longest sleep, unless limits.max_duration is longer.
 MAX_SLEEP = "7d"

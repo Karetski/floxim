@@ -1,4 +1,4 @@
-"""The expression language (spec §4.1, §4.2).
+"""The expression language.
 
 A restricted subset of Python expression syntax, parsed with `ast` and
 evaluated by a whitelist evaluator over JSON values: no `eval`, no builtins, no
@@ -30,7 +30,7 @@ ALIASES = {"true": True, "false": False, "null": None}
 
 
 class ExprError(Exception):
-    """A problem found while parsing: `code` is an Appendix C code."""
+    """A problem found while parsing: `code` is a problem code."""
 
     def __init__(self, code: str, message: str, offset: int = 0) -> None:
         super().__init__(message)
@@ -40,7 +40,7 @@ class ExprError(Exception):
 
 
 class EvalError(Exception):
-    """A run-time error (error kind `expression_error`, spec §4.1)."""
+    """A run-time error (error kind `expression_error`)."""
 
 
 @dataclass(frozen=True)
@@ -134,7 +134,7 @@ _DESCRIPTIONS = {
 
 
 def parse(text: str) -> Expression:
-    """Parse and check an expression. Raises ExprError with an Appendix C code."""
+    """Parse and check an expression. Raises ExprError with a problem code."""
     if len(text) > MAX_LENGTH:
         raise ExprError("E-EXPR-FORBIDDEN", f"expressions are limited to {MAX_LENGTH} characters")
     stripped = text.strip()
@@ -181,7 +181,7 @@ def _check_node(node: ast.AST) -> None:
         if not isinstance(node.func, ast.Name):
             raise ExprError(
                 "E-EXPR-FORBIDDEN",
-                "only the functions of spec §4.2 can be called; method calls are not allowed",
+                "only Floxim's built-in functions can be called; method calls are not allowed",
                 offset,
             )
         if node.func.id.startswith("_"):
@@ -371,7 +371,7 @@ def _truthy(value: Any) -> bool:
 
 def _get(target: Any, key: Any, attr: str | None) -> Any:
     """Null-safe read: a missing key, an index out of range, or anything read
-    from None yields None (spec §4.1)."""
+    from None yields None."""
     if target is None:
         return None
     if isinstance(target, dict):
@@ -414,11 +414,11 @@ def _compare(op: ast.cmpop, left: Any, right: Any) -> bool:
     return _CMPOPS[type(op)](left, right)
 
 
-# -- functions (spec §4.2) ----------------------------------------------------
+# -- functions ----------------------------------------------------
 
 
 def render_text(value: Any) -> str:
-    """Text for a value interpolated into a string (spec §4.4)."""
+    """Text for a value interpolated into a string."""
     if value is None:
         return ""
     if isinstance(value, str):

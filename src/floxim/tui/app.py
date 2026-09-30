@@ -1,4 +1,4 @@
-"""The Floxim TUI application (spec §10)."""
+"""The Floxim TUI application."""
 
 from __future__ import annotations
 

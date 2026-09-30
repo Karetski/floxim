@@ -1,4 +1,4 @@
-"""The Claude Code adapter (spec §8.3, §8.4, research §1.2).
+"""The Claude Code adapter.
 
 Drives `claude -p` with `--output-format stream-json`. Floxim chooses session
 IDs, so `session_started` is known before the process starts. The outcome is
@@ -31,12 +31,12 @@ from floxim.adapters.process import ProcessAdapter, StreamParser
 
 # Tools that change files; denied in the read-only profile.
 EDIT_TOOLS = ("Edit", "Write", "NotebookEdit")
-# Nested orchestration is denied by default (ADR 0005).
+# Nested orchestration is denied by default.
 ALWAYS_DENIED = ("Workflow",)
 
 
 def permission_flags(profile: str) -> list[str]:
-    """The intent of spec §8.4 as Claude Code flags.
+    """The permission profiles as Claude Code flags.
 
     read-only: dontAsk mode allows reads and pre-approved tools and denies
     anything that would prompt; file-editing tools are denied outright.

@@ -1,4 +1,4 @@
-"""The harness adapter contract (spec §8.1, ADR 0011).
+"""The harness adapter contract.
 
 The engine depends on nothing but these types. An adapter drives one harness:
 it declares its capabilities, runs one request while emitting normalized
@@ -200,7 +200,7 @@ class Probe:
 
 class Adapter(Protocol):
     name: ClassVar[str]
-    # Environment variables the harness needs for authentication (spec §12.3).
+    # Environment variables the harness needs for authentication.
     auth_env: ClassVar[tuple[str, ...]]
 
     def capabilities(self) -> Capabilities: ...

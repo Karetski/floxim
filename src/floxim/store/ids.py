@@ -1,4 +1,4 @@
-"""Run IDs and run arguments (spec §7.1)."""
+"""Run IDs and run arguments."""
 
 from __future__ import annotations
 

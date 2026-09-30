@@ -1,4 +1,4 @@
-"""`${{ }}` templates in string fields (spec §4.4)."""
+"""`${{ }}` templates in string fields."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ class Template:
 
     @property
     def is_whole_value(self) -> bool:
-        """The whole field is one `${{ }}` (spec §4.4): the result keeps its type."""
+        """The whole field is one `${{ }}`: the result keeps its type."""
         return len(self.parts) == 1 and self.parts[0].expression is not None
 
     def render(self, namespace: Mapping[str, Any], clock: Clock | None = None) -> Any:

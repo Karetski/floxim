@@ -1,6 +1,6 @@
 name: Release
 
-# Pushing a tag vX.Y.Z publishes that version (ADR 0016): the wheel and sdist
+# Pushing a tag vX.Y.Z publishes that version: the wheel and sdist
 # to PyPI through trusted publishing, and a GitHub release with them and
 # floxim.pyz attached.
 
@@ -34,7 +34,7 @@ jobs:
       - name: Build sdist and wheel
         run: uv build
 
-      - name: Every runtime dependency is pure Python (ADR 0001)
+      - name: Every runtime dependency is pure Python
         run: |
           uv venv /tmp/pure
           uv pip install --python /tmp/pure dist/*.whl

@@ -1,4 +1,4 @@
-"""The python node (spec §5.7)."""
+"""The python node."""
 
 import os
 import sys

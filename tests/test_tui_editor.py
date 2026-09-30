@@ -1,4 +1,4 @@
-"""Editing a flow from the TUI (spec §10.3, §10.4)."""
+"""Editing a flow from the TUI."""
 
 from __future__ import annotations
 

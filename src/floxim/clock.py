@@ -1,4 +1,4 @@
-"""Time, injected so tests of sleeps, timeouts and durations run instantly (spec §13)."""
+"""Time, injected so tests of sleeps, timeouts and durations run instantly."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ class FakeClock(Clock):
 
 
 def iso(moment: datetime.datetime) -> str:
-    """ISO 8601 in UTC with milliseconds, as event timestamps use (spec §7.3)."""
+    """ISO 8601 in UTC with milliseconds, as event timestamps use."""
     return moment.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.") + (
         f"{moment.microsecond // 1000:03d}Z"
     )

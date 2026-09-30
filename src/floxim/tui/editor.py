@@ -1,8 +1,8 @@
-"""Editing a flow from the TUI (spec §10.1, §10.4).
+"""Editing a flow from the TUI.
 
 Every change goes through `floxim.edit`, exactly like `floxim flow <op>`, and
 reaches the screen through the same file polling as an edit made by hand or by
-an agent (§10.3).
+an agent.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def apply(
     path: Path, operation: Operation, *, based_on: str | None = None, allow_invalid: bool = False
 ) -> Failure | None:
     """Run one edit end to end, exactly as `floxim flow <op>` does. `based_on` is
-    the file's SHA-256 when the person started the edit (§10.4 step 4)."""
+    the file's SHA-256 when the person started the edit."""
     try:
         editable = edit.open_flow(path)
         if based_on is not None and editable.sha256 != based_on:

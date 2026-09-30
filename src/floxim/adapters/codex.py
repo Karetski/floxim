@@ -1,4 +1,4 @@
-"""The Codex CLI adapter (spec §8.3, §8.4, research §1.3).
+"""The Codex CLI adapter.
 
 Drives `codex exec --json` with the prompt on stdin. Codex chooses the session
 (thread) ID and announces it in `thread.started`. The outcome is judged from

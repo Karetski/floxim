@@ -1,4 +1,4 @@
-"""Run storage: IDs, the event log, derived state, the lock and the inbox (spec §7)."""
+"""Run storage: IDs, the event log, derived state, the lock and the inbox."""
 
 import datetime
 import json

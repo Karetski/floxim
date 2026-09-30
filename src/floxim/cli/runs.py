@@ -1,4 +1,4 @@
-"""`floxim run` (spec §9.3)."""
+"""`floxim run`."""
 
 from __future__ import annotations
 
@@ -71,7 +71,7 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
         "resume",
         parents=[common],
         help="continue a run",
-        description="Continue a run from its last checkpoint (spec §7.5, §7.6).",
+        description="Continue a run from its last checkpoint.",
     )
     resume.add_argument(
         "run", nargs="?", help="run ID, unique prefix or suffix, @last or @last:<flow>"
@@ -101,7 +101,7 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
         "respond",
         parents=[common],
         help="answer a waiting run",
-        description="Answer a pending human node (spec §5.4, §6.11).",
+        description="Answer a pending human node.",
     )
     respond.add_argument("run", help="run ID, unique prefix or suffix, @last or @last:<flow>")
     respond.add_argument("node", nargs="?", help="the human node (needed when several wait)")
@@ -117,7 +117,7 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
     respond.set_defaults(handler=cmd_respond)
 
     cancel_parser = commands.add_parser(
-        "cancel", parents=[common], help="cancel a run", description="Cancel a run (spec §6.7)."
+        "cancel", parents=[common], help="cancel a run", description="Cancel a run."
     )
     cancel_parser.add_argument("run", help="run ID, unique prefix or suffix, @last or @last:<flow>")
     cancel_parser.add_argument("--reason", help="why, recorded with the cancellation")
@@ -128,7 +128,7 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
         "handoff",
         parents=[common],
         help="open a pending handoff session",
-        description="Open a pending handoff session here, then continue the run (spec §5.10).",
+        description="Open a pending handoff session here, then continue the run.",
     )
     handoff.add_argument("run", help="run ID, unique prefix or suffix, @last or @last:<flow>")
     handoff.add_argument("node", nargs="?", help="the handoff node (needed when several wait)")
@@ -307,7 +307,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 def _untracked(flow: Path) -> bool:
-    """True when the flow file is in a git work tree but not tracked (§12.1)."""
+    """True when the flow file is in a git work tree but not tracked."""
     try:
         result = subprocess.run(
             ["git", "ls-files", "--error-unmatch", "--", flow.name],
@@ -398,7 +398,7 @@ def _fail(args: argparse.Namespace, code: str, message: str, exit_code: int) -> 
 
 def _drive(runner: Runner, run: RunDir, args: argparse.Namespace) -> int:
     """Run in the foreground. SIGINT or SIGTERM leaves the run resumable; a second
-    SIGINT within three seconds skips the grace period (spec §6.7)."""
+    SIGINT within three seconds skips the grace period."""
     last_interrupt = 0.0
 
     def on_signal(signum: int) -> None:

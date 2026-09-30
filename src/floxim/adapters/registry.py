@@ -1,4 +1,4 @@
-"""Finding adapters by name (spec §8.1–8.6).
+"""Finding adapters by name.
 
 Names resolve in this order: built-in adapters, then command adapters declared
 in the project's `.floxim/harnesses/<name>.yaml`, then Python entry points in
@@ -48,7 +48,7 @@ def is_known(name: str, root: Path | None = None) -> bool:
 
 
 def source(name: str, root: Path | None = None) -> str:
-    """Where an adapter comes from, for `floxim adapters` (spec §12.6)."""
+    """Where an adapter comes from, for `floxim adapters`."""
     if name in BUILT_IN:
         return "built-in"
     path = _command_file(name, root)
@@ -62,7 +62,7 @@ def source(name: str, root: Path | None = None) -> str:
 
 
 def is_aap(name: str, root: Path | None = None) -> bool:
-    """A harness file declaring the Agent Adapter Protocol (Planned, spec §8.6)."""
+    """A harness file declaring the Agent Adapter Protocol, which is not supported yet."""
     path = _command_file(name, root)
     if path is None:
         return False

@@ -1,4 +1,4 @@
-"""The `agent` node: one harness session through an adapter (spec §5.1, §8.1)."""
+"""The `agent` node: one harness session through an adapter."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ from floxim.templates import parse_template
 RESUME_PROMPT = (
     "Your previous run was interrupted. Continue the task and finish with the required output."
 )
-MAX_TEXT = 256 * 1024  # of `text` kept in state (spec §6.3); the full text is in the visit dir
+MAX_TEXT = 256 * 1024  # of `text` kept in state; the full text is in the visit dir
 PROGRESS_INTERVAL_S = 0.2  # at most five progress events per second
 
 
@@ -258,7 +258,7 @@ def _add_usage(total: Usage, more: Usage) -> Usage:
 
 
 def _session(ctx: VisitContext, capabilities: Any) -> SessionSpec:
-    """The session for this attempt (spec §5.1.3, §6.6, §7.5)."""
+    """The session for this attempt."""
     state = ctx.runner.state
     setting = ctx.config.get("session", "new")
     new_id = str(uuid.uuid4()) if capabilities.session_id == "caller" else None
@@ -318,7 +318,7 @@ def _previous_attempt_session(state: dict[str, Any], ctx: VisitContext) -> str |
 
 
 class _Forwarder:
-    """Turns adapter events into run events (spec §8.1, Appendix B)."""
+    """Turns adapter events into run events."""
 
     def __init__(self, ctx: VisitContext) -> None:
         self.ctx = ctx
@@ -361,7 +361,7 @@ def _progress(event: AdapterEvent) -> dict[str, Any]:
 
 def _redact_stream(ctx: VisitContext) -> None:
     """Apply `redact` patterns to the raw harness stream unless redact_streams is
-    off (spec §12.4)."""
+    off."""
     runner = ctx.runner
     if not runner.redactor or not runner.config["redact_streams"] or ctx.attempt_dir is None:
         return

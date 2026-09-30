@@ -1,4 +1,4 @@
-"""The CI check that every installed runtime distribution is pure Python (ADR 0001)."""
+"""The CI check that every installed runtime distribution is pure Python."""
 
 from check_pure_python import find_impure
 

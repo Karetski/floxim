@@ -1,8 +1,8 @@
-"""Tier 2: command adapters declared in `.floxim/harnesses/<name>.yaml` (spec §8.5).
+"""Tier 2: command adapters declared in `.floxim/harnesses/<name>.yaml`.
 
 A command adapter drives any CLI with JSON-lines output, without code: the file
 gives the command line, how to send the prompt, how to resume, and expressions
-(§4 language, with `event` bound to each parsed line) that pick the session ID,
+(the expression language, with `event` bound to each parsed line) that pick the session ID,
 text, usage, result and errors out of the stream. Placeholders are substituted
 per argv element, never through a shell.
 """

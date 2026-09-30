@@ -1,6 +1,6 @@
 """Which strings in a node's configuration are templates, and rendering them.
 
-The declarations in `floxim.flowspec` mark templated fields (spec §5, "T");
+The declarations in `floxim.flowspec` mark templated fields;
 validation parses exactly those strings, and the runner renders exactly those.
 """
 

@@ -1,4 +1,4 @@
-"""The fake adapter: scripted responses, no processes, no cost (spec §8.3).
+"""The fake adapter: scripted responses, no processes, no cost.
 
 Every engine test drives agent nodes through it. A script is a list of
 responses. An entry with `match` answers every call whose node, visit and

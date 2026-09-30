@@ -1,4 +1,4 @@
-"""Validation problems (spec §9.4, Appendix C)."""
+"""Validation problems."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ SEVERITIES = {"E": "error", "W": "warning", "I": "info"}
 
 @dataclass(frozen=True)
 class Problem:
-    """One finding. The severity follows from the code's prefix (Appendix C)."""
+    """One finding. The severity follows from the code's prefix."""
 
     code: str
     message: str

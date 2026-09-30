@@ -1,5 +1,4 @@
-"""init, adapters, gc, doctor, global flags, and the published CLI output schemas
-(spec §9.1, §9.3, §7.7)."""
+"""init, adapters, gc, doctor, global flags, and the published CLI output schemas."""
 
 from __future__ import annotations
 

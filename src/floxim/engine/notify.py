@@ -1,4 +1,4 @@
-"""The `notify` node: a command or a webhook, fire and forget (spec §5.11)."""
+"""The `notify` node: a command or a webhook, fire and forget."""
 
 from __future__ import annotations
 

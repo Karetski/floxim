@@ -1,4 +1,4 @@
-"""Child-process entry point for `python` nodes (spec §5.7).
+"""Child-process entry point for `python` nodes.
 
 Run as a script by path, with any Python 3 interpreter: it imports nothing from
 Floxim, so `interpreter:` can name a Python that does not have Floxim

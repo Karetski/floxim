@@ -1,6 +1,6 @@
 """Fail if any distribution installed in this environment ships compiled code.
 
-ADR 0001 requires every runtime dependency to be pure Python. Run this with the
+Floxim requires every runtime dependency to be pure Python. Run this with the
 interpreter of a fresh environment into which only the Floxim wheel was
 installed, so every distribution it sees is Floxim or a runtime dependency.
 """

@@ -1,12 +1,10 @@
-"""Cancel, notify, lazy human timeouts, resume --due and on_resume: ask
-(spec §5.11, §6.7, §6.11, §7.5, §7.6)."""
+"""Cancel, notify, lazy human timeouts, resume --due and on_resume: ask."""
 
 from __future__ import annotations
 
 import http.server
 import json
 import os
-import re
 import subprocess
 import sys
 import threading
@@ -274,51 +272,3 @@ def test_given_interrupted_visit_with_on_resume_ask_when_resumed_then_a_person_d
         (root / "deploys.txt").read_text().splitlines() if (root / "deploys.txt").exists() else []
     )
     assert len(lines) == deploys
-
-
-# -- dogfooding ----------------------------------------------------------------------------------
-
-
-def test_given_the_build_milestone_flow_when_run_on_the_fake_adapter_then_it_commits(
-    tmp_path: Path,
-) -> None:
-    # Given: Floxim's own flow, with the harnesses swapped for scripted fakes
-    repo = Path(__file__).parent.parent
-    flow = (repo / "flows" / "build-milestone.yaml").read_text()
-    flow = flow.replace(
-        "    harness: claude\n",
-        "    harness: fake\n    harness_options:\n      responses:\n"
-        "        - {match: {node: plan}, output: {status: ready, summary: Add the widget, steps: [test, code]}}\n"
-        "        - {match: {node: implement}, text: done}\n",
-    )
-    flow = flow.replace(
-        "    harness: codex\n",
-        "    harness: fake\n    harness_options:\n      responses: [{output: {verdict: approve, issues: []}}]\n",
-    )
-    flow = flow.replace(
-        "run: uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest -q",
-        "run: echo checks pass",
-    )
-    flow = flow.replace(
-        'git commit -m "$MILESTONE: $SUMMARY"', 'echo "$MILESTONE: $SUMMARY" > committed.txt'
-    )
-    root = project(tmp_path, flow)
-    (root / "prompts").mkdir()
-    (root / "schemas").mkdir()
-    for name in ("plan-milestone.md", "implement-milestone.md", "review-milestone.md"):
-        (root / "prompts" / name).write_text((repo / "flows" / "prompts" / name).read_text())
-    for name in ("milestone-plan.json", "review.json"):
-        (root / "schemas" / name).write_text((repo / "flows" / "schemas" / name).read_text())
-    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
-
-    # When
-    assert re.search(r"harness: fake", flow)
-    started = cli(root, "run", "flow.yaml", "--on-wait", "exit", "--input", "milestone=M9z")
-    answered = cli(root, "respond", "@last", "approve", "--choice", "commit")
-
-    # Then
-    assert started.returncode == 4, started.stderr
-    assert answered.returncode == 0, answered.stderr
-    state = wait_for_status(latest(root), {"succeeded", "failed"})
-    assert state["status"] == "succeeded", (latest(root).path / "runner.log").read_text()
-    assert (root / "committed.txt").read_text() == "M9z: Add the widget\n"

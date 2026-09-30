@@ -1,4 +1,4 @@
-"""Build the single-file `floxim.pyz` from a built wheel (ADR 0001).
+"""Build the single-file `floxim.pyz` from a built wheel.
 
 Usage: python tools/build_zipapp.py dist/floxim-<version>-py3-none-any.whl dist/floxim.pyz
 

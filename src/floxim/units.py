@@ -1,4 +1,4 @@
-"""Durations and sizes as written in flow files (spec §3.1, §5.2)."""
+"""Durations and sizes as written in flow files."""
 
 from __future__ import annotations
 

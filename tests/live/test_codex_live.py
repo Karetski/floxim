@@ -1,4 +1,4 @@
-"""Live contract tests against a real Codex CLI (spec §8.8, §15 Q8).
+"""Live contract tests against a real Codex CLI.
 
 Marked `live` and excluded by default; run with FLOXIM_LIVE=1. They settle
 what the offline suite cannot: signals, exit codes and the schema subset.

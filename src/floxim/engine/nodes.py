@@ -1,9 +1,9 @@
-"""Node executors: what each node type does in one attempt (spec §5).
+"""Node executors: what each node type does in one attempt.
 
 The runner owns everything common to all nodes: visits, attempts, retries,
-timeouts, events and routing (§6.2). An executor only runs one attempt of its
+timeouts, events and routing. An executor only runs one attempt of its
 node type and reports the result. Adding a node type means adding an
-executor here; the runner does not change (brief principle 9).
+executor here; the runner does not change.
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ class _Base:
 
 
 class ConditionExecutor(_Base):
-    """Routes without doing work (§5.3). Its visit succeeds unless an expression errors."""
+    """Routes without doing work. Its visit succeeds unless an expression errors."""
 
     async def run(self, ctx: VisitContext) -> AttemptResult:
         decision = decide(ctx.node.config["next"], ctx.namespace, ctx.runner.clock.now)
@@ -80,7 +80,7 @@ class ConditionExecutor(_Base):
 
 
 class SleepExecutor(_Base):
-    """Waits for a duration or until a time (§5.5). `wake_at` is recorded at visit
+    """Waits for a duration or until a time. `wake_at` is recorded at visit
     start, so a resumed run sleeps only for the remainder."""
 
     continues_waiting = True
@@ -118,7 +118,7 @@ class SleepError(Exception):
 
 
 class SetExecutor(_Base):
-    """Assigns variables (§5.6). Values were rendered against the state before the
+    """Assigns variables. Values were rendered against the state before the
     node, at visit start; they are assigned together when the visit succeeds."""
 
     async def run(self, ctx: VisitContext) -> AttemptResult:

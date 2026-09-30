@@ -1,7 +1,7 @@
-"""Creating runs and executing them: the run lifecycle and step loop (spec §6.1, §6.2).
+"""Creating runs and executing them: the run lifecycle and step loop.
 
 Every transition is an event appended to the run's log before the runner moves
-on, so every event boundary is a checkpoint (ADR 0012). The runner keeps the
+on, so every event boundary is a checkpoint. The runner keeps the
 derived state in memory by applying each event as it is written, and rewrites
 `state.json` after each routing decision.
 """
@@ -70,7 +70,7 @@ class FlowInvalid(Exception):
 
 
 class FullPermissionsRefused(Exception):
-    """`permissions: full` needs --allow-full or `allow_full: true` in config (§12.2)."""
+    """`permissions: full` needs --allow-full or `allow_full: true` in config."""
 
     def __init__(self, nodes: list[str]) -> None:
         super().__init__(
@@ -96,7 +96,7 @@ def create_run(
     limits_cap: dict[str, float | None] | None = None,
     depth: int = 0,
 ) -> RunDir:
-    """Validate the flow, resolve inputs, and create the run directory (§6.1 step 1).
+    """Validate the flow, resolve inputs, and create the run directory.
     Raises FlowInvalid or InputError; nothing is created in that case."""
     report = validate(flow_path, config=config, workdir=workdir)
     if not report.ok() or report.flow is None:
@@ -160,7 +160,7 @@ class RunOutcome:
 
 @dataclass
 class ResumeOptions:
-    """`floxim resume` options (spec §7.6)."""
+    """`floxim resume` options."""
 
     reload: bool = False
     from_node: str | None = None
@@ -182,7 +182,7 @@ class Detached(Exception):
 
 
 def crash_hook_from_env(environ: Mapping[str, str]) -> Callable[[Event], None] | None:
-    """Fault injection for tests (spec §13): `FLOXIM_TEST_CRASH_AT=<event type>:<n>`
+    """Fault injection for tests: `FLOXIM_TEST_CRASH_AT=<event type>:<n>`
     kills the process right after the n-th event of that type in the run's log is
     written, counting events earlier processes wrote."""
     spec = environ.get("FLOXIM_TEST_CRASH_AT")
@@ -209,7 +209,7 @@ def crash_hook_from_env(environ: Mapping[str, str]) -> Callable[[Event], None] |
 
 def reload_problem(old: Flow, new: Flow, nodes: dict[str, Any]) -> str | None:
     """Why `new` cannot replace `old` for a run whose node results are `nodes`:
-    every node with a finished visit must still exist with the same type (§7.6)."""
+    every node with a finished visit must still exist with the same type."""
     for node_id, result in nodes.items():
         if result is None:
             continue
@@ -268,7 +268,7 @@ class Runner:
     # -- lifecycle ----------------------------------------------------------------
 
     def check_resumable(self) -> None:
-        """Raise ResumeRefused if this run cannot continue as asked (spec §1.1, §7.6)."""
+        """Raise ResumeRefused if this run cannot continue as asked."""
         status = self.state["status"]
         if status == "succeeded":
             raise ResumeRefused("the run succeeded; a succeeded run cannot be resumed")
@@ -338,7 +338,7 @@ class Runner:
             lock.release()
 
     def request_shutdown(self, urgent: bool = False) -> None:
-        """Stop the current attempt and leave the run resumable (spec §6.7)."""
+        """Stop the current attempt and leave the run resumable."""
         self.shutting_down = True
         if self._current is None:
             return
@@ -351,7 +351,7 @@ class Runner:
             task.cancel()
 
     async def _watch_inbox(self) -> None:
-        """Take cancel requests from other processes while the run goes on (§7.4)."""
+        """Take cancel requests from other processes while the run goes on."""
         while True:
             for path, request in inbox.pending(self.run_dir.inbox):
                 if request.get("type") == "cancel":
@@ -360,7 +360,7 @@ class Runner:
             await self.clock.sleep(INBOX_POLL_S)
 
     def request_cancel(self, by: Any, reason: Any) -> None:
-        """Stop the current attempt and end the run cancelled (spec §6.7)."""
+        """Stop the current attempt and end the run cancelled."""
         if self.cancel is not None:
             return
         self.cancel = {"by": by, "reason": reason}
@@ -404,7 +404,7 @@ class Runner:
         assert self.writer is not None
         return self.writer.append(type_, data, node=node, visit=visit, attempt=attempt)
 
-    # -- the step loop (§6.2) ---------------------------------------------------------
+    # -- the step loop ---------------------------------------------------------
 
     async def _main(self) -> str:
         status = await self._recover()
@@ -428,9 +428,9 @@ class Runner:
                 return status
 
     def _after_visit(self, node: Node, outcome: str, decision: Decision | None) -> str | None:
-        """Route after a finished visit (§6.2 step 5). Returns a final status, or None."""
+        """Route after a finished visit. Returns a final status, or None."""
         if self.cancel is not None or outcome == "cancelled":
-            return self._cancelled()  # cancellation is never routed (§6.5)
+            return self._cancelled()  # cancellation is never routed
         try:
             if decision is None:
                 decision = self._route(node, outcome)
@@ -480,7 +480,7 @@ class Runner:
         )
 
     def run_limits(self) -> tuple[float | None, float | None]:
-        """The run budget: the flow's, capped by what a parent run had left (§5.8)."""
+        """The run budget: the flow's, capped by what a parent run had left."""
         usd, tokens = budget.run_limits(self.flow.limits)
         cap = self.meta.get("limits_cap") or {}
         return _tighter(usd, cap.get("usd")), _tighter(tokens, cap.get("tokens"))
@@ -491,7 +491,7 @@ class Runner:
             return None
         return limit - active_seconds(self.state, iso(self.clock.now()))
 
-    # -- resume (§7.5, §7.6) ----------------------------------------------------------
+    # -- resume ----------------------------------------------------------
 
     async def _recover(self) -> str | None:
         """Bring a resumed run back to a step boundary. Returns a final status, or
@@ -586,7 +586,7 @@ class Runner:
     async def _continue_visit(
         self, node: Node, progress: dict[str, Any]
     ) -> tuple[str, Decision | None]:
-        """Finish a visit that started before the runner stopped (§7.5)."""
+        """Finish a visit that started before the runner stopped."""
         executor = EXECUTORS[node.type]
         visit = progress["visit"]
         attempts = progress["attempts"]
@@ -644,7 +644,7 @@ class Runner:
         return self._finish_visit(ctx, result, count, started)
 
     async def _ask_after_interruption(self, ctx: VisitContext, progress: dict[str, Any]) -> str:
-        """`on_resume: ask`: turn the interruption into a prompt (spec §7.5)."""
+        """`on_resume: ask`: turn the interruption into a prompt."""
         node = ctx.node.id
         response = progress.get("response")
         if response is None:
@@ -674,7 +674,7 @@ class Runner:
         self, executor: Executor, node: Node, progress: dict[str, Any], last: dict[str, Any]
     ) -> tuple[str, Decision | None]:
         """Continue an open attempt of a node that waits (human, sleep): its wait
-        goes on where it stopped, with no new attempt (spec §7.5)."""
+        goes on where it stopped, with no new attempt."""
         visit = progress["visit"]
         ctx = VisitContext(self, node, visit, {}, dict(progress.get("data") or {}))
         ctx.workspace = progress.get("workspace")
@@ -704,7 +704,7 @@ class Runner:
             return self._finish_visit(ctx, result, count, started)
         return self._finish_visit(ctx, result, ctx.attempt, started)
 
-    # -- human answers (§5.4, §6.11) -----------------------------------------------------
+    # -- human answers -----------------------------------------------------
 
     async def wait_for_answer(self, ctx: VisitContext) -> dict[str, Any]:
         """Wait for an answer to the node's pending prompt: from the inbox (another
@@ -774,7 +774,7 @@ class Runner:
         try:
             ctx.namespace = self.namespace(node, visit, 1)
             if node.type in ("human", "notify") and "message" in node.config:
-                # `node.message` is available to the node's other fields (§4.3, §5.11).
+                # `node.message` is available to the node's other fields.
                 message = render_config(
                     node.type, {"message": node.config["message"]}, ctx.namespace, self.clock.now
                 )["message"]
@@ -838,7 +838,7 @@ class Runner:
     async def _attempts(
         self, executor: Executor, ctx: VisitContext, *, first: int = 1, used: int = 0
     ) -> tuple[AttemptResult, int]:
-        """Run attempts until one succeeds or retries run out (§6.6). `used` counts
+        """Run attempts until one succeeds or retries run out. `used` counts
         earlier attempts that ended (interrupted ones do not count)."""
         node = ctx.node
         retry = node.config.get("retry") or {}
@@ -949,7 +949,7 @@ class Runner:
             return decide(on_error, namespace, self.clock.now)
         except RoutingError as exc:
             if exc.reason == "no_route":
-                return None  # a case list without a default falls back to fail (§6.5)
+                return None  # a case list without a default falls back to fail
             raise
 
     def _succeed(self) -> str:
@@ -988,7 +988,7 @@ class Runner:
             self._adapters[name] = adapter
         return self._adapters[name]
 
-    # -- budgets (§6.8) ----------------------------------------------------------------
+    # -- budgets ----------------------------------------------------------------
 
     def _cost(
         self, harness: str, model: str | None, usage: Usage, cost: float | None
@@ -1080,7 +1080,7 @@ class Runner:
         return Path(self.meta["workdir"])
 
     def node_workdir(self, ctx: VisitContext) -> Path:
-        """Where a node's process runs: its worktree, else the run workdir (§6.9)."""
+        """Where a node's process runs: its worktree, else the run workdir."""
         return Path(ctx.workspace["path"]) if ctx.workspace else self.workdir
 
     def git_env(self) -> dict[str, str]:
@@ -1120,7 +1120,7 @@ class Runner:
             self.emit("workspace_removed", {"name": recorded["name"], "path": recorded["path"]})
 
     def process_env(self, ctx: VisitContext, adapter_vars: tuple[str, ...] = ()) -> dict[str, str]:
-        """The environment of a node's child process (spec §12.3)."""
+        """The environment of a node's child process."""
         extra = {str(k): str(v) for k, v in (ctx.config.get("env") or {}).items()}
         artifacts = self.run_dir.artifacts_dir(ctx.node.id, ctx.visit)
         return environment.process_environment(
@@ -1138,7 +1138,7 @@ class Runner:
             },
         )
 
-    # -- the expression namespace (§4.3) ----------------------------------------------------
+    # -- the expression namespace ----------------------------------------------------
 
     def allowed_env(self) -> dict[str, str]:
         return environment.allowed(self.environ, passthrough=self.config["env_passthrough"])

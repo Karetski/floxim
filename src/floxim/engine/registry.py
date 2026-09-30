@@ -1,4 +1,4 @@
-"""Executors by node type. Adding a node type means adding it here (brief principle 9)."""
+"""Executors by node type. Adding a node type means adding it here."""
 
 from __future__ import annotations
 

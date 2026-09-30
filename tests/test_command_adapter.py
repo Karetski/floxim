@@ -1,4 +1,4 @@
-"""Command adapters declared in YAML, and the conformance kit (spec §8.5, §8.8)."""
+"""Command adapters declared in YAML, and the conformance kit."""
 
 from __future__ import annotations
 

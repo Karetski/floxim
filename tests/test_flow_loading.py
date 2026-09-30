@@ -1,4 +1,4 @@
-"""Loading a flow into effective nodes: defaults, templates, includes (spec §3.4, §3.6)."""
+"""Loading a flow into effective nodes: defaults, templates, includes."""
 
 from collections.abc import Callable
 from pathlib import Path

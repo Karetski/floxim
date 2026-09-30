@@ -11,7 +11,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Alexey Karetski" }]
 requires-python = ">=3.10"
-# Runtime dependencies must be pure Python (ADR 0001); CI enforces it.
+# Runtime dependencies must be pure Python; CI enforces it.
 dependencies = [
     "fastjsonschema>=2.19",
     "grandalf>=0.8",

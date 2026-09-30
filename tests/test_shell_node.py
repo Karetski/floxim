@@ -1,4 +1,4 @@
-"""The shell node and process control (spec §5.2, §6.6, §6.7, §12.3, §12.4)."""
+"""The shell node and process control."""
 
 import json
 import time

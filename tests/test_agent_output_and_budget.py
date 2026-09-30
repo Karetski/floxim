@@ -1,4 +1,4 @@
-"""Structured agent output and budgets (spec §5.1.2, §6.8)."""
+"""Structured agent output and budgets."""
 
 from __future__ import annotations
 
@@ -213,7 +213,7 @@ def test_given_usd_budget_on_adapter_without_cost_or_price_when_validated_then_w
 IMPLEMENT_FEATURE = """
 floxim: 1
 name: implement-feature
-description: Appendix A.1 without its human nodes, on the fake adapter.
+description: implement-feature without its human nodes, on the fake adapter.
 inputs:
   feature: {type: string, required: true}
 defaults:

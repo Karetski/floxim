@@ -1,4 +1,4 @@
-"""The run directory (spec §7.2)."""
+"""The run directory."""
 
 from __future__ import annotations
 

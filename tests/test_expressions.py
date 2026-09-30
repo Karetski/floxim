@@ -1,4 +1,4 @@
-"""The expression language (spec §4.1, §4.2)."""
+"""The expression language."""
 
 import datetime
 import time

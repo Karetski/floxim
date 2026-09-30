@@ -5,5 +5,5 @@
 `SDKResultMessage`; code.claude.com, 2026-09-29), not recorded from a real run:
 recording costs money and needs credentials, which the offline suite must not
 use. Re-record them from the pinned version with the live conformance suite
-(`floxim adapter test claude --live`, spec §8.8) and replace these files; keep
+(`floxim adapter test claude --live`) and replace these files; keep
 the file names, which name the cases.

@@ -1,4 +1,4 @@
-"""`floxim validate`: every check of spec §9.4 on one flow file."""
+"""`floxim validate`: every check on one flow file."""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ def validate(
     workdir: Path | None = None,
     implementation_gate: bool = True,
 ) -> Report:
-    """Run the checks in the order of §9.4, stopping after the first stage with errors."""
+    """Run the checks in order, stopping after the first stage with errors."""
     flow, problems = load_flow(path)
     if flow is not None:
         graph = build_graph(flow)

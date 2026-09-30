@@ -1,4 +1,4 @@
-"""The `python` node: call a function in a child process (spec §5.7)."""
+"""The `python` node: call a function in a child process."""
 
 from __future__ import annotations
 

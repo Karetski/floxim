@@ -1,4 +1,4 @@
-"""The `shell` node: run a command (spec §5.2)."""
+"""The `shell` node: run a command."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from floxim.engine.nodes import AttemptResult, VisitContext
 from floxim.engine.process import ProcessResult, run_process
 from floxim.units import parse_size
 
-MAX_OUTPUT_OBJECT = 1024 * 1024  # serialized `output` kept in state (spec §6.3)
+MAX_OUTPUT_OBJECT = 1024 * 1024  # serialized `output` kept in state
 
 
 def shell_argv(config: dict[str, Any], env_path: str | None) -> list[str]:

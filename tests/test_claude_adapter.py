@@ -1,5 +1,5 @@
 """The Claude Code adapter, offline: stream parsing, command lines, and the
-process path through a stub executable (spec §8.3, §8.4, §8.8)."""
+process path through a stub executable."""
 
 from __future__ import annotations
 

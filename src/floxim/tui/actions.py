@@ -1,6 +1,6 @@
-"""Acting on runs from the TUI (spec §10.1): answering, running, cancelling,
+"""Acting on runs from the TUI: answering, running, cancelling,
 resuming, opening sessions and artifacts. Every action goes through the same
-library functions as the CLI, so it produces the same events (brief principle 2).
+library functions as the CLI, so it produces the same events.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ _CONTROL = re.compile(
 
 
 def clean(text: str) -> str:
-    """Text safe to show: terminal control sequences removed (spec §12.5). It is
+    """Text safe to show: terminal control sequences removed. It is
     always displayed as plain text, so markup in it is never interpreted."""
     return _CONTROL.sub("", text)
 
@@ -123,7 +123,7 @@ class AnswerModal(ModalScreen[str | None]):
 
 
 class RunModal(ModalScreen[str | None]):
-    """A form built from the flow's inputs; starts a detached run (§10.1)."""
+    """A form built from the flow's inputs; starts a detached run."""
 
     DEFAULT_CSS = """
     RunModal { align: center middle; }

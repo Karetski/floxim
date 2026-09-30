@@ -1,4 +1,4 @@
-"""The text graph renderer (spec §10.2)."""
+"""The text graph renderer."""
 
 from __future__ import annotations
 

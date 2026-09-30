@@ -1,4 +1,4 @@
-"""Acting on a run from another process: answers, cancels, timeouts (spec §6.11, §7.4).
+"""Acting on a run from another process: answers, cancels, timeouts.
 
 With a live runner, a request goes into the run's inbox and the runner records
 it. Without one, the acting process takes the lock, records the events itself,
@@ -161,7 +161,7 @@ def enforce_timeouts(
     run: RunDir, *, clock: Clock, project_root: Path, continue_run: bool = True
 ) -> bool:
     """Apply a passed human-node deadline when no runner holds the run (lazy
-    timeouts, spec §6.11). Returns whether anything timed out."""
+    timeouts). Returns whether anything timed out."""
     state = run.read_state()
     if state["status"] != "waiting" or lock_state(run.lock, clock.now()) == "live":
         return False

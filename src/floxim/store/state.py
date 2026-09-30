@@ -1,4 +1,4 @@
-"""Run state derived from the event log (spec §7.3).
+"""Run state derived from the event log.
 
 `reduce(events)` is a pure fold: the same events always give the same state, so
 `state.json` is only a cache that can be rebuilt at any time.

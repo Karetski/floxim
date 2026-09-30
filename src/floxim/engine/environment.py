@@ -1,4 +1,4 @@
-"""Which environment variables reach templates and child processes (spec §12.3).
+"""Which environment variables reach templates and child processes.
 
 Processes start from an empty environment plus: a base allowlist, the auth
 variables of the adapter in use, `env_passthrough` from config, the flow's and
@@ -18,7 +18,7 @@ BASE_ALLOWLIST = (
 )  # fmt: skip
 BASE_DENY = ("GIT_DIR", "GIT_WORK_TREE")
 
-# Variables of a parent agent session (research §1.4, §1.5.4); never passed on.
+# Variables of a parent agent session; never passed on.
 SESSION_DENYLIST = (
     "CLAUDECODE",
     "CLAUDE_CODE_SESSION_ID",
@@ -41,7 +41,8 @@ def allowed(
     adapter_vars: Iterable[str] = (),
     session_denylist: Iterable[str] = (),
 ) -> dict[str, str]:
-    """Variables of `source` allowed by sources 1–3 of §12.3."""
+    """Variables of `source` allowed by the base allowlist, the adapter's auth variables
+    and `env_passthrough`."""
     allow = (*BASE_ALLOWLIST, *adapter_vars, *passthrough)
     deny = (*BASE_DENY, *SESSION_DENYLIST, *session_denylist)
     return {

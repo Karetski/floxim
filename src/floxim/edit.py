@@ -1,4 +1,4 @@
-"""Structured edits of a flow file (spec §10.4).
+"""Structured edits of a flow file.
 
 Every edit, from the TUI or from `floxim flow <op>`, goes through this module:
 

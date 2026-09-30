@@ -1,4 +1,4 @@
-"""Requests from other processes to the runner (spec §7.4).
+"""Requests from other processes to the runner.
 
 `floxim respond`, `floxim cancel` and the TUI never append events while a
 runner is live: they drop a request file into `inbox/`, which the runner

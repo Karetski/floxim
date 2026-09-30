@@ -1,4 +1,4 @@
-"""`floxim run` on the command line: exit codes and the --json document (spec §9.2)."""
+"""`floxim run` on the command line: exit codes and the --json document."""
 
 import json
 from pathlib import Path

@@ -1,4 +1,4 @@
-"""The `--json` envelope every command prints (spec §9.1)."""
+"""The `--json` envelope every command prints."""
 
 from __future__ import annotations
 

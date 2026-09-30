@@ -1,4 +1,4 @@
-"""`floxim flow <op>`: structured edits of a flow file (spec §10.4)."""
+"""`floxim flow <op>`: structured edits of a flow file."""
 
 from __future__ import annotations
 

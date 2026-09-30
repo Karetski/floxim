@@ -1,4 +1,4 @@
-"""Workspaces and artifacts (spec §6.9, §6.10)."""
+"""Workspaces and artifacts."""
 
 from __future__ import annotations
 

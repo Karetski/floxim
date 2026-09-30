@@ -1,4 +1,4 @@
-"""Resume and crash safety (spec §7.5, §7.6, §6.7, §13 crash-and-resume layer)."""
+"""Resume and crash safety."""
 
 from __future__ import annotations
 

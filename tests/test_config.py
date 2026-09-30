@@ -1,4 +1,4 @@
-"""Project root discovery and configuration (spec §2.1, §2.2)."""
+"""Project root discovery and configuration."""
 
 from pathlib import Path
 

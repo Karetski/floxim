@@ -1,4 +1,4 @@
-"""Test support: an asyncio event loop with virtual time (spec §13).
+"""Test support: an asyncio event loop with virtual time.
 
 On a `VirtualTimeLoop`, time only moves when every task is waiting on a timer:
 the loop then jumps straight to the next timer. Sleeps and timeouts of any

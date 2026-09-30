@@ -1,4 +1,4 @@
-"""Structured agent output: prompt-based JSON and extraction (spec §5.1.2)."""
+"""Structured agent output: prompt-based JSON and extraction."""
 
 from __future__ import annotations
 

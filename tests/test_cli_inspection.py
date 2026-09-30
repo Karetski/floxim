@@ -1,4 +1,4 @@
-"""Inspection commands: status, list, logs, wait, artifacts, flows, graph (spec §9.3)."""
+"""Inspection commands: status, list, logs, wait, artifacts, flows, graph."""
 
 from __future__ import annotations
 

@@ -48,7 +48,7 @@ jobs:
       - name: The wheel is pure Python
         run: ls dist/floxim-*-py3-none-any.whl
 
-      - name: Every runtime dependency is pure Python (ADR 0001)
+      - name: Every runtime dependency is pure Python
         run: |
           uv venv /tmp/pure
           uv pip install --python /tmp/pure dist/*.whl

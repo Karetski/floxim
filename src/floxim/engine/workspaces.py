@@ -1,4 +1,4 @@
-"""Floxim-managed git worktrees (spec §6.9, ADR 0004).
+"""Floxim-managed git worktrees.
 
 A node with `workspace: worktree` runs in a worktree private to it; a named
 worktree is shared by every node that names it in the run. Worktrees are

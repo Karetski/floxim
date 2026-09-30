@@ -1,5 +1,5 @@
-"""Static checks on a loaded flow: graph (§3.9, §6.4, §6.5), expressions and
-references (§4.5), and security lints (§12.7)."""
+"""Static checks on a loaded flow: graph, expressions and
+references, and security lints."""
 
 from __future__ import annotations
 
@@ -521,7 +521,7 @@ def _reachable_without_human(flow: Flow, graph: Graph) -> set[str]:
 
 
 def limit_checks(flow: Flow) -> list[Problem]:
-    """A sleep with a fixed duration longer than the run may last (spec §3.4, §5.5)."""
+    """A sleep with a fixed duration longer than the run may last."""
     max_duration = flow.limits.get("max_duration", "8h")
     limit = parse_duration(max_duration)
     ceiling = max(parse_duration(MAX_SLEEP) or 0, limit or 0) if limit is not None else None
@@ -560,7 +560,7 @@ def workspace_checks(flow: Flow, workdir: Path) -> list[Problem]:
     return problems
 
 
-# -- harnesses and capabilities (§8.1, §8.2) -------------------------------------
+# -- harnesses and capabilities -------------------------------------
 
 
 def harness_checks(
@@ -661,7 +661,7 @@ def harness_checks(
 
 def handoff_checks(flow: Flow, root: Path | None = None) -> list[Problem]:
     """A handoff's `from` is an agent node whose adapter can open sessions
-    interactively (spec §5.10, §8.1)."""
+    interactively."""
     from floxim.adapters import registry
 
     problems: list[Problem] = []
@@ -718,7 +718,7 @@ def _session_source(flow: Flow, node: Node) -> list[Problem]:
 def strict_schema_problem(schema: Any, path: str = "") -> str | None:
     """The first object in `schema` that OpenAI strict mode is reported to reject:
     one without `additionalProperties: false`, or with a property missing from
-    `required` (spec §5.1.2, research §1.3)."""
+    `required`."""
     if not isinstance(schema, dict):
         return None
     if schema.get("type") == "object" or "properties" in schema:
@@ -747,7 +747,7 @@ def strict_schema_problem(schema: Any, path: str = "") -> str | None:
 
 def subflow_checks(flow: Flow, _seen: frozenset[Path] = frozenset()) -> list[Problem]:
     """Child flows of subflow and map nodes load cleanly, and are passed only the
-    inputs they declare, including every required one (spec §5.8, §5.9)."""
+    inputs they declare, including every required one."""
     problems: list[Problem] = []
     seen = _seen | {flow.path.resolve()}
     for node in flow.nodes.values():

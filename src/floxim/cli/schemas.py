@@ -1,4 +1,4 @@
-"""JSON Schemas of every command's `--json` output (spec §9.1, `floxim schema cli`).
+"""JSON Schemas of every command's `--json` output (`floxim schema cli`).
 
 They are part of Floxim's public interface: scripts and the TUI rely on them,
 and the test suite validates real command output against them.
