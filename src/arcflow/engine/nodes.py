@@ -36,6 +36,7 @@ class VisitContext:
     resume: dict[str, Any] | None = None  # set when continuing an interrupted visit
     stop: Stop = field(default_factory=Stop)  # set to stop the attempt (cancel, shutdown)
     workspace: dict[str, Any] | None = None  # {name, path, branch} of the node's worktree
+    scratch: dict[str, Any] = field(default_factory=dict)  # executor-private, per attempt
 
 
 @dataclass

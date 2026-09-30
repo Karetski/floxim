@@ -508,7 +508,7 @@ Flows that care whether the agent really did the work should require a `status` 
 | `{resume: <id>}` | Resume the latest session of node `<id>`, which must use the same harness (`E-SESSION-HARNESS`). The harness's view of the session changes. |
 | `{fork: <id>}` | Start a copy of node `<id>`'s latest session (Claude `--resume … --fork-session --session-id <new>`; Codex `exec fork`). Falls back to `resume` with a warning when the adapter lacks `fork`. |
 
-When the referenced node has not run, `resume`/`fork` behave as `new` and log a warning event. When the adapter cannot resume, `continue`/`resume` behave as `new` and `validate` warns.
+When the referenced node has not run, `resume`/`fork` behave as `new` and log a warning event (`W-SESSION-NEW`). When the adapter cannot resume, `continue`/`resume` behave as `new` and `validate` warns (`W-IGNORED-OPTION`); a `fork` the adapter cannot do resumes instead, with a `W-FORK-AS-RESUME` warning event. The session chosen for each attempt is recorded in `attempt_started` (`adapter`, `session_mode`, `resume_session_id`).
 
 **Cost on resume.** Adapters report the visit's own spend (the delta), not a session total (research §1.2, "Resume cost semantics").
 
@@ -912,6 +912,7 @@ class Adapter(Protocol):
 ```
 
 - **`run`** starts the harness, emits normalized events while it runs, and returns the result. The brief's `start`/`stream`/`result` are this one coroutine; **cancellation** is `asyncio` task cancellation, on which the adapter must perform the stop sequence of §6.7 and then return (not raise) an `AgentResult` with outcome `cancelled` or `timed_out` as the engine instructs through `req.stop_reason`. Adapters built on `arcflow.adapters.ProcessAdapter` get the process-group handling for free.
+- Adapters also declare `auth_env`, the environment variables their harness needs for authentication (§12.3). The engine keeps one adapter instance per runner process.
 - **`emit`** must be called with `SessionStarted` **as soon as** the session ID is known (Claude: before spawning, since Arcflow chose it; Codex: on `thread.started`). The engine writes it to the event log and `fsync`s before anything else, so a crash after that point can resume the session.
 
 ```python
@@ -930,6 +931,8 @@ class Capabilities:
     tool_rules: bool              # honours allow_tools/deny_tools
     permission_hook: bool         # can route permission prompts to Arcflow (Future)
     streaming: bool               # emits progress during the run
+    effort: bool                  # maps `effort`
+    bare: bool                    # supports `bare`
 
 @dataclass
 class AgentRequest:
@@ -949,8 +952,9 @@ class AgentRequest:
     stop_reason: StopReason | None  # set by the engine before cancelling
 
 AdapterEvent = SessionStarted(session_id) | Text(delta) | ToolCall(name, summary) \
-             | ToolResult(name, ok, summary) | Usage(tokens..., cost_usd) \
+             | ToolResult(name, ok, summary) | UsageUpdate(usage, cost_usd) \
              | PermissionDenied(tool, reason) | Log(level, message)
+# UsageUpdate carries the attempt's cumulative usage so far.
 
 @dataclass
 class AgentResult:
@@ -1042,7 +1046,7 @@ responses:
   - replay: fixtures/claude-2.1.285/success-schema.jsonl   # parse a recorded real stream
 ```
 
-The fake adapter declares every capability, can simulate slow runs (for cancel/timeout tests) and can replay recorded streams through the real adapters' parsers.
+The fake adapter declares every capability, can simulate slow runs (for cancel/timeout tests) and can replay recorded streams through the real adapters' parsers. An entry with `match` answers every call it matches; the other entries answer calls in order, counted per runner process, so tests that resume a run should use `match`.
 
 ### 8.4 Permission profiles
 
@@ -1268,7 +1272,7 @@ Authoring agents can also be used outside Arcflow: `arcflow schema flow` plus `a
 ### 12.2 Agent autonomy
 
 - Default profile `edit`, prompts auto-denied (ADR 0005). Nested orchestration denied (Claude `Workflow` tool).
-- `permissions: full` produces a validate warning (`W-FULL-PERMISSIONS`) and `arcflow run` refuses it unless the flow is run with `--allow-full` or the project config sets `allow_full: true`.
+- `permissions: full` produces a validate warning (`W-FULL-PERMISSIONS`) and `arcflow run` refuses it (`E-FULL-PERMISSIONS`, exit 3) unless the flow is run with `--allow-full` or the project config sets `allow_full: true`.
 - Permission denials are recorded per visit and can be routed on.
 
 ### 12.3 Environment control

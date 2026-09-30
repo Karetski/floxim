@@ -6,9 +6,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from arcflow.adapters.registry import PENDING as PENDING_ADAPTERS
 from arcflow.checks import (
     expression_checks,
     graph_checks,
+    harness_checks,
     limit_checks,
     lint_checks,
     workspace_checks,
@@ -21,7 +23,9 @@ from arcflow.problems import Problem
 # Node types the runner can execute in this version. Validation reports
 # E-NOT-IMPLEMENTED for the others as its last stage; each milestone that makes a
 # node type runnable adds it here (docs/milestones.md).
-IMPLEMENTED_NODE_TYPES: frozenset[str] = frozenset({"condition", "sleep", "set", "shell", "python"})
+IMPLEMENTED_NODE_TYPES: frozenset[str] = frozenset(
+    {"condition", "sleep", "set", "shell", "python", "agent"}
+)
 
 
 @dataclass
@@ -56,6 +60,7 @@ def validate(
             lambda: graph_checks(flow, graph),
             lambda: expression_checks(flow, graph),
             lambda: limit_checks(flow),
+            lambda: harness_checks(flow),
             lambda: workspace_checks(flow, workdir or path.parent),
             lambda: lint_checks(flow, graph, risky),
         ]
@@ -86,6 +91,14 @@ def _not_implemented(flow: Flow) -> list[Problem]:
                 )
             )
             continue
+        harness = node.config.get("harness")
+        if node.type == "agent" and harness in PENDING_ADAPTERS:
+            problems.append(
+                node.where("harness").problem(
+                    "E-NOT-IMPLEMENTED",
+                    f"the {harness} adapter is not available in this version of Arcflow",
+                )
+            )
         for (key, value), what in PENDING_FEATURES.items():
             if node.config.get(key) == value:
                 problems.append(

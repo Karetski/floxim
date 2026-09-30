@@ -1,0 +1,33 @@
+name: harness
+nodes:
+  plan:
+    type: agent
+    harness: fakee
+    prompt: Plan.
+    next: review
+  review:
+    type: agent
+    harness: fake
+    prompt: Review.
+    harness_options: {speed: fast}
+    next: again
+  again:
+    type: agent
+    harness: fake
+    prompt: Again.
+    session: {resume: check}
+    next: branch
+  branch:
+    type: agent
+    harness: fake
+    prompt: Branch.
+    session: {fork: nowhere}
+    next: check
+  check:
+    type: shell
+    run: "true"
+
+# expect: E-UNKNOWN-HARNESS @ 5:14
+# expect: E-HARNESS-OPTIONS @ 12:22
+# expect: E-SESSION-HARNESS @ 18:14
+# expect: E-UNKNOWN-REF @ 24:14

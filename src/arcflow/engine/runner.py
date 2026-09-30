@@ -20,6 +20,8 @@ from pathlib import Path
 from typing import Any
 
 from arcflow import __version__
+from arcflow.adapters import Adapter, UsageUpdate
+from arcflow.adapters import registry as adapter_registry
 from arcflow.clock import Clock, iso, parse_iso
 from arcflow.config import Config
 from arcflow.engine import environment, workspaces
@@ -57,6 +59,17 @@ class FlowInvalid(Exception):
         self.report = report
 
 
+class FullPermissionsRefused(Exception):
+    """`permissions: full` needs --allow-full or `allow_full: true` in config (§12.2)."""
+
+    def __init__(self, nodes: list[str]) -> None:
+        super().__init__(
+            f"node(s) {', '.join(nodes)} use permissions: full; run with --allow-full "
+            "or set allow_full: true in the project config"
+        )
+        self.nodes = nodes
+
+
 # -- creating runs ---------------------------------------------------------------
 
 
@@ -69,6 +82,7 @@ def create_run(
     workdir: Path,
     from_text: set[str] | None = None,
     parent: str | None = None,
+    allow_full: bool = False,
 ) -> RunDir:
     """Validate the flow, resolve inputs, and create the run directory (§6.1 step 1).
     Raises FlowInvalid or InputError; nothing is created in that case."""
@@ -76,6 +90,9 @@ def create_run(
     if not report.ok() or report.flow is None:
         raise FlowInvalid(report)
     flow = report.flow
+    full = [n.id for n in flow.nodes.values() if n.config.get("permissions") == "full"]
+    if full and not (allow_full or config["allow_full"]):
+        raise FullPermissionsRefused(full)
     inputs = resolve_inputs(flow, given_inputs, from_text=from_text or set())
     run_id = new_run_id(flow.name, clock.now())
     flow_sha = hashlib.sha256(flow.path.read_bytes()).hexdigest()
@@ -196,6 +213,7 @@ class Runner:
         self.writer: EventWriter | None = None
         self.shutting_down = False
         self._current: tuple[VisitContext, asyncio.Future[AttemptResult], bool] | None = None
+        self._adapters: dict[str, Adapter] = {}
 
     def _snapshot_path(self) -> Path:
         relative = str(self.state["run"].get("snapshot") or self.meta["snapshot_flow"])
@@ -608,11 +626,14 @@ class Runner:
                 raise Detached
             ctx.attempt = attempt
             ctx.stop = Stop()
+            ctx.scratch = {}
             ctx.attempt_dir = self.run_dir.attempt_dir(node.id, ctx.visit, attempt)
             ctx.attempt_dir.mkdir(parents=True, exist_ok=True)
+            attempt_info = getattr(executor, "attempt_info", None)
+            info = attempt_info(ctx) if attempt_info is not None else {}
             self.emit(
                 "attempt_started",
-                {"attempt": attempt},
+                {"attempt": attempt, **info},
                 node=node.id,
                 visit=ctx.visit,
                 attempt=attempt,
@@ -717,6 +738,16 @@ class Runner:
         return totals
 
     # -- processes ------------------------------------------------------------------------
+
+    def adapter(self, name: str) -> Adapter:
+        """The run's adapter instance for a harness (one per runner process)."""
+        if name not in self._adapters:
+            self._adapters[name] = adapter_registry.load(name)
+        return self._adapters[name]
+
+    def on_usage(self, ctx: VisitContext, event: UsageUpdate) -> None:
+        """Usage reported while an agent attempt runs."""
+        ctx.scratch["usage"] = event
 
     @property
     def workdir(self) -> Path:

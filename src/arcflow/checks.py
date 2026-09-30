@@ -558,3 +558,97 @@ def workspace_checks(flow: Flow, workdir: Path) -> list[Problem]:
                 )
             )
     return problems
+
+
+# -- harnesses and capabilities (§8.1, §8.2) -------------------------------------
+
+
+def harness_checks(flow: Flow) -> list[Problem]:
+    from arcflow import jsonschemas
+    from arcflow.adapters import registry
+
+    problems: list[Problem] = []
+    for node in flow.nodes.values():
+        if node.type != "agent":
+            continue
+        config = node.config
+        harness = config.get("harness")
+        if not isinstance(harness, str):
+            continue
+        where = node.where("harness")
+        if not registry.is_known(harness):
+            hint = closest(harness, registry.names())
+            problems.append(
+                where.problem(
+                    "E-UNKNOWN-HARNESS",
+                    f"no adapter named {harness!r}"
+                    + (f" (did you mean {hint!r}?)" if hint else ""),
+                )
+            )
+            continue
+        problems += _session_source(flow, node)
+        if harness in registry.PENDING:
+            continue  # reported as E-NOT-IMPLEMENTED by the last stage
+        adapter = registry.load(harness)
+        caps = adapter.capabilities()
+        options = config.get("harness_options") or {}
+        error = jsonschemas.validation_error(
+            jsonschemas.compile_schema(adapter.options_schema()), options
+        )
+        if error is not None:
+            problems.append(node.where("harness_options").problem("E-HARNESS-OPTIONS", error))
+        if "extra_args" in options:
+            problems.append(
+                node.where("harness_options").problem(
+                    "I-EXTRA-ARGS", "harness_options.extra_args passes arguments straight through"
+                )
+            )
+        permissions = config.get("permissions", "edit")
+        if permissions not in caps.permission_profiles:
+            problems.append(
+                node.where("permissions").problem(
+                    "E-PERMISSION-UNSUPPORTED",
+                    f"the {harness} adapter has no {permissions!r} permission profile",
+                )
+            )
+        ignored = []
+        if "effort" in config and not caps.effort:
+            ignored.append("effort")
+        if ("allow_tools" in config or "deny_tools" in config) and not caps.tool_rules:
+            ignored.append("allow_tools/deny_tools")
+        if config.get("bare") and not caps.bare:
+            ignored.append("bare")
+        if "max_turns" in config and not caps.turn_cap:
+            ignored.append("max_turns")
+        session = config.get("session", "new")
+        if session != "new" and not caps.resume:
+            ignored.append("session (sessions cannot be resumed; each attempt starts new)")
+        elif isinstance(session, dict) and "fork" in session and not caps.fork:
+            ignored.append("session.fork (the session is resumed instead)")
+        for what in ignored:
+            problems.append(
+                node.origin.problem(
+                    "W-IGNORED-OPTION", f"the {harness} adapter ignores {what}", key=True
+                )
+            )
+    return problems
+
+
+def _session_source(flow: Flow, node: Node) -> list[Problem]:
+    session = node.config.get("session")
+    if not isinstance(session, dict):
+        return []
+    key = "resume" if "resume" in session else "fork"
+    source_id = session[key]
+    source = flow.nodes.get(source_id)
+    where = node.where("session")
+    if source is None:
+        return [where.problem("E-UNKNOWN-REF", f"session.{key}: no node named {source_id!r}")]
+    if source.type != "agent" or source.config.get("harness") != node.config.get("harness"):
+        return [
+            where.problem(
+                "E-SESSION-HARNESS",
+                f"session.{key}: {source_id!r} must be an agent node on the same harness",
+            )
+        ]
+    return []

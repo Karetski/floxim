@@ -15,6 +15,7 @@ from arcflow.clock import Clock
 from arcflow.engine.inputs import InputError, load_inputs_file, parse_assignments
 from arcflow.engine.runner import (
     FlowInvalid,
+    FullPermissionsRefused,
     ResumeOptions,
     ResumeRefused,
     Runner,
@@ -45,6 +46,9 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
     run.add_argument("--inputs-file", type=Path, help="YAML or JSON file of input values")
     run.add_argument("--workdir", type=Path, help="run working directory (default: project root)")
     run.add_argument("--events", action="store_true", help="stream events as JSON lines")
+    run.add_argument(
+        "--allow-full", action="store_true", help="allow agent nodes with permissions: full"
+    )
     run.set_defaults(handler=cmd_run)
 
     resume = commands.add_parser(
@@ -87,6 +91,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             clock=clock,
             workdir=workdir,
             from_text=set(assigned),
+            allow_full=args.allow_full,
         )
     except FlowInvalid as exc:
         problems = exc.report.problems
@@ -97,11 +102,9 @@ def cmd_run(args: argparse.Namespace) -> int:
             print_problems(problems)
         return ExitCode.INVALID
     except InputError as exc:
-        if args.json:
-            emit_json(False, error=error("E-INVALID-INPUT", str(exc)))
-        else:
-            stderr(f"arcflow: {exc}")
-        return ExitCode.INVALID
+        return _fail(args, "E-INVALID-INPUT", str(exc), ExitCode.INVALID)
+    except FullPermissionsRefused as exc:
+        return _fail(args, "E-FULL-PERMISSIONS", str(exc), ExitCode.INVALID)
     stderr(f"run {run.id}")
     runner = Runner(
         run,

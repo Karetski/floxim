@@ -20,7 +20,6 @@ import json
 import sys
 import traceback
 
-
 # Read-only context passed to functions that accept `ctx`.
 Context = collections.namedtuple(
     "Context", ["run_id", "node_id", "visit", "artifacts_dir", "workdir"]
