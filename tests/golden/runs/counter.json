@@ -32,7 +32,8 @@
     "data": {
       "config_ref": "nodes/count/1/visit.json",
       "config_sha256": "2f4613f7579dd98e7efa0b9228ff7ebf3715569861f078a70d0bb53cae56d7b1",
-      "type": "set"
+      "type": "set",
+      "workspace": null
     },
     "node": "count",
     "seq": 3,
@@ -111,7 +112,8 @@
     "data": {
       "config_ref": "nodes/check/1/visit.json",
       "config_sha256": "820a98d8195b39b821471f3be054b1908395c51c07021a24928690b5d2319b23",
-      "type": "condition"
+      "type": "condition",
+      "workspace": null
     },
     "node": "check",
     "seq": 8,
@@ -189,7 +191,8 @@
       "config_ref": "nodes/nap/1/visit.json",
       "config_sha256": "c86b87b5198c6f1c544ab1a402a665c877f8df22d168c5ea2f8fffadd33e9ed1",
       "type": "sleep",
-      "wake_at": "2026-09-30T12:10:00.000Z"
+      "wake_at": "2026-09-30T12:10:00.000Z",
+      "workspace": null
     },
     "node": "nap",
     "seq": 13,
@@ -266,7 +269,8 @@
     "data": {
       "config_ref": "nodes/count/2/visit.json",
       "config_sha256": "d17fdc66353498ef61910138dab350fdbd8e1c7c0fd9d337230f81c5ee497945",
-      "type": "set"
+      "type": "set",
+      "workspace": null
     },
     "node": "count",
     "seq": 18,
@@ -345,7 +349,8 @@
     "data": {
       "config_ref": "nodes/check/2/visit.json",
       "config_sha256": "820a98d8195b39b821471f3be054b1908395c51c07021a24928690b5d2319b23",
-      "type": "condition"
+      "type": "condition",
+      "workspace": null
     },
     "node": "check",
     "seq": 23,
@@ -423,7 +428,8 @@
       "config_ref": "nodes/nap/2/visit.json",
       "config_sha256": "c86b87b5198c6f1c544ab1a402a665c877f8df22d168c5ea2f8fffadd33e9ed1",
       "type": "sleep",
-      "wake_at": "2026-09-30T12:20:00.000Z"
+      "wake_at": "2026-09-30T12:20:00.000Z",
+      "workspace": null
     },
     "node": "nap",
     "seq": 28,
@@ -500,7 +506,8 @@
     "data": {
       "config_ref": "nodes/count/3/visit.json",
       "config_sha256": "27971d39b9be123002c18d8b74f663b55fe13f61804748215b2da2ef13297798",
-      "type": "set"
+      "type": "set",
+      "workspace": null
     },
     "node": "count",
     "seq": 33,
@@ -579,7 +586,8 @@
     "data": {
       "config_ref": "nodes/check/3/visit.json",
       "config_sha256": "820a98d8195b39b821471f3be054b1908395c51c07021a24928690b5d2319b23",
-      "type": "condition"
+      "type": "condition",
+      "workspace": null
     },
     "node": "check",
     "seq": 38,

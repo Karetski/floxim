@@ -60,6 +60,9 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
         "--rerun", action="store_true", help="rerun an interrupted visit from scratch"
     )
     resume.add_argument("--force", action="store_true", help="resume a failed or cancelled run")
+    resume.add_argument(
+        "--recreate-workspaces", action="store_true", help="recreate deleted worktrees"
+    )
     resume.add_argument("--events", action="store_true", help="stream events as JSON lines")
     resume.set_defaults(handler=cmd_resume)
 
@@ -117,7 +120,11 @@ def cmd_resume(args: argparse.Namespace) -> int:
     except (RunNotFound, AmbiguousRun) as exc:
         return _fail(args, "E-NOT-FOUND", str(exc), ExitCode.NOT_FOUND)
     options = ResumeOptions(
-        reload=args.reload, from_node=args.from_node, rerun=args.rerun, force=args.force
+        reload=args.reload,
+        from_node=args.from_node,
+        rerun=args.rerun,
+        force=args.force,
+        recreate_workspaces=args.recreate_workspaces,
     )
     try:
         runner = Runner(

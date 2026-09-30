@@ -775,7 +775,9 @@ workspace:
   keep: true                        # default true; false removes it when the run succeeds
 ```
 
-- Created on first use with `git worktree add -b <branch> .arcflow/worktrees/<run-id>/<name> <base>`. `<name>` defaults to the node ID. Base commit and branch are recorded (`workspace_created`) so resume reuses the same worktree.
+- Created on first use with `git worktree add -b <branch> .arcflow/worktrees/<run-id>/<name> <base>` (under the project root). `<name>` defaults to the node ID. The default base is the run workdir's `HEAD` when the run was created, recorded as `git_head` in `run.json`. Base commit and branch are recorded (`workspace_created`) so resume reuses the same worktree. When several nodes name one worktree, the first to run creates it and its `base`/`branch` apply.
+- `keep: false` worktrees are removed with `git worktree remove --force` when the run succeeds (`workspace_removed`); their branches stay. `--recreate-workspaces` recreates a missing worktree from its recorded branch, so only what was committed there comes back.
+- A worktree that cannot be created fails the visit with error kind `workspace_error`.
 - The run workdir must be inside a git repository, otherwise `E-WORKSPACE-NO-GIT` at validate/run start.
 - Arcflow never merges, pushes or deletes branches by itself; flows do that with shell nodes (Appendix A, example 2). `arcflow gc` removes worktrees of finished runs older than `retention.keep_days` whose `keep` is false or whose branch is fully merged.
 - Harness-native worktree flags (`claude -w`, `codex --worktree`) are not used.
@@ -1783,7 +1785,8 @@ All events carry `v`, `seq`, `ts`, `type`, and where relevant `branch`, `node`, 
 | `runner_attached` / `runner_detached` / `runner_takeover` | `pid`, `host`, `reason` |
 | `flow_reloaded` | `old_sha256`, `new_sha256`, `snapshot` |
 | `visit_started` | `type`, `config_ref` (path to `visit.json`), `config_sha256`, `wake_at` (sleep), `workspace` |
-| `workspace_created` | `name`, `path`, `branch`, `base_commit` |
+| `workspace_created` | `name`, `path`, `branch`, `base_commit`, `keep`, and `recreated: true` when `--recreate-workspaces` put it back |
+| `workspace_removed` | `name`, `path` |
 | `attempt_started` | `attempt`, `adapter`, `session_mode`, `resume_session_id` |
 | `session_started` | `session_id` (fsynced immediately, §8.1) |
 | `progress` | `kind` (`text`, `tool_call`, `tool_result`, `usage`, `log`), `summary` (sampled, at most 5 per second; full detail is in `stream.jsonl`) |

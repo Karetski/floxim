@@ -208,6 +208,14 @@ def _workspace_created(
     state["workspaces"][data["name"]] = data
 
 
+def _workspace_removed(
+    state: State, event: Event, data: dict[str, Any], ts: str, node: Any
+) -> None:
+    recorded = state["workspaces"].get(data["name"])
+    if recorded is not None:
+        recorded["removed"] = True
+
+
 def _human_waiting(state: State, event: Event, data: dict[str, Any], ts: str, node: Any) -> None:
     state["pending_human"][node] = {**data, "visit": event.get("visit"), "since": ts}
 
@@ -264,6 +272,7 @@ _HANDLERS = {
     "flow_reloaded": _flow_reloaded,
     "visit_started": _visit_started,
     "workspace_created": _workspace_created,
+    "workspace_removed": _workspace_removed,
     "attempt_started": _attempt_started,
     "session_started": _session_started,
     "permission_denied": _permission_denied,

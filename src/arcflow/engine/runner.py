@@ -22,7 +22,7 @@ from typing import Any
 from arcflow import __version__
 from arcflow.clock import Clock, iso, parse_iso
 from arcflow.config import Config
-from arcflow.engine import environment
+from arcflow.engine import environment, workspaces
 from arcflow.engine.inputs import resolve_inputs
 from arcflow.engine.nodes import AttemptResult, Executor, SleepError, VisitContext
 from arcflow.engine.process import Stop
@@ -30,7 +30,7 @@ from arcflow.engine.registry import EXECUTORS
 from arcflow.engine.routing import Decision, RoutingError, decide
 from arcflow.expr import EvalError, ExprError
 from arcflow.flow import Flow, Node, load_flow
-from arcflow.flowspec import DEFAULT_TIMEOUTS
+from arcflow.flowspec import DEFAULT_TIMEOUTS, WORKSPACE_TYPES
 from arcflow.redact import Redactor
 from arcflow.rendering import render_config
 from arcflow.store.events import Event, EventWriter, read_log
@@ -94,6 +94,7 @@ def create_run(
             "parent": parent,
             "host": hostname(),
             "user": getpass.getuser(),
+            "git_head": workspaces.head_commit(workdir, os.environ),
         },
     )
     snapshot_flow = run.write_snapshot(flow.files(), flow.path)
@@ -134,6 +135,7 @@ class ResumeOptions:
     from_node: str | None = None
     rerun: bool = False
     force: bool = False
+    recreate_workspaces: bool = False
 
 
 class ResumeRefused(Exception):
@@ -217,6 +219,13 @@ class Runner:
             raise ResumeRefused(f"the run {status}; use --force to continue it anyway")
         if self.options.from_node and self.options.from_node not in self.flow.nodes:
             raise ResumeRefused(f"--from: no node named {self.options.from_node!r}")
+        missing = [w for w in self.state["workspaces"].values() if not Path(w["path"]).is_dir()]
+        if missing and not self.options.recreate_workspaces:
+            names = ", ".join(w["name"] for w in missing)
+            raise ResumeRefused(
+                f"E-WORKSPACE-MISSING: worktree {names} no longer exists; "
+                "use --recreate-workspaces to recreate it from its branch"
+            )
 
     async def run(self) -> RunOutcome:
         if self.state["status"] != "pending":
@@ -370,6 +379,10 @@ class Runner:
         """Bring a resumed run back to a step boundary. Returns a final status, or
         None to continue with the step loop."""
         options = self.options
+        for recorded in list(self.state["workspaces"].values()):
+            if not Path(recorded["path"]).is_dir():
+                workspaces.recreate(recorded, self.workdir, self.git_env())
+                self.emit("workspace_created", {**recorded, "recreated": True})
         if self.state["status"] in ("failed", "cancelled"):
             self._reopen()
         if options.reload:
@@ -481,6 +494,7 @@ class Runner:
             else node.config.get("on_resume", executor.default_on_resume)
         )
         ctx = VisitContext(self, node, visit, {}, dict(progress.get("data") or {}))
+        ctx.workspace = progress.get("workspace")
         ctx.namespace = self.namespace(node, visit, (last or {}).get("attempt", 0) + 1)
         if self.options.rerun:
             ctx.config = render_config(node.type, node.config, ctx.namespace, self.clock.now)
@@ -505,14 +519,18 @@ class Runner:
         visit_dir = self.run_dir.visit_dir(node.id, visit)
         visit_dir.mkdir(parents=True, exist_ok=True)
         started = self.clock.now()
+        self.run_dir.artifacts_dir(node.id, visit).mkdir(parents=True, exist_ok=True)
         ctx = VisitContext(self, node, visit, {}, {})
-        render_error: str | None = None
+        failure: AttemptResult | None = None
         try:
             ctx.namespace = self.namespace(node, visit, 1)
             ctx.config = render_config(node.type, node.config, ctx.namespace, self.clock.now)
+            ctx.workspace = self._workspace(node, visit, ctx.config)
             ctx.visit_data = executor.prepare(ctx)
         except (ExprError, EvalError, SleepError) as exc:
-            render_error = str(exc)
+            failure = AttemptResult.failed("expression_error", str(exc))
+        except workspaces.WorkspaceError as exc:
+            failure = AttemptResult.failed("workspace_error", str(exc))
         config_text = json.dumps(ctx.config, indent=2, ensure_ascii=False, default=str)
         (visit_dir / "visit.json").write_text(config_text + "\n")
         self.emit(
@@ -521,15 +539,14 @@ class Runner:
                 "type": node.type,
                 "config_ref": str((visit_dir / "visit.json").relative_to(self.run_dir.path)),
                 "config_sha256": hashlib.sha256(config_text.encode()).hexdigest(),
+                "workspace": ctx.workspace,
                 **ctx.visit_data,
             },
             node=node.id,
             visit=visit,
         )
-        if render_error is not None:
-            return self._finish_visit(
-                ctx, AttemptResult.failed("expression_error", render_error), 0, started
-            )
+        if failure is not None:
+            return self._finish_visit(ctx, failure, 0, started)
         result, count = await self._attempts(executor, ctx)
         return self._finish_visit(ctx, result, count, started)
 
@@ -537,8 +554,16 @@ class Runner:
         self, ctx: VisitContext, result: AttemptResult, attempts: int, started: Any
     ) -> tuple[str, Decision | None]:
         finished = self.clock.now()
+        extra: dict[str, Any] = {}
+        if ctx.node.type in WORKSPACE_TYPES:
+            workspace = ctx.workspace or {"path": str(self.workdir), "branch": None}
+            extra = {
+                "workspace": {"path": workspace["path"], "branch": workspace["branch"]},
+                "artifacts_dir": str(self.run_dir.artifacts_dir(ctx.node.id, ctx.visit)),
+            }
         fields = {
             **result.fields,
+            **extra,
             "outcome": result.outcome,
             "visit": ctx.visit,
             "attempts": attempts,
@@ -673,6 +698,7 @@ class Runner:
             outputs = render_value(self.flow.outputs, namespace, self.clock.now)
         except (ExprError, EvalError) as exc:
             return self._fail("expression_error", f"outputs: {exc}", None)
+        self._remove_temporary_workspaces()
         self.emit("run_succeeded", {"outputs": outputs, "totals": self._totals()})
         self.run_dir.write_state(self.state)
         return "succeeded"
@@ -692,9 +718,49 @@ class Runner:
 
     # -- processes ------------------------------------------------------------------------
 
-    def node_workdir(self, ctx: VisitContext) -> Path:
-        """Where a node's process runs: the run workdir (worktrees come with workspaces)."""
+    @property
+    def workdir(self) -> Path:
         return Path(self.meta["workdir"])
+
+    def node_workdir(self, ctx: VisitContext) -> Path:
+        """Where a node's process runs: its worktree, else the run workdir (§6.9)."""
+        return Path(ctx.workspace["path"]) if ctx.workspace else self.workdir
+
+    def git_env(self) -> dict[str, str]:
+        return environment.allowed(self.environ, passthrough=self.config["env_passthrough"])
+
+    def _workspace(
+        self, node: Node, visit: int, config: Mapping[str, Any]
+    ) -> dict[str, Any] | None:
+        """The node's worktree, created on first use and reused after that."""
+        if node.type not in WORKSPACE_TYPES:
+            return None
+        spec = workspaces.spec_for(node.id, config.get("workspace"))
+        if spec is None:
+            return None
+        recorded = self.state["workspaces"].get(spec.name)
+        if recorded is None:
+            recorded = workspaces.create(
+                spec,
+                run_id=self.meta["id"],
+                root=self.config.root,
+                workdir=self.workdir,
+                default_base=self.meta.get("git_head"),
+                env=self.git_env(),
+            )
+            self.emit("workspace_created", recorded, node=node.id, visit=visit)
+        return {"name": spec.name, "path": recorded["path"], "branch": recorded["branch"]}
+
+    def _remove_temporary_workspaces(self) -> None:
+        for recorded in list(self.state["workspaces"].values()):
+            if recorded.get("keep", True) or not Path(recorded["path"]).is_dir():
+                continue
+            try:
+                workspaces.remove(recorded, self.workdir, self.git_env())
+            except workspaces.WorkspaceError as exc:
+                self.emit("warning", {"code": "W-WORKSPACE-REMOVE", "message": str(exc)})
+                continue
+            self.emit("workspace_removed", {"name": recorded["name"], "path": recorded["path"]})
 
     def process_env(self, ctx: VisitContext, adapter_vars: tuple[str, ...] = ()) -> dict[str, str]:
         """The environment of a node's child process (spec §12.3)."""
