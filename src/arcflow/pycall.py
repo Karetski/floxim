@@ -21,6 +21,12 @@ import sys
 import traceback
 
 
+# Read-only context passed to functions that accept `ctx`.
+Context = collections.namedtuple(
+    "Context", ["run_id", "node_id", "visit", "artifacts_dir", "workdir"]
+)
+
+
 def main() -> int:
     request = json.load(sys.stdin)
     sys.path.insert(0, request["project_root"])
@@ -33,9 +39,7 @@ def main() -> int:
             p.kind is inspect.Parameter.VAR_KEYWORD for p in parameters.values()
         )
         if accepts_ctx:
-            fields = sorted(request["ctx"])
-            Context = collections.namedtuple("Context", fields)  # read-only
-            kwargs["ctx"] = Context(**{k: request["ctx"][k] for k in fields})
+            kwargs["ctx"] = Context(**request["ctx"])
         value = function(**kwargs)
         text = json.dumps({"ok": True, "value": value})
     except BaseException as exc:  # report everything, including SystemExit
