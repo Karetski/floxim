@@ -30,6 +30,7 @@ from arcflow import runinfo
 from arcflow.clock import Clock, parse_iso
 from arcflow.config import Config
 from arcflow.engine.budget import run_limits
+from arcflow.engine.runner import reload_problem
 from arcflow.flow import Flow, load_flow
 from arcflow.store.events import read_log
 from arcflow.store.rundir import RunDir
@@ -74,12 +75,16 @@ def _duration(item: dict[str, Any]) -> str:
     )
 
 
+def snapshot_of(run: RunDir) -> Path | None:
+    relative = run.read_state().get("run", {}).get("snapshot") or run.meta().get("snapshot_flow")
+    return run.path / str(relative) if relative else None
+
+
 def run_flow_of(run: RunDir) -> Flow | None:
-    state = run.read_state()
-    relative = state.get("run", {}).get("snapshot") or run.meta().get("snapshot_flow")
-    if not relative:
+    snapshot = snapshot_of(run)
+    if snapshot is None:
         return None
-    flow, _ = load_flow(run.path / str(relative))
+    flow, _ = load_flow(snapshot)
     return flow
 
 
@@ -310,6 +315,7 @@ class RunDetailScreen(RunControl):
         Binding("g", "open_in_harness", "Open session"),
         Binding("y", "copy_session", "Copy session ID"),
         Binding("o", "open_artifact", "Open artifact"),
+        Binding("L", "reload_flow", "Resume with edited flow"),
     ]
 
     def __init__(self, config: Config, run_id: str) -> None:
@@ -335,7 +341,15 @@ class RunDetailScreen(RunControl):
             with Vertical(id="side"):
                 yield ListView(id="timeline")
                 with TabbedContent(id="inspector"):
-                    for tab in ("prompt", "output", "activity", "logs", "artifacts", "usage"):
+                    for tab in (
+                        "prompt",
+                        "output",
+                        "activity",
+                        "logs",
+                        "artifacts",
+                        "usage",
+                        "flow",
+                    ):
                         with TabPane(tab.capitalize(), id=f"tab-{tab}"), VerticalScroll():
                             yield Static("", id=f"inspect-{tab}")
         yield Footer()
@@ -346,6 +360,45 @@ class RunDetailScreen(RunControl):
 
     def selected_run(self) -> RunDir | None:
         return self.run
+
+    def _flow_change(self) -> str:
+        """A diff of the run's snapshot against the flow file as it is now, or ""."""
+        import difflib
+
+        current = Path(str(self.run.meta().get("flow_path")))
+        snapshot = snapshot_of(self.run)
+        if snapshot is None or not current.exists() or not snapshot.exists():
+            return ""
+        before, after = snapshot.read_text(), current.read_text()
+        if before == after:
+            return ""
+        diff = difflib.unified_diff(
+            before.splitlines(), after.splitlines(), "run snapshot", str(current), lineterm=""
+        )
+        return "\n".join(diff)
+
+    def _reload_problem(self) -> str | None:
+        """Why `resume --reload` cannot continue this run with the edited flow (§7.6)."""
+        status = runinfo.display_status(self.run, self.run.read_state(), Clock())
+        if status not in ("interrupted", "waiting"):
+            return f"the run is {status}"
+        flow, _ = load_flow(Path(str(self.run.meta().get("flow_path"))))
+        if flow is None or self.flow is None:
+            return "the edited flow does not load"
+        return reload_problem(self.flow, flow, self.run.read_state().get("nodes") or {})
+
+    def action_reload_flow(self) -> None:
+        from arcflow.engine.respond import spawn_detached
+
+        if not self._flow_change():
+            self.notify("the flow has not changed since the run started")
+            return
+        problem = self._reload_problem()
+        if problem is not None:
+            self.notify(f"cannot resume with the edited flow: {problem}", severity="error")
+            return
+        spawn_detached(self.run, self.config.root, ["--reload"])
+        self.notify("resuming with the edited flow")
 
     def _selected_result(self) -> dict[str, Any]:
         if self.selected is None:
@@ -435,7 +488,20 @@ class RunDetailScreen(RunControl):
             if pending
             else ""
         )
-        banner.display = bool(pending)
+        changed = self._flow_change()
+        if changed:
+            lines = [str(banner.render())] if pending else []
+            hint = (
+                "L resumes with it"
+                if self._reload_problem() is None
+                else "it cannot replace this run's flow"
+            )
+            lines.append(f"flow changed since this run started; {hint}")
+            banner.update(Text("\n".join(line for line in lines if line), style="magenta bold"))
+        banner.display = bool(pending) or bool(changed)
+        self.query_one("#inspect-flow", Static).update(
+            Text(changed or "(unchanged since the run started)")
+        )
         if self.flow is not None:
             self.query_one("#graph", GraphView).show(
                 self.flow, node_status(state), state.get("visits")
@@ -532,9 +598,20 @@ class RunDetailScreen(RunControl):
 
 
 class FlowGraphScreen(Screen[None]):
-    """A flow's graph, live-synced with its file (§10.3)."""
+    """A flow's graph, live-synced with its file (§10.3), and its editor (§10.4)."""
 
-    BINDINGS = [Binding("escape", "app.pop_screen", "Back")]
+    BINDINGS = [
+        Binding("escape", "app.pop_screen", "Back"),
+        Binding("e", "edit_field", "Edit field"),
+        Binding("p", "edit_prompt", "Prompt in $EDITOR"),
+        Binding("n", "add_node", "Add"),
+        Binding("d", "remove_node", "Remove"),
+        Binding("R", "rename_node", "Rename"),
+        Binding("k", "connect", "Connect"),
+        Binding("x", "disconnect", "Disconnect"),
+        Binding("o", "reorder", "Reorder cases"),
+        Binding("t", "change_type", "Change type"),
+    ]
 
     def __init__(self, path: Path) -> None:
         super().__init__()
@@ -542,12 +619,18 @@ class FlowGraphScreen(Screen[None]):
         self.watcher = FileWatcher(path)
         self.flow: Flow | None = None
         self.previous: dict[str, Any] = {}
+        self.node: str | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static(str(self.path), id="flow-title")
-        with VerticalScroll(id="graph-pane"):
-            yield GraphView(id="graph")
+        with Horizontal(id="body"):
+            with VerticalScroll(id="graph-pane"):
+                yield GraphView(id="graph")
+            with Vertical(id="side"):
+                yield ListView(id="node-list")
+                with VerticalScroll(id="node-inspector"):
+                    yield Static("", id="node-config")
         yield Static("", id="problems")
         yield Footer()
 
@@ -578,3 +661,169 @@ class FlowGraphScreen(Screen[None]):
         graph.show(flow, highlight=changed)
         if changed:
             self.set_timer(HIGHLIGHT_S, lambda: graph.show(flow))
+        self._list_nodes(flow)
+
+    def _list_nodes(self, flow: Flow) -> None:
+        listing = self.query_one("#node-list", ListView)
+        listing.clear()
+        for node in flow.nodes.values():
+            listing.append(NodeItem(node.id, Label(f"{node.id}  ({node.type})")))
+        if self.node not in flow.nodes:
+            self.node = next(iter(flow.nodes), None)
+        index = list(flow.nodes).index(self.node) if self.node else 0
+        listing.index = index
+        self._inspect()
+
+    @on(ListView.Highlighted, "#node-list")
+    def _highlighted(self, event: ListView.Highlighted) -> None:
+        # A rebuilt list still delivers highlights for the items it replaced.
+        if isinstance(event.item, NodeItem) and self.flow and event.item.node in self.flow.nodes:
+            self.node = event.item.node
+            self._inspect()
+
+    def _inspect(self) -> None:
+        from arcflow.tui.editor import yaml_text
+
+        if self.flow is None or self.node not in self.flow.nodes:
+            return
+        node = self.flow.nodes[self.node]
+        self.query_one("#node-config", Static).update(
+            Text(yaml_text({"type": node.type, **node.config}))
+        )
+
+    def _edit(self, modal: Any, *, draft: bool = False) -> None:
+        """Open an edit form; its edit applies to the file as it was when the form opened."""
+        from arcflow.tui.editor import file_sha
+
+        based_on = file_sha(self.path)
+        self.app.push_screen(modal, lambda op: self._apply(op, based_on, draft=draft))
+
+    def _apply(
+        self, operation: Any, based_on: str, *, draft: bool = False, allow_invalid: bool = False
+    ) -> None:
+        """Write one edit. When the file changed meanwhile, reload and ask (§10.4);
+        when a free-text edit would make the flow invalid, offer to keep it as a draft."""
+        from arcflow.tui.editor import ConfirmModal, apply, file_sha
+
+        if operation is None:
+            return
+        failure = apply(self.path, operation, based_on=based_on, allow_invalid=allow_invalid)
+        self.poll()
+        if failure is None:
+            return
+        if failure.kind == "conflict":
+            fresh = file_sha(self.path)
+
+            def retry(yes: bool | None) -> None:
+                if yes:
+                    self._apply(operation, fresh, draft=draft)
+
+            question = f"{failure.message}. Apply your edit to the new version?"
+            self.app.push_screen(ConfirmModal(question, "Apply"), retry)
+        elif failure.kind == "invalid" and draft:
+
+            def keep(yes: bool | None) -> None:
+                if yes:
+                    self._apply(operation, based_on, allow_invalid=True)
+
+            question = f"{failure.message}\n\nSave it anyway, as a draft to fix later?"
+            self.app.push_screen(ConfirmModal(question, "Save draft"), keep)
+        else:
+            self.notify(failure.message, severity="error")
+
+    def _current(self) -> Any:
+        if self.flow is None or self.node is None or self.node not in self.flow.nodes:
+            self.notify("select a node first")
+            return None
+        return self.flow.nodes[self.node]
+
+    def action_edit_field(self) -> None:
+        from arcflow.tui.editor import FieldModal
+
+        node = self._current()
+        if node is not None:
+            self._edit(FieldModal(node.id, node.type, node.config), draft=True)
+
+    def action_edit_prompt(self) -> None:
+        from arcflow import edit
+        from arcflow.tui.editor import edit_in_editor
+
+        node = self._current()
+        if node is None:
+            return
+        key = next((k for k in ("prompt", "message", "run") if k in node.config), None)
+        if key is None:
+            self.notify(f"{node.id} has no prompt, message or run to edit")
+            return
+        from arcflow.tui.editor import file_sha
+
+        based_on = file_sha(self.path)
+        with self.app.suspend():
+            updated = edit_in_editor(str(node.config[key]))
+        if updated is not None:
+            operation = lambda ed: edit.set_field(ed, node.id, key, updated)  # noqa: E731
+            self._apply(operation, based_on, draft=True)
+
+    def action_add_node(self) -> None:
+        from arcflow.tui.editor import AddNodeModal
+
+        self._edit(AddNodeModal(self.node))
+
+    def action_remove_node(self) -> None:
+        from arcflow.tui.editor import RemoveNodeModal
+
+        node = self._current()
+        if node is not None:
+            self._edit(RemoveNodeModal(node.id))
+
+    def action_rename_node(self) -> None:
+        from arcflow.tui.editor import RenameModal
+
+        node = self._current()
+        if node is not None:
+            self._edit(RenameModal(node.id))
+
+    def _targets(self) -> list[str]:
+        assert self.flow is not None
+        return [*self.flow.nodes, "end", "fail"]
+
+    def action_connect(self) -> None:
+        from arcflow.tui.editor import ConnectModal
+
+        node = self._current()
+        if node is not None:
+            self._edit(ConnectModal(node.id, self._targets()))
+
+    def action_disconnect(self) -> None:
+        from arcflow.tui.editor import ConnectModal
+
+        node = self._current()
+        if node is not None:
+            self._edit(ConnectModal(node.id, self._targets(), disconnect=True))
+
+    def action_reorder(self) -> None:
+        from arcflow.tui.editor import ReorderModal
+
+        node = self._current()
+        if node is None:
+            return
+        cases = node.config.get("next")
+        if not isinstance(cases, list) or len(cases) < 2:
+            self.notify(f"{node.id} has no cases to reorder")
+            return
+        self._edit(ReorderModal(node.id, len(cases)))
+
+    def action_change_type(self) -> None:
+        from arcflow.tui.editor import ChangeTypeModal
+
+        node = self._current()
+        if node is not None:
+            self._edit(ChangeTypeModal(node.id, node.type))
+
+
+class NodeItem(ListItem):
+    """A node in the editor's node list."""
+
+    def __init__(self, node: str, *children: Any) -> None:
+        super().__init__(*children)
+        self.node = node

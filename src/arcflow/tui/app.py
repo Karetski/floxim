@@ -25,6 +25,8 @@ CSS = """
 #side { width: 2fr; }
 #timeline { height: 1fr; border: round $primary; }
 #inspector { height: 2fr; }
+#node-list { height: 1fr; border: round $primary; }
+#node-inspector { height: 2fr; border: round $primary; padding: 0 1; }
 #problems { height: auto; max-height: 12; padding: 0 1; }
 #runs-filter, #flow-title { padding: 0 1; }
 """

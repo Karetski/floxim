@@ -207,6 +207,18 @@ def crash_hook_from_env(environ: Mapping[str, str]) -> Callable[[Event], None] |
     return hook
 
 
+def reload_problem(old: Flow, new: Flow, nodes: dict[str, Any]) -> str | None:
+    """Why `new` cannot replace `old` for a run whose node results are `nodes`:
+    every node with a finished visit must still exist with the same type (§7.6)."""
+    for node_id, result in nodes.items():
+        if result is None:
+            continue
+        found = new.nodes.get(node_id)
+        if found is None or found.type != old.nodes[node_id].type:
+            return f"node {node_id!r} has finished visits and was removed or changed type"
+    return None
+
+
 class Runner:
     def __init__(
         self,
@@ -530,15 +542,9 @@ class Runner:
     def _reload(self) -> None:
         current_path = Path(self.meta["flow_path"])
         flow = self._load_flow(current_path)
-        for node_id, result in self.state["nodes"].items():
-            if result is None:
-                continue
-            new = flow.nodes.get(node_id)
-            if new is None or new.type != self.flow.nodes[node_id].type:
-                raise ResumeRefused(
-                    f"--reload: node {node_id!r} has finished visits and was removed or "
-                    "changed type"
-                )
+        problem = reload_problem(self.flow, flow, self.state["nodes"])
+        if problem is not None:
+            raise ResumeRefused(f"--reload: {problem}")
         generation = 1 + sum(1 for p in self.run_dir.path.glob("snapshot-*"))
         copy = self.run_dir.write_snapshot(flow.files(), flow.path, generation)
         old_sha = self.state["run"].get("flow_sha256") or self.meta["flow_sha256"]
