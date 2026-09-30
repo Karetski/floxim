@@ -34,19 +34,18 @@ class Result:
         """Events with run-specific values replaced. With `real_time`, timestamps,
         durations and session IDs are replaced too."""
         text = json.dumps(self.events)
-        if real_time:
-            text = re.sub(r'"\d{4}-\d\d-\d\dT[\d:.]+Z"', '"<time>"', text)
-            text = re.sub(r'"(duration_s|active_s)": [\d.]+', r'"\1": 0', text)
-            sessions: dict[str, str] = {}
-            for found in re.findall(
-                r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", text
-            ):
-                sessions.setdefault(found, f"<session-{len(sessions) + 1}>")
-            for found, label in sessions.items():
-                text = text.replace(found, label)
         text = text.replace(self.run.id, "<run>").replace(str(tmp_path.resolve()), "<tmp>")
         text = re.sub(r'"(pid)": \d+', r'"\1": 0', text)
         text = re.sub(r'"host": "[^"]*"', '"host": "<host>"', text)
+        if real_time:
+            text = re.sub(r'"\d{4}-\d\d-\d\dT[\d:.]+Z"', '"<time>"', text)
+            text = re.sub(r'"(duration_s|active_s)": [\d.]+', r'"\1": 0', text)
+            # Number session IDs in the order the run first reports them.
+            sessions: dict[str, str] = {}
+            for found in re.findall(r'"session_id": "([^"]+)"', text):
+                sessions.setdefault(found, f"<session-{len(sessions) + 1}>")
+            for found, label in sessions.items():
+                text = text.replace(found, label)
         return list(json.loads(text))
 
 
