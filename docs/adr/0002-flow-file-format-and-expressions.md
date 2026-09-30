@@ -31,3 +31,7 @@ Alexey requires a single source of truth for each flow that the TUI, an agent, a
 - YAML plus a Python builder: rejected by Alexey as a second source.
 - CEL expressions: its only Python implementation needs native code (see ADR 0001).
 - TOML, CUE, JSON: less readable for graphs and prompts.
+
+## Amendment (2026-09-29)
+
+`include` brings in **templates only** (spec §3.7, §15 Q3). Nodes, inputs and routing always live in the flow's own file, so the graph can be read and edited from one file. Decided by Alexey in the spec review.

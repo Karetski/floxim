@@ -2,20 +2,21 @@
 
 | | |
 |---|---|
-| Status | Draft 1 for review by Alexey |
-| Date | 2026-09-30 |
+| Status | Accepted (reviewed by Alexey, 2026-09-29) |
+| Date | 2026-09-30 (Draft 1); 2026-09-29 (review outcomes, §15) |
 | Stage | 2 (Spec), per PROJECT_BRIEF.md §15 |
-| Inputs | PROJECT_BRIEF.md, docs/research.md, ADRs 0001–0012 |
+| Inputs | PROJECT_BRIEF.md, docs/research.md, ADRs 0001–0014 |
+| Build plan | `docs/milestones.md` |
 | Format version | `arcflow: 1` |
 
-This document is the authoritative definition of Arcflow v1. Where it disagrees with the brief or research.md, this document wins; where it disagrees with an ADR, the ADR wins until the conflict is raised and resolved (see §15). Every choice the ADRs left open is made here with a default and listed in §14 as an open question, so implementation is never blocked on it.
+This document is the authoritative definition of Arcflow v1. Where it disagrees with the brief or research.md, this document wins; where it disagrees with an ADR, the ADR wins until the conflict is raised and resolved (see §15). Every choice the ADRs left open is made here; §15 lists the ones that were open questions in the draft and how the review resolved them.
 
 Keywords: **must**, **must not**, **should** and **may** have their RFC 2119 meanings. The project is named Arcflow (ADR 0013): the command `arcflow` (with the short alias `arcf`), the directory `.arcflow/`, the `ARCFLOW_*` environment variables and the Python package `arcflow`.
 
 **Tiers.** Every feature carries one of three tiers:
 
-- **Core**: required for the v1 release (milestones M0–M8 in the brief).
-- **Planned**: fully specified here so the format and state model leave room for it, and the validator recognizes it, but it is scheduled after the core milestones unless Stage 3 pulls it in. Until implemented, `arcflow validate` reports `E-NOT-IMPLEMENTED` for it.
+- **Core**: required for the v1 release, and scheduled in `docs/milestones.md` (ADR 0014).
+- **Planned**: fully specified here so the format and state model leave room for it, and the validator recognizes it, but it is scheduled after v1. Until implemented, `arcflow validate` reports `E-NOT-IMPLEMENTED` for it. A Core feature whose milestone has not landed yet is reported the same way.
 - **Future**: named only, to reserve the word.
 
 ## Contents
@@ -159,7 +160,7 @@ The config file is validated against a published JSON Schema like flow files; un
 | `defaults` | map | no | Defaults for all nodes, and per node type (§3.4). |
 | `limits` | map | no | Run-wide limits (§3.5). |
 | `templates` | map name → partial node | no | Reusable node fragments (§3.6). |
-| `include` | list of paths | no | **Planned.** Template fragments shared between flows (§3.7). |
+| `include` | list of paths | no | Template fragments shared between flows (§3.7). |
 | `start` | node ID | no | Entry node. Default: the first key under `nodes`. |
 | `nodes` | map ID → node | yes | The graph. Key order is preserved and meaningful only for the default `start` and for display. |
 | `outputs` | map name → template string | no | Values computed when the run reaches `end`, stored as the run's outputs and returned by `arcflow run --json` and to a parent `subflow` node. |
@@ -260,7 +261,7 @@ nodes:
 - **Merge rule:** mappings merge key by key, recursively; scalars and lists in the more specific definition **replace** the inherited value. `null` removes an inherited key.
 - The effective node (after defaults and templates) is what the validator checks and what is recorded in the run's `visit_started` event.
 
-### 3.7 `include` (Planned)
+### 3.7 `include`
 
 To keep "one flow = one file" true for the graph, `include` may bring in **templates only**:
 
@@ -269,7 +270,7 @@ include:
   - ../shared/reviewers.yaml     # a file whose only top-level key is `templates`
 ```
 
-Included template names must not collide with local ones. The TUI shows included templates read-only and offers "open fragment" to edit that file. Nodes, inputs and routing can never be included. (See §15, Q3: ADR 0002 says "shared fragments" without restricting them to templates.)
+Included template names must not collide with local ones. The TUI shows included templates read-only and offers "open fragment" to edit that file. Nodes, inputs and routing can never be included (ADR 0002 amendment, §15 Q3).
 
 ### 3.8 Nodes: common keys
 
@@ -369,16 +370,16 @@ Per ADR 0003:
 | `nodes.<id>` | The **latest finished visit** of node `<id>`, or `None` if it has not finished a visit. Fields are listed per node type in §5; every node has `outcome`, `visit`, `attempts`, `started_at`, `finished_at`, `duration_s`, `error` (`{kind, message}` or `None`). |
 | `nodes.<id>.visits` | List of all finished visits of `<id>`, oldest first, each with the same fields. |
 | `visits.<id>` | Number of visits **started** for `<id>`, including the current one. `0` if never visited. |
-| `vars.<name>` | Variables set by `set` nodes (Planned). `None` when unset. |
+| `vars.<name>` | Variables set by `set` nodes. `None` when unset. |
 | `run` | `id`, `flow` (name), `flow_file`, `started_at`, `workdir`, `budget` (`{usd_spent, tokens_spent, usd_left, tokens_left}`; `None` for unknown or unlimited values). |
 | `env.<NAME>` | Environment variables of the runner process that are allowed by §12.3. Reading any other variable yields `None`. |
 | `node` | Inside a node's own configuration only: `id`, `visit`, `attempt`, `artifacts_dir`, `workdir`, and for human nodes `message`. |
-| `item`, `index` | Inside `map` bodies only (Planned). |
+| `item`, `index` | Inside `map` bodies only. |
 | `self` | Alias for `nodes.<current node id>`, usable in the node's own `next` and `on_error`. |
 
 `visits.<id>` counts started visits so that `when: visits.implement < 3` read in a later node means "implement has run fewer than three times".
 
-ADR 0003 lists `status` among a node's fields; this spec names it **`outcome`** to avoid clashing with the `status` field agents are encouraged to put in their own structured output (`nodes.x.output.status`). See §15, Q1.
+The normalized result field is named **`outcome`**, not `status`, so it does not clash with the `status` field agents are encouraged to put in their own structured output (`nodes.x.output.status`) (ADR 0003 amendment, §15 Q1).
 
 ### 4.4 Templates (`${{ }}`)
 
@@ -415,12 +416,12 @@ Key tables use: **T** = templated field (§4.4). Every node also has the common 
 | `condition` | Core | Branch without doing work. |
 | `human` | Core | Pause for a choice, text or acknowledgement. |
 | `sleep` | Core | Wait for a duration or until a time. |
-| `set` | Planned | Assign variables. |
-| `python` | Planned | Call a Python function. |
-| `subflow` | Planned | Run another flow file as a child run. |
-| `map` | Planned | Run a subflow once per list item (sequential in v1, ADR 0007). |
-| `handoff` | Planned | Hand an agent session to the user interactively, continue when they exit. |
-| `notify` | Planned | Send a notification through a command or webhook. |
+| `set` | Core | Assign variables. |
+| `python` | Core | Call a Python function. |
+| `subflow` | Core | Run another flow file as a child run. |
+| `map` | Core | Run a subflow once per list item (sequential in v1, ADR 0007). |
+| `handoff` | Core | Hand an agent session to the user interactively, continue when they exit. |
+| `notify` | Core | Send a notification through a command or webhook. |
 | `parallel`, `join`, `git`, `http`, `wait_for` | Future | Reserved. |
 
 ### 5.1 `agent` (Core)
@@ -586,7 +587,7 @@ wait_for_ci:
 
 Exactly one of `duration` (duration, T) or `until` (timestamp, T). The runner records `wake_at` in the `visit_started` event, so a resumed run sleeps only for the remainder. A sleep longer than the remaining `limits.max_duration` fails validation when static and fails the visit at run time otherwise. Result fields: `woke_at`. While sleeping the run stays `running`; `arcflow run --detach` is the way to leave a long sleep unattended.
 
-### 5.6 `set` (Planned)
+### 5.6 `set` (Core)
 
 ```yaml
 bump:
@@ -598,7 +599,7 @@ bump:
 
 Evaluates every value (whole-value rule applies) against the state **before** the node, then assigns them together. Result fields: `values`.
 
-### 5.7 `python` (Planned)
+### 5.7 `python` (Core)
 
 ```yaml
 coverage_ok:
@@ -614,7 +615,7 @@ coverage_ok:
 - The function receives `args` as keyword arguments (JSON values) and a read-only `ctx` keyword with `run_id`, `node_id`, `visit`, `artifacts_dir`, `workdir`. It returns a JSON-serializable value, which becomes `output`. An exception is outcome `failed` with kind `exception` and the traceback in the visit directory.
 - Arcflow never reads or edits the function body; the TUI shows `call` as a reference that opens the module in `$EDITOR` (research §8.2).
 
-### 5.8 `subflow` (Planned)
+### 5.8 `subflow` (Core)
 
 ```yaml
 triage_one:
@@ -626,7 +627,7 @@ triage_one:
 
 Starts a **child run** of the referenced flow with its own run directory, linked by `parent` in `run.json` and by `child_run` in the parent's events. The parent's remaining budget and `max_duration` are passed down as the child's limits (the smaller of the two wins). Result fields: `run_id`, `status`, `outputs` (the child flow's `outputs`), and `output` (alias of `outputs`). A failed child is outcome `failed`. Cancelling the parent cancels the child. A human node in the child makes the parent `waiting` as well, and `arcflow respond` accepts the parent's run ID (it forwards to the child). Recursion depth is limited to 8.
 
-### 5.9 `map` (Planned)
+### 5.9 `map` (Core)
 
 ```yaml
 fix_each:
@@ -641,7 +642,7 @@ fix_each:
 
 Runs one child run per item, **sequentially** in v1 (ADR 0007). `item` and `index` are available in `inputs`. Result fields: `results` (list of `{index, run_id, status, outputs}`), `succeeded`, `failed` (counts). A `concurrency` key is reserved and must be `1` in v1.
 
-### 5.10 `handoff` (Planned)
+### 5.10 `handoff` (Core)
 
 ```yaml
 take_over:
@@ -652,7 +653,7 @@ take_over:
 
 When the runner is in the foreground on a TTY, Arcflow prints the message and runs the adapter's interactive command (Claude `claude --resume <id>`, Codex `codex resume <id>`) attached to the terminal, then continues when it exits. Otherwise the run becomes `waiting` like a human node, and `arcflow handoff <run>` opens the session later. Result fields: `session_id`, `exit_code`. Requires adapter capability `interactive`.
 
-### 5.11 `notify` (Planned)
+### 5.11 `notify` (Core)
 
 ```yaml
 tell_me:
@@ -1144,9 +1145,9 @@ Stable and documented (ADR 0008):
 | `arcflow doctor [<run>]` | Core | Check environment (Python, git, harness versions, pure-Python deps, filesystem); with a run, check and repair its event log and state. |
 | `arcflow new <path> "<description>" [--harness h]` | Planned | Agent-authored flow (§11). |
 | `arcflow edit <flow> "<instruction>" [--harness h] [--yes]` | Planned | Agent edit of an existing flow (§11). |
-| `arcflow flow <op> <flow> …` | Planned | Structured edits (§10.4): `add-node`, `rm-node`, `rename-node`, `set`, `unset`, `connect`, `disconnect`. |
-| `arcflow handoff <run> [<node>]` | Planned | Open a pending handoff session interactively. |
-| `arcflow adapter test <name> [--live]` | Planned | Conformance kit (§8.8). |
+| `arcflow flow <op> <flow> …` | Core | Structured edits (§10.4): `add-node`, `rm-node`, `rename-node`, `set`, `unset`, `connect`, `disconnect`. |
+| `arcflow handoff <run> [<node>]` | Core | Open a pending handoff session interactively. |
+| `arcflow adapter test <name> [--live]` | Core | Conformance kit (§8.8). |
 
 ### 9.4 `arcflow validate`
 
@@ -1170,8 +1171,8 @@ The TUI is a Textual application in the same package. It is a client: it reads f
 |---|---|---|
 | **Flows** | Flow files under `flow_paths`: name, description, validity badge, last run status. | validate, run (input form built from `inputs`), open graph, open in `$EDITOR` |
 | **Runs** | Active and recent runs: status (incl. `interrupted`), flow, current node, duration, spend, pending prompts first. Filter by flow and status. | open, resume, cancel, respond |
-| **Run detail** | Graph (§10.2) with live node status; timeline of visits; inspector for the selected visit: rendered prompt, output (pretty JSON), streamed agent activity, stdout/stderr, artifacts, usage and cost; budget and limit gauges. | respond inline to pending human nodes, cancel, resume, open handoff (Planned), open artifact, copy session ID, "open in harness" (`claude --resume …` in a new terminal) |
-| **Flow graph / editor** (Planned for editing; viewing is Core) | The flow's graph, live-synced with the file (§10.3), plus an inspector form for the selected node. | structured edits (§10.4), "edit with agent" (§11) |
+| **Run detail** | Graph (§10.2) with live node status; timeline of visits; inspector for the selected visit: rendered prompt, output (pretty JSON), streamed agent activity, stdout/stderr, artifacts, usage and cost; budget and limit gauges. | respond inline to pending human nodes, cancel, resume, open handoff, open artifact, copy session ID, "open in harness" (`claude --resume …` in a new terminal) |
+| **Flow graph / editor** | The flow's graph, live-synced with the file (§10.3), plus an inspector form for the selected node. | structured edits (§10.4), "edit with agent" (§11, Planned) |
 
 Human prompts: a pending prompt shows as a banner in every screen and as a modal in run detail with the message, `show` lines, choices, and a text field when allowed. Answering writes through `respond`.
 
@@ -1190,7 +1191,7 @@ Alexey's requirement: one YAML file edited equally from the TUI, by agents and b
 - On a change: parse and validate. **Valid** → re-render the graph in place, keeping selection by node ID and highlighting nodes whose definition changed for 2 s. **Invalid** → keep showing the last valid graph, dimmed, with the problems listed (clickable to line numbers) until the file is valid again.
 - The TUI's own edits are written by the editing library (§10.4), then read back through the same polling path, so there is one code path for "the file changed" regardless of who changed it.
 
-### 10.4 Structured edits (Planned)
+### 10.4 Structured edits
 
 All edits, from the TUI or from `arcflow flow <op>`, go through one library, `arcflow.edit`, which:
 
@@ -1317,7 +1318,7 @@ Dogfooding (brief §15, after M4): Arcflow's own build loop runs as a Arcflow fl
 - A web UI, hosted service, or long-running daemon; built-in scheduling (ADR 0008).
 - Parallel execution of nodes (`parallel`/`join`, concurrent `map`) (ADR 0007). The event log and state are ready for it.
 - A code-based flow builder or any second flow representation (ADR 0002).
-- Free-form visual layout (drag and drop, stored positions). Structured and agent-driven editing of the file are in scope (Planned), which revises the brief's "visual graph editing" non-goal.
+- Free-form visual layout (drag and drop, stored positions). Structured editing of the file is in scope for v1 and agent-driven editing is Planned, which revises the brief's "visual graph editing" non-goal.
 - `include` of anything other than templates (§3.7).
 - Multi-user collaboration, remote runners, or authenticated responders.
 - Routing harness permission prompts to human nodes (Future; ADR 0005).
@@ -1326,27 +1327,27 @@ Dogfooding (brief §15, after M4): Arcflow's own build loop runs as a Arcflow fl
 
 ---
 
-## 15. Open questions and defaults chosen
+## 15. Review decisions
 
-Each item names the default this spec uses, so work can proceed. Resolving one either confirms the default or becomes an ADR plus a spec change.
+Draft 1 left these questions open, each with a default. Alexey's review on 2026-09-29 resolved all of them; the spec text above reflects the resolutions. A later change to any of them needs an ADR.
 
-| # | Question | Default in this spec |
+| # | Question | Resolution |
 |---|---|---|
-| Q1 | ADR 0003 names a node field `status`; the spec calls it `outcome` so it does not collide with `output.status` in agent schemas. Amend ADR 0003? | `outcome` (§4.3). |
-| Q2 | Expression syntax: accept `true/false/null` aliases next to Python's `True/False/None`? | Accepted (§4.1). |
-| Q3 | ADR 0002 lists `include` of "shared fragments". To keep the graph in one file, the spec limits `include` to templates. Accept the narrowing? | Templates only, Planned (§3.7). |
-| Q4 | Which Planned features belong in v1 (M0–M8) versus after? Alexey's goals (agent authoring, live two-way editor) are beyond the brief's milestones. | Core = brief's M0–M8 scope plus the live read-only graph; editing, `arcflow new/edit`, `set`, `subflow`, `map`, `python`, `handoff`, `notify` are Planned, to be placed in Stage 3. |
-| Q5 | Default run budget. | `usd: 25`, `tokens: 10M` (§3.4). |
-| Q6 | Exact Claude flag set per permission profile (especially Bash in `edit` and read tools in `read-only`). | Intent fixed in §8.4; flags fixed by M3 contract tests. |
-| Q7 | Full env denylist for nested agent sessions (research §7.6). | The list in §12.3, refined in M3. |
-| Q8 | Codex behaviours: signals, exit codes, default sandbox, schema subset (research §7.1–7.4). | Treated conservatively (§8.3); M3 contract tests decide. |
-| Q9 | Human node timeout default. | 7 days with lazy enforcement and `arcflow resume --due` (§6.11). |
-| Q10 | Windows support. | Not in v1; Linux and macOS only. Process-group code is kept behind one module so Windows (job objects) can be added. |
+| Q1 | ADR 0003 names a node field `status`, which collides with the `status` field agents are encouraged to put in their structured output. | The field is **`outcome`** (§4.3); ADR 0003 carries an amendment note. |
+| Q2 | Accept `true`/`false`/`null` in expressions next to Python's `True`/`False`/`None`? | Both spellings are accepted (§4.1). |
+| Q3 | ADR 0002 lists `include` of "shared fragments"; should it be limited to templates so the graph stays in one file? | Templates only (§3.7); ADR 0002 carries an amendment note. |
+| Q4 | Which features beyond the brief's M0–M8 belong in v1? | ADR 0014: v1 adds structured editing (§10.4, TUI editor, `arcflow flow`), the `set`, `python`, `subflow`, `map`, `handoff` and `notify` nodes, `include`, command adapters (§8.5) and the conformance kit (§8.8). Agent authoring (§11), AAP (§8.6) and ACP (§8.7) stay Planned. |
+| Q5 | Default run budget. | `usd: 25`, `tokens: 10_000_000` (§3.4). |
+| Q6 | Exact Claude flag set per permission profile. | Intent fixed in §8.4; the flags are fixed by contract tests against the pinned harness versions, and §8.4 is updated from them. |
+| Q7 | Full env denylist for nested agent sessions (research §7.6). | The list in §12.3, refined by the same contract tests. |
+| Q8 | Codex behaviours: signals, exit codes, default sandbox, schema subset (research §7.1–7.4). | Treated conservatively (§8.3) until the contract tests decide. |
+| Q9 | Human node timeout default. | 7 days, with lazy enforcement and `arcflow resume --due` (§6.11). |
+| Q10 | Windows support. | Not in v1; Linux and macOS only. Process-group code stays behind one module so Windows (job objects) can be added. |
 | Q11 | Does `respond` auto-start a detached runner? | Yes, unless `--no-continue` (§6.11). |
-| Q12 | Price table for Codex/others: ship built-in prices (go stale) or config only? | Config only; no built-in prices. |
-| Q13 | lionagi hands-on trial (research §2.2) was optional and hasn't been done. | Not blocking; worth an hour before Stage 3. |
-| Q14 | Minimum Python on Alexey's target enterprise images (research §8.3). | 3.10, per ADR 0001; confirm. |
-| Q15 | Shell for `run`: `bash -eo pipefail` when available. Some users will expect plain `sh -c` semantics. | `bash -eo pipefail`, override with `shell:`. |
+| Q12 | Price table for harnesses that report tokens only. | Config only; no built-in prices (§2.2, §6.8). |
+| Q13 | Hands-on lionagi trial (research §2.2). | Skipped; not expected to change the design. |
+| Q14 | Minimum Python version. | 3.10, per ADR 0001. |
+| Q15 | Interpreter for `shell.run`. | `bash -eo pipefail` when bash exists, else `sh -e`; override with `shell:` (§5.2). |
 
 ---
 
@@ -1367,12 +1368,13 @@ Each item names the default this spec uses, so work can proceed. Resolving one e
 | 0010 MIT | No spec impact |
 | 0011 Adapters | §8 |
 | 0012 Run storage and resume | §7 |
+| 0014 v1 scope | Tiers (header), §5 node catalog, §9.3, §10, §15 Q4 |
 
 ---
 
 ## Appendix A. Example flows
 
-All four are part of the valid-flow test corpus (§13); the first three use only Core features.
+All four are part of the valid-flow test corpus (§13). The first three use only the five basic node types; the fourth uses composition and custom logic.
 
 ### A.1 `implement-feature`: plan, implement, test loop, approval
 
@@ -1663,9 +1665,9 @@ nodes:
     next: fix
 ```
 
-### A.4 `triage-issues` (Planned features)
+### A.4 `triage-issues`: composition and custom logic
 
-Shows `include`, `python`, `map` over a subflow, and `set`. Not runnable until those land; it is in the corpus to lock the format.
+Shows `include`, `python`, `map` over a subflow, `set` and `notify`. It is in the valid corpus from M1 and becomes runnable once those node types land (`docs/milestones.md`).
 
 ```yaml
 arcflow: 1
@@ -1816,7 +1818,7 @@ Severity prefix: `E` error, `W` warning, `I` info. The list is stable; codes are
 | `E-SESSION-HARNESS` | `resume`/`fork` across different harnesses |
 | `E-MUTUALLY-EXCLUSIVE` | e.g. `prompt` and `prompt_file`, `run` and `args`, `duration` and `until` |
 | `E-WORKSPACE-NO-GIT` | Worktree requested outside a git repository |
-| `E-NOT-IMPLEMENTED` | Planned feature not available in this version |
+| `E-NOT-IMPLEMENTED` | Feature specified but not available in this version |
 | `E-EXPR-RUNTIME` / `E-NO-ROUTE` / `E-WORKSPACE-MISSING` | Run-time counterparts, reported in events |
 | `W-NO-DEFAULT-ROUTE` | Case list without a default |
 | `W-UNREACHABLE` | Node not reachable from `start` |

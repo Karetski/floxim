@@ -19,3 +19,7 @@ Expressions and templates see this namespace:
 ## Consequences
 
 The common loop case (`nodes.test.stderr` inside a fix loop) stays short. Outputs are typed JSON, not strings. Parallel branches (post-v1, ADR 0007) will need visits keyed by branch; the event log must allow for that from the start.
+
+## Amendment (2026-09-29)
+
+A node's normalized result field is named **`outcome`**, not `status` (spec §4.3, §15 Q1). Agent output schemas are encouraged to carry their own `status` field, and `nodes.<id>.outcome` next to `nodes.<id>.output.status` keeps the two apart. Decided by Alexey in the spec review.

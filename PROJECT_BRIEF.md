@@ -9,7 +9,7 @@
 | Item | State |
 |---|---|
 | Current stage | **Stage 2: Spec**. Stage 1 (Research) completed 2026-09-30: see `docs/research.md` and `docs/adr/` |
-| Spec | Draft 1 in `docs/spec.md` (2026-09-30), awaiting review |
+| Spec | `docs/spec.md`, accepted 2026-09-29; review decisions in its §15 |
 | Code | None |
 | Name | Arcflow (ADR 0013); CLI `arcflow`, short alias `arcf` |
 | Last updated | 2026-09-30 |
@@ -309,7 +309,7 @@ Record each resolved decision as an ADR in `docs/adr/`.
 - Calling model APIs directly or implementing an agent loop.
 - A web UI or hosted service.
 - A long-running daemon or built-in distributed execution.
-- Visual graph editing in the TUI.
+- Free-form visual layout in the TUI (structured editing of the flow file is in v1, ADR 0014).
 - Multi-user collaboration.
 
 ---
