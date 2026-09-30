@@ -8,6 +8,7 @@ from arcflow.engine.nodes import ConditionExecutor, Executor, SetExecutor, Sleep
 from arcflow.engine.notify import NotifyExecutor
 from arcflow.engine.python import PythonExecutor
 from arcflow.engine.shell import ShellExecutor
+from arcflow.engine.subflow import MapExecutor, SubflowExecutor
 
 EXECUTORS: dict[str, Executor] = {
     "condition": ConditionExecutor(),
@@ -18,4 +19,6 @@ EXECUTORS: dict[str, Executor] = {
     "agent": AgentExecutor(),
     "human": HumanExecutor(),
     "notify": NotifyExecutor(),
+    "subflow": SubflowExecutor(),
+    "map": MapExecutor(),
 }

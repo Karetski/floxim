@@ -7,6 +7,7 @@ and (for answers and timeouts) starts a detached runner to continue the run.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import subprocess
 import sys
@@ -60,10 +61,29 @@ def respond(
     project_root: Path,
     continue_run: bool = True,
 ) -> Delivery:
-    """Record an answer. Raises NotWaiting or InvalidAnswer; nothing changes then."""
+    """Record an answer. Raises NotWaiting or InvalidAnswer; nothing changes then.
+    An answer to a subflow or map node waiting on its child goes to the child."""
     enforce_timeouts(run, clock=clock, project_root=project_root, continue_run=continue_run)
     node, prompt = pending_node(run, node)
     check_answer(dict(prompt), answer)
+    if prompt.get("kind") == "child" and prompt.get("child_run"):
+        child = RunDir(run.path.parent / str(prompt["child_run"]))
+        if lock_state(child.lock, clock.now()) == "live":
+            respond(
+                child, str(prompt["child_node"]), answer, clock=clock, project_root=project_root
+            )
+            return Delivery(node, via_inbox=True, continued=False)
+        respond(
+            child,
+            str(prompt["child_node"]),
+            answer,
+            clock=clock,
+            project_root=project_root,
+            continue_run=False,
+        )
+        answer = Answer(
+            answer.choice, answer.text, answer.acknowledged, answer.responder, "forwarded"
+        )
     if lock_state(run.lock, clock.now()) == "live":
         inbox.post(run.inbox, {"type": "respond", "node": node, **answer.to_json()}, clock)
         return Delivery(node, via_inbox=True, continued=False)
@@ -113,6 +133,9 @@ def cancel(run: RunDir, *, by: str | None, reason: str | None, clock: Clock) -> 
     if lock_state(run.lock, clock.now()) == "live":
         inbox.post(run.inbox, {"type": "cancel", **request}, clock)
         return "requested"
+    for child in _open_children(run, state):
+        with contextlib.suppress(AlreadyFinished):
+            cancel(child, by=by, reason=reason, clock=clock)
     lock = RunLock(run.lock, clock)
     lock.acquire()
     try:
@@ -125,6 +148,12 @@ def cancel(run: RunDir, *, by: str | None, reason: str | None, clock: Clock) -> 
     finally:
         lock.release()
     return "cancelled"
+
+
+def _open_children(run: RunDir, state: dict[str, object]) -> list[RunDir]:
+    progress = state.get("in_progress") or {}
+    assert isinstance(progress, dict)
+    return [RunDir(run.path.parent / str(c["run_id"])) for c in progress.get("children") or []]
 
 
 def enforce_timeouts(

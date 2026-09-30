@@ -14,6 +14,7 @@ from arcflow.checks import (
     harness_checks,
     limit_checks,
     lint_checks,
+    subflow_checks,
     workspace_checks,
 )
 from arcflow.config import DEFAULT_RISKY_COMMANDS, Config, find_project_root
@@ -25,7 +26,7 @@ from arcflow.problems import Problem
 # E-NOT-IMPLEMENTED for the others as its last stage; each milestone that makes a
 # node type runnable adds it here (docs/milestones.md).
 IMPLEMENTED_NODE_TYPES: frozenset[str] = frozenset(
-    {"condition", "sleep", "set", "shell", "python", "agent", "human", "notify"}
+    {"condition", "sleep", "set", "shell", "python", "agent", "human", "notify", "subflow", "map"}
 )
 
 
@@ -63,6 +64,7 @@ def validate(
             lambda: expression_checks(flow, graph),
             lambda: limit_checks(flow),
             lambda: harness_checks(flow, config["prices"] if config else None, root),
+            lambda: subflow_checks(flow),
             lambda: workspace_checks(flow, workdir or path.parent),
             lambda: lint_checks(flow, graph, risky),
         ]

@@ -638,7 +638,7 @@ triage_one:
     issue: ${{ nodes.fetch.output[0] }}
 ```
 
-Starts a **child run** of the referenced flow with its own run directory, linked by `parent` in `run.json` and by `child_run` in the parent's events. The parent's remaining budget and `max_duration` are passed down as the child's limits (the smaller of the two wins). Result fields: `run_id`, `status`, `outputs` (the child flow's `outputs`), and `output` (alias of `outputs`). A failed child is outcome `failed`. Cancelling the parent cancels the child. A human node in the child makes the parent `waiting` as well, and `arcflow respond` accepts the parent's run ID (it forwards to the child). Recursion depth is limited to 8.
+Starts a **child run** of the referenced flow with its own run directory, linked by `parent` in `run.json` and by `child_run` in the parent's events. The child runs in the parent's runner process. The parent's remaining budget and `max_duration` are passed down as the child's limits (the smaller of the two wins; recorded as `limits_cap` in the child's `run.json`), and the child's spend is added to the parent's totals when it ends. Result fields: `run_id`, `status`, `outputs` (the child flow's `outputs`), and `output` (alias of `outputs`). A failed child is outcome `failed`, error kind `child_failed`, as is a child that cannot be created (invalid flow or inputs). Cancelling the parent cancels the child; a `timeout` on the node cancels the child and the outcome is `timed_out`. A human node in the child makes the parent `waiting` as well: the parent records a `human_waiting` with `kind: "child"`, `child_run` and `child_node`, and `arcflow respond` on the parent's run ID forwards the answer to the child. Recursion depth is limited to 8 (`depth` in `run.json`). The child flow is part of the parent's snapshot, with its own referenced files. `validate` loads the child flow, reports its errors, and checks that the node passes only declared inputs and every required one.
 
 ### 5.9 `map` (Core)
 
@@ -653,7 +653,7 @@ fix_each:
   on_item_error: continue              # fail (default) | continue
 ```
 
-Runs one child run per item, **sequentially** in v1 (ADR 0007). `item` and `index` are available in `inputs`. Result fields: `results` (list of `{index, run_id, status, outputs}`), `succeeded`, `failed` (counts). A `concurrency` key is reserved and must be `1` in v1.
+Runs one child run per item, **sequentially** in v1 (ADR 0007), with everything `subflow` does for each. `item` and `index` are available in `inputs`, which are rendered once per item (not at visit start). Result fields: `results` (list of `{index, run_id, status, outputs}`), `succeeded`, `failed` (counts). With `on_item_error: fail` the node fails at the first failed item; with `continue` it runs every item and succeeds. A `concurrency` key is reserved and must be `1` in v1 (`E-SCHEMA` otherwise). `items` must evaluate to a list.
 
 ### 5.10 `handoff` (Core)
 
@@ -729,7 +729,7 @@ A visit whose final attempt is not `succeeded` is an **error**. `on_error` decid
 
 `arcflow validate` warns (`W-ERROR-NEVER-ROUTED`) when a node's `next` references its own `exit_code` or `outcome` but `on_error` is `fail`, since the failing branch could never be taken. This is the typical mistake with a test step in a fix loop; Appendix A shows the right pattern (`on_error: continue`).
 
-Error kinds (`nodes.<id>.error.kind`): `exit_code`, `harness_error`, `no_result`, `timeout`, `budget`, `schema`, `output_parse`, `output_too_large`, `expression_error`, `exception`, `spawn_failed`, `workspace_error`, `limit`.
+Error kinds (`nodes.<id>.error.kind`): `exit_code`, `harness_error`, `no_result`, `timeout`, `budget`, `schema`, `output_parse`, `output_too_large`, `expression_error`, `exception`, `spawn_failed`, `workspace_error`, `limit`, `child_failed`.
 
 ### 6.6 Retries
 
@@ -1332,7 +1332,7 @@ Brief §16: tests first; engine tests use the fake adapter; unit tests never cal
 | Parser and validator | Every rule in §3–§5 and every code in Appendix C | A corpus `tests/flows/invalid/*.yaml`, each file annotated with its expected codes and positions (`# expect: E-UNKNOWN-TARGET @ 41:13`); `tests/flows/valid/*.yaml` including all Appendix A examples. The M1 acceptance criterion is this corpus. |
 | Expressions | Grammar, forbidden constructs, null-safety, functions, rendering rules | Table-driven tests plus property tests (Hypothesis, a dev-only dependency) that no accepted expression can reach builtins or dunders. |
 | Engine | Routing, loops, limits, retries, `on_error`, budgets, timeouts, cancellation, human waits, workspaces | Fake adapter scripts; assertions on the resulting **event log** (golden files, normalized for timestamps and IDs). Time is injected (fake clock) so sleeps and timeouts run instantly. |
-| Crash and resume | At-least-once guarantees, `on_resume` modes, torn last line, stale locks | A fault-injection hook (`ARCFLOW_TEST_CRASH_AT=<event type>:<n>`) that kills the runner right after the n-th event of that type in the run's log (counting events earlier processes wrote); for each example flow, crash at every event boundary, resume, and assert the final state equals the uncrashed run and no finished visit ran twice. |
+| Crash and resume | At-least-once guarantees, `on_resume` modes, torn last line, stale locks | A fault-injection hook (`ARCFLOW_TEST_CRASH_AT=<event type>:<n>`) that kills the runner right after the n-th event of that type in the run's log (counting events earlier processes wrote), and `ARCFLOW_TEST_CRASH_CHILD_AT` doing the same inside child runs; for each example flow, crash at every event boundary, resume, and assert the final state equals the uncrashed run and no finished visit ran twice. |
 | Adapters (offline) | Stream parsing and outcome mapping for `claude`, `codex`, command adapters | Recorded fixtures per pinned harness version (§8.8). |
 | Adapters (live) | Real harness smoke tests | Marked `live`, excluded by default, run manually or in a scheduled CI job with a spend cap (`--max-budget-usd` plus Arcflow's budget) and secrets; never on pull requests from forks. |
 | CLI | Every command's `--json` shape and exit code | Snapshot tests against the published CLI schemas. |

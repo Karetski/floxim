@@ -243,6 +243,14 @@ def _cancel_requested(state: State, event: Event, data: dict[str, Any], ts: str,
     state["cancel_requested"] = {**data, "at": ts}
 
 
+def _child_run(state: State, event: Event, data: dict[str, Any], ts: str, node: Any) -> None:
+    progress = state["in_progress"]
+    if progress is not None:
+        progress.setdefault("children", []).append(
+            {"run_id": data["run_id"], "item_index": data.get("item_index")}
+        )
+
+
 def _flow_reloaded(state: State, event: Event, data: dict[str, Any], ts: str, node: Any) -> None:
     state["run"]["flow_sha256"] = data.get("new_sha256")
     state["run"]["snapshot"] = data.get("snapshot")
@@ -288,6 +296,7 @@ _HANDLERS = {
     "run_waiting": _run_waiting,
     "human_responded": _human_responded,
     "cancel_requested": _cancel_requested,
+    "child_run": _child_run,
     "run_reopened": _run_reopened,
     "run_succeeded": _finished("succeeded"),
     "run_failed": _finished("failed"),

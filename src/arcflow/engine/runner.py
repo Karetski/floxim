@@ -93,6 +93,8 @@ def create_run(
     from_text: set[str] | None = None,
     parent: str | None = None,
     allow_full: bool = False,
+    limits_cap: dict[str, float | None] | None = None,
+    depth: int = 0,
 ) -> RunDir:
     """Validate the flow, resolve inputs, and create the run directory (§6.1 step 1).
     Raises FlowInvalid or InputError; nothing is created in that case."""
@@ -122,6 +124,8 @@ def create_run(
             "host": hostname(),
             "user": getpass.getuser(),
             "git_head": workspaces.head_commit(workdir, os.environ),
+            "limits_cap": limits_cap,
+            "depth": depth,
         },
     )
     snapshot_flow = run.write_snapshot(flow.files(), flow.path)
@@ -459,7 +463,15 @@ class Runner:
 
     def max_duration(self) -> float | None:
         value = self.flow.limits.get("max_duration", DEFAULT_MAX_DURATION)
-        return parse_duration(value)
+        return _tighter(
+            parse_duration(value), (self.meta.get("limits_cap") or {}).get("max_duration")
+        )
+
+    def run_limits(self) -> tuple[float | None, float | None]:
+        """The run budget: the flow's, capped by what a parent run had left (§5.8)."""
+        usd, tokens = budget.run_limits(self.flow.limits)
+        cap = self.meta.get("limits_cap") or {}
+        return _tighter(usd, cap.get("usd")), _tighter(tokens, cap.get("tokens"))
 
     def remaining_active_seconds(self) -> float | None:
         limit = self.max_duration()
@@ -982,7 +994,7 @@ class Runner:
         """What the next adapter call may spend: the tighter of the node's and the
         run's remaining budget. Passed to the harness as a backstop."""
         node_usd, node_tokens = budget.node_limits(ctx.config)
-        run_usd, run_tokens = budget.run_limits(self.flow.limits)
+        run_usd, run_tokens = self.run_limits()
         totals = self.state["totals"]
         usd = [
             v
@@ -1015,7 +1027,7 @@ class Runner:
         totals = self.state["totals"]
         usd_spent = round(totals["usd_spent"] + (cost or 0.0), 6)
         tokens_spent = totals["tokens_spent"] + tokens
-        run_usd, run_tokens = budget.run_limits(self.flow.limits)
+        run_usd, run_tokens = self.run_limits()
         self.emit(
             "budget_updated",
             {
@@ -1036,7 +1048,7 @@ class Runner:
         cost = self._cost(harness, ctx.config.get("model"), event.usage, event.cost_usd) or 0.0
         tokens = event.usage.total_tokens
         node_usd, node_tokens = budget.node_limits(ctx.config)
-        run_usd, run_tokens = budget.run_limits(self.flow.limits)
+        run_usd, run_tokens = self.run_limits()
         totals = self.state["totals"]
         crossed = (
             (node_usd is not None and ctx.spend.usd + cost > node_usd)
@@ -1048,7 +1060,7 @@ class Runner:
             ctx.stop.request("budget")
 
     def _run_budget_spent(self) -> str | None:
-        run_usd, run_tokens = budget.run_limits(self.flow.limits)
+        run_usd, run_tokens = self.run_limits()
         totals = self.state["totals"]
         if run_usd is not None and totals["usd_spent"] >= run_usd:
             return f"the run spent ~${totals['usd_spent']:.2f} of its ${run_usd:g} budget"
@@ -1164,6 +1176,12 @@ class Runner:
         if node is not None and routing:
             namespace["self"] = nodes[node.id]
         return namespace
+
+
+def _tighter(limit: float | None, cap: float | None) -> float | None:
+    if cap is None:
+        return limit
+    return cap if limit is None else min(limit, float(cap))
 
 
 def _result_json(result: AttemptResult) -> dict[str, Any]:

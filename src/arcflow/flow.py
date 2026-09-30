@@ -99,9 +99,22 @@ class Flow:
         origin = node.where(key)
         return self.schemas.get((origin.doc.file, origin.pointer))
 
-    def files(self) -> list[Path]:
-        """The flow file and every file it references, for run snapshots (§6.1)."""
+    def files(self, _seen: set[Path] | None = None) -> list[Path]:
+        """The flow file and every file it references, for run snapshots (§6.1),
+        including the files of subflows it calls."""
+        seen = _seen if _seen is not None else set()
+        seen.add(self.path.resolve())
         paths = [self.path, *(Path(d.file) for d in self.includes)]
+        for node in self.nodes.values():
+            child = node.config.get("flow") if node.type in ("subflow", "map") else None
+            if not isinstance(child, str):
+                continue
+            child_path = (node.where("flow").base_dir / child).resolve()
+            if child_path in seen:
+                continue
+            child_flow, _ = load_flow(child_path)
+            if child_flow is not None:
+                paths += child_flow.files(seen)
         for node in self.nodes.values():
             for key in FILE_KEYS.get(node.type, ()):
                 value = node.config.get(key)
@@ -419,6 +432,12 @@ class _Loader:
                 )
         if node.type == "human":
             self._check_human(node)
+        if node.type == "map" and node.config.get("concurrency", 1) != 1:
+            self.problems.append(
+                node.where("concurrency").problem(
+                    "E-SCHEMA", "concurrency is reserved and must be 1 in this version (ADR 0007)"
+                )
+            )
 
     def _check_human(self, node: Node) -> None:
         config = node.config

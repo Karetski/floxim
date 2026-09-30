@@ -56,6 +56,10 @@ def _walk(value: Any, type_: Type, pointer: str) -> Iterator[tuple[str, str]]:
                 yield from _walk(element, type_, child)
 
 
+# Fields rendered later by their executor: a map node's inputs, once per item.
+DEFERRED = frozenset({("map", "inputs")})
+
+
 def render_config(
     node_type: str,
     config: Mapping[str, Any],
@@ -67,7 +71,7 @@ def render_config(
     fields = node_fields(node_type)
     rendered: dict[str, Any] = {}
     for key, value in config.items():
-        if key in ROUTING_KEYS or key not in fields:
+        if key in ROUTING_KEYS or key not in fields or (node_type, key) in DEFERRED:
             rendered[key] = value
         else:
             rendered[key] = _render(value, fields[key].type, namespace, clock)

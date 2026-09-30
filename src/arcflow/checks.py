@@ -12,7 +12,7 @@ from typing import Any
 
 from arcflow.config import find_git_root
 from arcflow.expr import ExprError, Expression, Reference, parse
-from arcflow.flow import Flow, Node, Origin
+from arcflow.flow import Flow, Node, Origin, load_flow
 from arcflow.flowspec import (
     BUDGET_FIELDS,
     COMMON_RESULT_FIELDS,
@@ -707,3 +707,40 @@ def strict_schema_problem(schema: Any, path: str = "") -> str | None:
         if problem is not None:
             return problem
     return None
+
+
+def subflow_checks(flow: Flow, _seen: frozenset[Path] = frozenset()) -> list[Problem]:
+    """Child flows of subflow and map nodes load cleanly, and are passed only the
+    inputs they declare, including every required one (spec §5.8, §5.9)."""
+    problems: list[Problem] = []
+    seen = _seen | {flow.path.resolve()}
+    for node in flow.nodes.values():
+        if node.type not in ("subflow", "map") or not isinstance(node.config.get("flow"), str):
+            continue
+        where = node.where("flow")
+        path = (where.base_dir / node.config["flow"]).resolve()
+        if path in seen:
+            problems.append(where.problem("E-SCHEMA", f"{node.config['flow']} calls itself"))
+            continue
+        child, child_problems = load_flow(path)
+        problems += [p for p in child_problems if p.is_error]
+        if child is None:
+            continue
+        inputs = node.config.get("inputs")
+        if isinstance(inputs, dict):
+            origin = node.where("inputs")
+            for name in inputs:
+                if name not in child.inputs:
+                    problems.append(
+                        Origin(origin.doc, join_pointer(origin.pointer, name)).problem(
+                            "E-UNKNOWN-REF",
+                            f"{child.name} has no input named {name!r}",
+                            key=True,
+                        )
+                    )
+            for name, spec in child.inputs.items():
+                if spec.get("required") and "default" not in spec and name not in inputs:
+                    problems.append(
+                        origin.problem("E-SCHEMA", f"{child.name} needs input {name!r}")
+                    )
+    return problems
