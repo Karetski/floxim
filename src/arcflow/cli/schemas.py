@@ -161,6 +161,7 @@ DATA: dict[str, dict[str, Any]] = {
     ),
     "gc": obj({"removed": array(STR), "worktrees": array(STR), "dry_run": BOOL}),
     "doctor": obj({"checks": CHECKS}),
+    "flow": obj({"file": STR, "problems": array(PROBLEM)}),
     "adapter test": obj(
         {
             "adapter": STR,

@@ -1,0 +1,39 @@
+# A hand-written flow with comments.
+arcflow: 1
+name: hand   # the name
+
+inputs:
+  feature: { type: string, default: "login" }   # spaced flow map
+
+nodes:
+  # Planning step
+  plan:
+    type: agent
+    harness: fake
+    prompt: |
+      Plan ${{ inputs.feature }}.
+      The plan node's output feeds the build.
+    next: build            # go build
+
+  build:
+    type: shell
+    run: 'echo "$PLAN"'
+    env: { PLAN: "${{ nodes.plan.text }}" }
+    on_error: continue
+    next:
+      - when: nodes.build.exit_code == 0 and nodes["plan"].outcome == "succeeded"
+        to: check
+      - when: visits.plan < 3
+        to: plan
+      - to: fail
+        reason: "gave up on ${{ nodes.plan.text }}"
+
+  check:
+    type: condition
+    next:
+      - when: visits.build > 1
+        to: end
+      - to: end
+
+outputs:
+  summary: ${{ nodes.plan.text }}

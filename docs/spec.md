@@ -1246,6 +1246,10 @@ Operations:
 | connect / disconnect / reorder cases | Edits `next`/`on_error` lists; conditions are edited as text with live parse feedback. |
 | change type | Keeps common keys, drops keys the new type does not accept after confirmation. |
 
+Only the lines an edit changes are rewritten: the library dumps the original and the edited tree in the same normalized style, diffs the two, and applies only the changed hunks to the original text, so untouched lines keep their exact formatting (spacing inside flow mappings included) and changed lines take the file's detected indentation. Blank lines that separate a block from the next stay in place when the block's last line changes. A new node starts with a minimal body for its type (`add-node --set key=value` adds fields). Removing a node with `--remove-edges` also removes the cases that route to it, and a single `next`/`on_error` naming it (which then falls back to its default).
+
+`arcflow flow` exits 0 after a write, 3 (`E-EDIT-REFUSED`, with the problems) when the edit would make a valid flow invalid, 2 when the operation itself does not apply (an unknown node, a node still routed to), 6 when the file does not exist, and 7 (`E-CONFLICT`) when the file changed on disk since it was read. Its `--json` data is `{file, problems}` (the warnings left after the edit). Operation syntax: `add-node <flow> <id> --type T [--after N] [--set k=v]…`, `rm-node <flow> <id> [--remove-edges]`, `rename-node <flow> <old> <new>`, `set <flow> <node> <path> <yaml value>`, `unset <flow> <node> <path>`, `connect <flow> <from> <to> [--when E] [--on-error] [--position n]`, `disconnect <flow> <from> <to> [--on-error]`.
+
 Positions are never stored: the layout is recomputed, so a hand edit and a TUI edit produce the same picture. Free-form drag-and-drop layout remains a non-goal.
 
 **Editing while runs are active.** Runs use their snapshot (§6.1), so editing is always safe. Run detail shows "flow changed since this run started" with a diff, and offers `resume --reload` only when it is allowed (§7.6).
