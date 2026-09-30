@@ -81,7 +81,7 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
         "graph", parents=[common], help="render a flow's graph", description="Render the graph."
     )
     graph.add_argument("flow", help="flow file")
-    graph.add_argument("--format", choices=["mermaid", "dot", "json"], default="json")
+    graph.add_argument("--format", choices=["ascii", "mermaid", "dot", "json"], default="ascii")
     graph.set_defaults(handler=cmd_graph)
 
 
@@ -355,6 +355,10 @@ def cmd_graph(args: argparse.Namespace) -> int:
             print(json.dumps(data, indent=2))
     elif fmt == "mermaid":
         sys.stdout.write(runinfo.graph_mermaid(flow))
-    else:
+    elif fmt == "dot":
         sys.stdout.write(runinfo.graph_dot(flow))
+    else:
+        from arcflow.render import render_ascii
+
+        sys.stdout.write(render_ascii(flow))
     return ExitCode.OK

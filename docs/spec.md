@@ -1215,7 +1215,7 @@ Human prompts: a pending prompt shows as a banner in every screen and as a modal
 - Layered (Sugiyama) layout with `grandalf` (pure Python), drawn with box-drawing characters: nodes as boxes labelled `id` and type icon, forward edges downward, back edges (loops) routed on the side in a distinct style, edge labels showing a shortened `when`.
 - Node status colours in run detail: not visited, running (animated), succeeded, failed, waiting, skipped path; visit counts as a badge (`×3`).
 - Graphs larger than the viewport pan and zoom (two zoom levels: full boxes, compact dots). Above 60 nodes, or when layout takes more than 200 ms, the view falls back to a vertical list in topological order with edges shown as "→ target" lines (research §4).
-- `arcflow graph --format ascii` uses the same renderer, so the CLI and TUI never disagree.
+- `arcflow graph --format ascii` (the default format) uses the same renderer, so the CLI and TUI never disagree. Boxes show a type icon (◆ agent, $ shell, ? condition, ☺ human, ◷ sleep, = set, λ python, ⊂ subflow, ∀ map, ↪ handoff, ✉ notify, ● end, ✖ fail) and an optional status marker; `on_error` edges are dashed; `on_error: continue` draws no separate edges, since it routes with `next`. `when` labels are shortened to 18 characters and placed where they fit, truncated further when space is tight. The list fallback shows each node with its edges as `→ target  if <when>` lines. The renderer reports each node's box position, so the TUI can colour it by status.
 
 ### 10.3 Live two-way sync with the file
 

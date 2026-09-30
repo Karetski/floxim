@@ -14,6 +14,7 @@ requires-python = ">=3.10"
 # Runtime dependencies must be pure Python (ADR 0001); CI enforces it.
 dependencies = [
     "fastjsonschema>=2.19",
+    "grandalf>=0.8",
     "ruamel-yaml>=0.19",
 ]
 classifiers = [
@@ -72,5 +73,5 @@ files = ["src", "tests", "tools"]
 mypy_path = ["tools"]
 
 [[tool.mypy.overrides]]
-module = ["fastjsonschema", "fastjsonschema.*"]
+module = ["fastjsonschema", "fastjsonschema.*", "grandalf", "grandalf.*"]
 ignore_missing_imports = true
