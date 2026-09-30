@@ -2,7 +2,7 @@
   {
     "branch": "main",
     "data": {
-      "arcflow_version": "0.1.0.dev0",
+      "arcflow_version": "<version>",
       "flow": "implement-feature",
       "flow_sha256": "e2b39f6d73c29e091bbf27de7187017c0f2ce127656622f6a1a3d783ee2b5bef",
       "inputs": {

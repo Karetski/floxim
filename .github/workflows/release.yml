@@ -1,0 +1,98 @@
+name: Release
+
+# Pushing a tag vX.Y.Z publishes that version (ADR 0016): the wheel and sdist
+# to PyPI through trusted publishing, and a GitHub release with them and
+# arcflow.pyz attached.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: actions/setup-python@v7
+        id: py310
+        with:
+          python-version: "3.10"
+
+      - name: The tag matches the package version
+        run: |
+          version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/arcflow/__init__.py)
+          test "v$version" = "$GITHUB_REF_NAME" || {
+            echo "tag $GITHUB_REF_NAME does not match version $version"; exit 1; }
+
+      - name: The changelog has an entry for it
+        run: grep -q "^## \[${GITHUB_REF_NAME#v}\]" CHANGELOG.md
+
+      - run: uv sync --locked
+      - run: uv run pytest -q
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Every runtime dependency is pure Python (ADR 0001)
+        run: |
+          uv venv /tmp/pure
+          uv pip install --python /tmp/pure dist/*.whl
+          /tmp/pure/bin/python tools/check_pure_python.py
+
+      - name: Build the zipapp and run it on Python 3.10
+        run: |
+          uv run python tools/build_zipapp.py dist/arcflow-*.whl pyz/arcflow.pyz
+          "${{ steps.py310.outputs.python-path }}" pyz/arcflow.pyz --version
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pyz
+          path: pyz/
+
+  pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/arcflow
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@v1.14.2
+
+  github-release:
+    needs: pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts/
+          merge-multiple: true
+      - name: Create the release with this version's changelog entry
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on && /^\[[^]]*\]: / { next }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          gh release create "$GITHUB_REF_NAME" artifacts/* \
+            --title "Arcflow $version" --notes-file notes.md --verify-tag

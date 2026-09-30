@@ -19,7 +19,7 @@ dependencies = [
     "textual>=6",
 ]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Operating System :: MacOS",
     "Operating System :: POSIX :: Linux",
@@ -46,6 +46,10 @@ dev = [
 
 [tool.hatch.version]
 path = "src/arcflow/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+# Agent and CI configuration are for working on the repository, not for users.
+exclude = [".claude", ".github"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

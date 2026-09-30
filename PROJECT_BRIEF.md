@@ -8,10 +8,10 @@
 
 | Item | State |
 |---|---|
-| Current stage | **Stage 3: Build phases**. Stage 1 (Research) completed 2026-09-30 (`docs/research.md`, `docs/adr/`); Stage 2 (Spec) completed 2026-09-29 |
+| Current stage | **Stage 4: Build**. Milestones M0–M8 are implemented; release 0.1.0 is prepared and is published by pushing its tag (`docs/releasing.md`). Stage 1 (Research) completed 2026-09-30, Stage 2 (Spec) and Stage 3 (Build phases) completed 2026-09-29 |
 | Spec | `docs/spec.md`, accepted 2026-09-29; review decisions in its §15 |
-| Build plan | Draft 1 in `docs/milestones.md` (2026-09-29), awaiting review |
-| Code | None |
+| Build plan | `docs/milestones.md`, accepted 2026-09-29 |
+| Code | `src/arcflow/`, version 0.1.0; user guides in `docs/guide/`, examples in `examples/` |
 | Name | Arcflow (ADR 0013); CLI `arcflow`, short alias `arcf` |
 | Last updated | 2026-09-29 |
 

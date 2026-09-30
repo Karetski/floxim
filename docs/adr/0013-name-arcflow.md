@@ -25,6 +25,16 @@ The project is named **Arcflow**: arcs (graph edges) plus flow, matching the mod
 - No domain or trademark check was done; do one before the first public release (M8).
 - The short alias is the only second name. Directories, environment variables and the package use the full name, so there is one spelling to search for.
 
+## Amendment (2026-09-29): pre-release name check
+
+Before the first public release, a web search (not a trademark-register search or legal advice) found:
+
+- **Arcflow**, a cloud ERP for manufacturers from Arcflow Technology Limited (London; getarcflow.com, arcflow.co), reported to hold a registered trademark in the class for scientific and electric apparatus and instruments. It is a different market, but it describes itself with AI and workflow automation terms.
+- **ArcFlow**, a project presenting "agent workflows you can trust" (arcflows.vercel.app), in the same space as this project.
+- `arcflow` and `arcf` were still unused on PyPI.
+
+Alexey decided to keep the name and release as Arcflow, accepting the risk of confusion and of a later rename. If a rename becomes necessary, the one-spelling rule above keeps it mechanical.
+
 ## Alternatives considered
 
 Rejected as taken on PyPI or crowded on GitHub: `relay`, `baton`, `braid`, `segue`, `tempo`, `cadence` (also Uber's workflow engine). Offered and not chosen: Teamster, Whiffletree, Muleteer, Switchman, Cuelist, Relai, Ondeck.

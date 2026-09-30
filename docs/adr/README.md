@@ -17,5 +17,6 @@
 | [0013](0013-name-arcflow.md) | Project name: Arcflow, CLI `arcflow` with alias `arcf` | Accepted |
 | [0014](0014-v1-scope.md) | v1 scope: Core plus structured editing, the extra node types and command adapters | Accepted |
 | [0015](0015-dev-tooling.md) | CLI with `argparse`; `hatchling`, `mypy --strict`, `ruff`, `uv` with a lockfile | Accepted |
+| [0016](0016-release-process.md) | Releases from a version tag: PyPI trusted publishing and a GitHub release | Accepted |
 
 Background for all of these: [../research.md](../research.md).

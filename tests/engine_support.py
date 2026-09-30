@@ -37,6 +37,7 @@ class Result:
         text = text.replace(self.run.id, "<run>").replace(str(tmp_path.resolve()), "<tmp>")
         text = re.sub(r'"(pid)": \d+', r'"\1": 0', text)
         text = re.sub(r'"host": "[^"]*"', '"host": "<host>"', text)
+        text = re.sub(r'"arcflow_version": "[^"]*"', '"arcflow_version": "<version>"', text)
         if real_time:
             text = re.sub(r'"\d{4}-\d\d-\d\dT[\d:.]+Z"', '"<time>"', text)
             text = re.sub(r'"(duration_s|active_s)": [\d.]+', r'"\1": 0', text)
