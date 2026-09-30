@@ -16,7 +16,7 @@ from floxim.adapters import Adapter, Capabilities
 from floxim.problems import Problem
 
 BUILT_IN = ("claude", "codex", "fake")
-# Built-in adapters whose milestone has not landed (docs/milestones.md).
+# Built-in adapter names that are reserved but not yet runnable.
 PENDING: frozenset[str] = frozenset()
 ENTRY_POINT_GROUP = "floxim.adapters"
 

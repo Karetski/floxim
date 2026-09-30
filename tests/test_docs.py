@@ -10,11 +10,7 @@ import pytest
 from floxim.validate import validate
 
 ROOT = Path(__file__).parent.parent
-DOCS = [
-    ROOT / "README.md",
-    ROOT / "examples" / "README.md",
-    *sorted((ROOT / "docs" / "guide").glob("*.md")),
-]
+DOCS = [ROOT / "README.md"]
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 
 

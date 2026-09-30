@@ -24,8 +24,8 @@ from floxim.graph import build_graph
 from floxim.problems import Problem
 
 # Node types the runner can execute in this version. Validation reports
-# E-NOT-IMPLEMENTED for the others as its last stage; each milestone that makes a
-# node type runnable adds it here (docs/milestones.md).
+# E-NOT-IMPLEMENTED for the others as its last stage; a node type becomes
+# runnable by being added here.
 IMPLEMENTED_NODE_TYPES: frozenset[str] = frozenset(
     {
         "condition",

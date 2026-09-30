@@ -28,9 +28,6 @@ jobs:
           test "v$version" = "$GITHUB_REF_NAME" || {
             echo "tag $GITHUB_REF_NAME does not match version $version"; exit 1; }
 
-      - name: The changelog has an entry for it
-        run: grep -q "^## \[${GITHUB_REF_NAME#v}\]" CHANGELOG.md
-
       - run: uv sync --locked
       - run: uv run pytest -q
 
@@ -83,16 +80,9 @@ jobs:
         with:
           path: artifacts/
           merge-multiple: true
-      - name: Create the release with this version's changelog entry
+      - name: Create the release with generated notes
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version=${GITHUB_REF_NAME#v}
-          awk -v v="$version" '
-            $0 ~ "^## \\[" v "\\]" { on = 1; next }
-            on && /^## \[/ { exit }
-            on && /^\[[^]]*\]: / { next }
-            on { print }
-          ' CHANGELOG.md > notes.md
           gh release create "$GITHUB_REF_NAME" artifacts/* \
-            --title "Floxim $version" --notes-file notes.md --verify-tag
+            --title "Floxim ${GITHUB_REF_NAME#v}" --generate-notes --verify-tag
