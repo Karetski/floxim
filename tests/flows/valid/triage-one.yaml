@@ -1,4 +1,4 @@
-arcflow: 1
+floxim: 1
 name: triage-one
 include: [shared/templates.yaml]
 inputs:

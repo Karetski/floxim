@@ -1,15 +1,15 @@
 """Fail if any distribution installed in this environment ships compiled code.
 
 ADR 0001 requires every runtime dependency to be pure Python. Run this with the
-interpreter of a fresh environment into which only the Arcflow wheel was
-installed, so every distribution it sees is Arcflow or a runtime dependency.
+interpreter of a fresh environment into which only the Floxim wheel was
+installed, so every distribution it sees is Floxim or a runtime dependency.
 """
 
 from __future__ import annotations
 
 import sys
 
-from arcflow.purity import find_impure, installed_wheels
+from floxim.purity import find_impure, installed_wheels
 
 __all__ = ["find_impure", "main"]
 

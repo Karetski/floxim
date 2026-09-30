@@ -12,10 +12,10 @@ from typing import Any
 import pytest
 from engine_support import Result, run_flow
 
-from arcflow.adapters import AgentRequest, SessionSpec
-from arcflow.adapters.claude import ClaudeAdapter, ClaudeStream
-from arcflow.adapters.process import parse_lines, version_in_range
-from arcflow.conformance import FIXTURES_DIR
+from floxim.adapters import AgentRequest, SessionSpec
+from floxim.adapters.claude import ClaudeAdapter, ClaudeStream
+from floxim.adapters.process import parse_lines, version_in_range
+from floxim.conformance import FIXTURES_DIR
 
 FIXTURES = FIXTURES_DIR / "claude-2.1.285"
 SESSION = "11111111-2222-4333-8444-555555555555"
@@ -129,7 +129,7 @@ def argv(**changes: Any) -> list[str]:
     return ClaudeAdapter().command(request(**changes))
 
 
-def test_given_new_session_when_command_built_then_arcflow_chooses_the_id() -> None:
+def test_given_new_session_when_command_built_then_floxim_chooses_the_id() -> None:
     line = argv()
     assert line[:2] == ["claude", "-p"]
     assert line[line.index("--session-id") + 1] == SESSION

@@ -7,7 +7,7 @@
 
 ## Decision
 
-Agent and shell nodes share the run's working directory by default. A node may opt in to `workspace: worktree`, in which case **Arcflow** creates and manages a git worktree for it (not the harnesses' own `--worktree` flags, so behaviour is the same across harnesses).
+Agent and shell nodes share the run's working directory by default. A node may opt in to `workspace: worktree`, in which case **Floxim** creates and manages a git worktree for it (not the harnesses' own `--worktree` flags, so behaviour is the same across harnesses).
 
 ## Consequences
 

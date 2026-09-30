@@ -11,11 +11,11 @@ ADR 0001 fixed Python 3.10+ with pure-Python runtime dependencies and left the C
 
 ## Decision
 
-- **CLI:** `argparse` from the standard library. No runtime dependency, the fastest startup for scripts that poll `arcflow status --json`, and full control over output and the exit codes of spec §9.2.
+- **CLI:** `argparse` from the standard library. No runtime dependency, the fastest startup for scripts that poll `floxim status --json`, and full control over output and the exit codes of spec §9.2.
 - **Build backend:** `hatchling`. It is pure Python, so building from the sdist on a restricted mirror needs no compiled code.
 - **Type checking:** `mypy --strict` in CI from the first commit.
 - **Lint and format:** `ruff`.
-- **Development environment:** `uv`, with `uv.lock` committed and CI running `uv sync --locked`. Users still install with `pipx` or `uv tool install` (ADR 0001); `uv` is not required to use Arcflow.
+- **Development environment:** `uv`, with `uv.lock` committed and CI running `uv sync --locked`. Users still install with `pipx` or `uv tool install` (ADR 0001); `uv` is not required to use Floxim.
 
 ## Consequences
 

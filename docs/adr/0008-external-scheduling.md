@@ -7,8 +7,8 @@
 
 ## Decision
 
-Arcflow has no scheduler or daemon in v1. Scheduling uses cron, systemd timers or CI. Arcflow supports this with stable, documented exit codes, `--json` output on every command, and documentation recipes for each scheduler.
+Floxim has no scheduler or daemon in v1. Scheduling uses cron, systemd timers or CI. Floxim supports this with stable, documented exit codes, `--json` output on every command, and documentation recipes for each scheduler.
 
 ## Consequences
 
-Matches brief principle 7. A `arcflow schedule` helper that generates crontab or systemd units may come later.
+Matches brief principle 7. A `floxim schedule` helper that generates crontab or systemd units may come later.

@@ -1,4 +1,4 @@
-# Arcflow Milestones
+# Floxim Milestones
 
 | | |
 |---|---|
@@ -7,7 +7,7 @@
 | Stage | 3 (Build phases), per PROJECT_BRIEF.md §15 |
 | Inputs | `docs/spec.md` (accepted), ADRs 0001–0014 |
 
-This is the build plan for Arcflow v1. It orders the work into milestones, each sized for roughly one agent session, with the spec sections it implements, what it depends on, its acceptance criteria and the tests it must add. The spec defines behaviour; this document only schedules it. If a milestone seems to need behaviour the spec doesn't define, stop and raise it (brief §16.1).
+This is the build plan for Floxim v1. It orders the work into milestones, each sized for roughly one agent session, with the spec sections it implements, what it depends on, its acceptance criteria and the tests it must add. The spec defines behaviour; this document only schedules it. If a milestone seems to need behaviour the spec doesn't define, stop and raise it (brief §16.1).
 
 ## How to read this
 
@@ -29,7 +29,7 @@ A milestone is done only when all of these hold, in addition to its own criteria
 6. Every node type the milestone makes runnable joins the crash-and-resume matrix (§13): crash at each event boundary, resume, and assert the same final state with no finished visit run twice.
 7. Behaviour the milestone had to clarify is written back into the spec in the same change; new non-trivial decisions get an ADR.
 
-**`E-NOT-IMPLEMENTED` during the build.** One table in the code lists the node types and features the runner can execute, and each milestone that adds one updates it. `arcflow validate` checks the format and semantics of every feature from M1 on, and reports `E-NOT-IMPLEMENTED` as its last stage for anything outside that table. Corpus tests assert the other stages separately, so the Appendix A flows are in the valid corpus from M1 even before they can run.
+**`E-NOT-IMPLEMENTED` during the build.** One table in the code lists the node types and features the runner can execute, and each milestone that adds one updates it. `floxim validate` checks the format and semantics of every feature from M1 on, and reports `E-NOT-IMPLEMENTED` as its last stage for anything outside that table. Corpus tests assert the other stages separately, so the Appendix A flows are in the valid corpus from M1 even before they can run.
 
 ## Overview
 
@@ -56,14 +56,14 @@ A milestone is done only when all of these hold, in addition to its own criteria
 | M4d | `handoff` | M3c, M3d, M4a |
 | M5a | Inspection commands | M4b |
 | M5b | Housekeeping commands and the CLI contract | M5a, M3e |
-| M5c | Structured editing library and `arcflow flow` | M1c |
+| M5c | Structured editing library and `floxim flow` | M1c |
 | M6a | Graph renderer | M1c |
 | M6b | Read-only TUI monitor | M5a, M6a |
 | M7a | TUI run control and human prompts | M6b |
 | M7b | TUI graph editor | M7a, M5c |
 | M8 | Docs, examples, first release | all |
 
-Dogfooding starts after M4b (brief §15): Arcflow's own milestone loop (plan → implement → test → review → approve) runs as an Arcflow flow from then on.
+Dogfooding starts after M4b (brief §15): Floxim's own milestone loop (plan → implement → test → review → approve) runs as an Floxim flow from then on.
 
 M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the others is flexible.
 
@@ -75,7 +75,7 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 
 **Scope**
 
-- `pyproject.toml` with a pure-Python build backend; package `arcflow` under `src/`; console scripts `arcflow` and `arcf` for the same entry point; `arcflow --version`.
+- `pyproject.toml` with a pure-Python build backend; package `floxim` under `src/`; console scripts `floxim` and `flx` for the same entry point; `floxim --version`.
 - Top-level error handling: an unexpected exception exits with code 70 and asks for a bug report (§9.2).
 - Dev tooling: pytest, Hypothesis, a linter and formatter, and a type checker.
 - CI (GitHub Actions): lint, type check, tests on 3.10–3.13 × Linux and macOS, wheel and zipapp build, and a check that every transitive runtime dependency installs as a `py3-none-any` wheel.
@@ -85,7 +85,7 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 **Done when**
 
 - CI is green on a project with no features.
-- `pipx install .` and `uv tool install .` both give working `arcflow --version` and `arcf --version`; so does the zipapp run with a system Python 3.10.
+- `pipx install .` and `uv tool install .` both give working `floxim --version` and `flx --version`; so does the zipapp run with a system Python 3.10.
 - The pure-Python check fails when a native dependency is added (proved by the check's own test against a fixture list of wheels).
 
 ## M1a. Loader, flow model and `validate`
@@ -98,8 +98,8 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 - A declarative model of flows, inputs, defaults, limits, templates and all eleven node types, from which both the validator and the published schema derive; `x-*` keys preserved and ignored; durations and identifiers.
 - Effective-node computation: built-in defaults → `defaults` → `defaults.<type>` → templates (`extends` chains) → node keys, with the merge rules of §3.6; `include` of template-only fragments.
 - Referenced files resolved relative to the flow file; JSON Schemas checked with `fastjsonschema`.
-- `arcflow validate <flow>… [--strict] [--json]`, printing problems as `file:line:col severity CODE pointer: message` and as the JSON array of §9.4. The `--json` envelope and the exit-code constants are shared code from here on.
-- `arcflow schema flow`, generated from the same dataclasses.
+- `floxim validate <flow>… [--strict] [--json]`, printing problems as `file:line:col severity CODE pointer: message` and as the JSON array of §9.4. The `--json` envelope and the exit-code constants are shared code from here on.
+- `floxim schema flow`, generated from the same dataclasses.
 - The corpus runner: `tests/flows/invalid/*.yaml` with `# expect:` annotations, `tests/flows/valid/*.yaml` with all four Appendix A flows.
 
 **Done when**
@@ -135,14 +135,14 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 - Routing checks, reachability, exits, unguarded cycles.
 - Reference resolution for every expression and template: inputs, node IDs, per-type result fields, `output` paths through the node's `output_schema` (`properties`, `items`, local `$ref`), `W-NEVER-SET` from path analysis.
 - Security lints, with the risky-command patterns taken from config.
-- Project-root discovery and config loading with precedence (§2.2); `arcflow schema config`.
+- Project-root discovery and config loading with precedence (§2.2); `floxim schema config`.
 - Did-you-mean hints for unknown targets and references.
 
 **Done when**
 
 - The invalid corpus covers every code above.
 - The valid corpus, including all Appendix A flows, reports no errors other than `E-NOT-IMPLEMENTED`, and its expected warnings are pinned in the corpus annotations (A.2's include the `W-NO-HUMAN-BEFORE-RISKY` that §A.2 predicts).
-- **Brief M1 is complete:** `arcflow validate` catches the whole invalid-flow suite.
+- **Brief M1 is complete:** `floxim validate` catches the whole invalid-flow suite.
 
 ## M2a. Run store: event log, state, lock, inbox
 
@@ -165,7 +165,7 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 
 ## M2b. Step loop with `condition`, `sleep` and `set`
 
-**Implements:** §6.1–6.5, §6.3 size limits, §5.3, §5.5, §5.6, §3.4 limits, §4.3 state namespace; `arcflow run` (foreground, `--input`, `--inputs-file`, `--input k=@file`, `--workdir`, `--json`, `--events`); exit codes 0, 1, 3.
+**Implements:** §6.1–6.5, §6.3 size limits, §5.3, §5.5, §5.6, §3.4 limits, §4.3 state namespace; `floxim run` (foreground, `--input`, `--inputs-file`, `--input k=@file`, `--workdir`, `--json`, `--events`); exit codes 0, 1, 3.
 
 **Scope**
 
@@ -180,7 +180,7 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 
 - Golden event logs for flows exercising every routing form, every limit and each of the three node types.
 - A loop without a guard stops at `max_visits` and names the node.
-- `arcflow run` on a condition/sleep/set-only flow succeeds and exits 0, fails and exits 1, and rejects bad inputs with exit 3.
+- `floxim run` on a condition/sleep/set-only flow succeeds and exits 0, fails and exits 1, and rejects bad inputs with exit 3.
 
 ## M2c. `shell` node and process control
 
@@ -189,10 +189,10 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 **Scope**
 
 - The process layer, one module for all child processes: process groups, the SIGINT → grace → SIGTERM → SIGKILL stop sequence with `stopped_by`, per-attempt timeouts. Platform-specific code is isolated there (§15 Q10).
-- `shell` node: `run` through `bash -eo pipefail` (or `sh -e`), `args` without a shell, `cwd`, `stdin`, `ok_codes`, `output: json|text`, `output_schema`, output tails and full logs, `ARCFLOW_*` variables.
+- `shell` node: `run` through `bash -eo pipefail` (or `sh -e`), `args` without a shell, `cwd`, `stdin`, `ok_codes`, `output: json|text`, `output_schema`, output tails and full logs, `FLOXIM_*` variables.
 - Environment control: empty environment plus the allowlists, `env_passthrough`, node `env`; the session denylist always applied; `env.X` in templates limited to allowed variables.
 - Retries with backoff and `on` outcomes.
-- Redaction of everything Arcflow writes (§12.4).
+- Redaction of everything Floxim writes (§12.4).
 
 **Done when**
 
@@ -203,14 +203,14 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 
 ## M2d. Resume and crash safety
 
-**Implements:** §7.5 (`resume` and `restart` modes), §7.6 (`--reload`, `--from`, `--rerun`, `--force`), §6.7 runner signals, §13 crash-and-resume layer; `arcflow resume`; exit code 8.
+**Implements:** §7.5 (`resume` and `restart` modes), §7.6 (`--reload`, `--from`, `--rerun`, `--force`), §6.7 runner signals, §13 crash-and-resume layer; `floxim resume`; exit code 8.
 
 **Scope**
 
 - Rebuilding state from events and continuing; interrupted visits handled by `on_resume` (`ask` comes in M4b).
 - The resume options above, including snapshot versioning for `--reload`.
 - SIGINT/SIGTERM to a foreground run: stop the attempt, record `runner_detached`, exit 8; a second SIGINT within 3 s skips the grace period.
-- The fault-injection hook `ARCFLOW_TEST_CRASH_AT=<event type>:<n>` and the crash matrix harness.
+- The fault-injection hook `FLOXIM_TEST_CRASH_AT=<event type>:<n>` and the crash matrix harness.
 - The derived `interrupted` display status.
 
 **Done when**
@@ -225,8 +225,8 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 **Scope**
 
 - `workspace: worktree` and named worktrees, created on first use with the recorded base and branch, reused across visits and nodes, reused on resume.
-- `keep` handling (removal happens in `arcflow gc`, M5b).
-- Artifact directories per visit, `node.artifacts_dir`, `ARCFLOW_ARTIFACTS_DIR`, `nodes.<id>.artifacts_dir`.
+- `keep` handling (removal happens in `floxim gc`, M5b).
+- Artifact directories per visit, `node.artifacts_dir`, `FLOXIM_ARTIFACTS_DIR`, `nodes.<id>.artifacts_dir`.
 
 **Done when**
 
@@ -239,7 +239,7 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 
 **Scope**
 
-- `arcflow.pycall` child entry point, `interpreter:`, project root on `sys.path`, `args` as keyword arguments and a read-only `ctx`, JSON return values, `output_schema`.
+- `floxim.pycall` child entry point, `interpreter:`, project root on `sys.path`, `args` as keyword arguments and a read-only `ctx`, JSON return values, `output_schema`.
 - Exceptions become outcome `failed` with kind `exception` and the traceback in the visit directory.
 - Timeouts and cancellation through the M2c process layer.
 
@@ -254,7 +254,7 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 
 **Scope**
 
-- The `Adapter` protocol and its data types; the adapter registry (built-ins plus lazily loaded `arcflow.adapters` entry points).
+- The `Adapter` protocol and its data types; the adapter registry (built-ins plus lazily loaded `floxim.adapters` entry points).
 - `ProcessAdapter` base on the M2c process layer.
 - The fake adapter: scripted responses by order or `match`, outcomes and errors, delays, usage and cost, and (as a stub until M3c) stream replay.
 - The `agent` node in the engine: rendered `prompt.md`/`instructions.md`, `session_started` written and `fsync`ed first, session modes with graceful degradation, `permission_denials`, results in state.
@@ -263,7 +263,7 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 **Done when**
 
 - Engine tests drive every session mode, every outcome and every degradation row of §8.1 through the fake adapter.
-- An agent visit crashed after `session_started` resumes that session on `arcflow resume`.
+- An agent visit crashed after `session_started` resumes that session on `floxim resume`.
 
 ## M3b. Structured output, budgets and cost
 
@@ -287,7 +287,7 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 
 **Scope**
 
-- Command construction, prompt on stdin, `--session-id` chosen by Arcflow, `stream-json` parsing into adapter events, the raw stream saved byte for byte, outcome mapping from `subtype`/`terminal_reason`, version capture and `tested_versions` warning, `--disallowedTools Workflow`, `interactive_command`.
+- Command construction, prompt on stdin, `--session-id` chosen by Floxim, `stream-json` parsing into adapter events, the raw stream saved byte for byte, outcome mapping from `subtype`/`terminal_reason`, version capture and `tested_versions` warning, `--disallowedTools Workflow`, `interactive_command`.
 - Offline fixtures recorded from the pinned version under `fixtures/claude-<version>/`, replayed through the parser (also by the fake adapter's `replay`).
 - **Contract tests** (marked `live`, opt-in, with a spend cap): settle the exact flags per permission profile (§15 Q6) and the env denylist (§15 Q7), then update §8.4 and §12.3 from the results.
 
@@ -314,54 +314,54 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 
 ## M3e. Command adapters and conformance kit
 
-**Implements:** §8.5, §8.8, §9.3 `arcflow adapter test`, `arcflow schema harness`.
+**Implements:** §8.5, §8.8, §9.3 `floxim adapter test`, `floxim schema harness`.
 
 **Scope**
 
-- `.arcflow/harnesses/<name>.yaml` loading and validation, per-argv placeholder substitution with the flag-pair omission rule, `prompt_via`, stream mappings evaluated with the M1b evaluator, permission argv, auth env, `tested_versions`.
+- `.floxim/harnesses/<name>.yaml` loading and validation, per-argv placeholder substitution with the flag-pair omission rule, `prompt_via`, stream mappings evaluated with the M1b evaluator, permission argv, auth env, `tested_versions`.
 - The conformance suite: offline mode replays fixture streams through a built-in adapter's parser, or through a stub executable for command adapters; live mode (`--live`) runs the small prompt set with a spend cap.
 - A sample command adapter in the tests (driving a stub CLI) that passes the offline suite.
 
 **Done when**
 
-- `arcflow adapter test claude`, `codex` and the sample command adapter pass offline.
+- `floxim adapter test claude`, `codex` and the sample command adapter pass offline.
 - A malformed harness file produces precise validation problems with positions.
 
 ## M4a. `human` node, waiting, `respond`, detached runners
 
-**Implements:** §5.4, §6.11 (`--on-wait prompt|wait|exit`), §7.4 inbox for answers, ADR 0006; `arcflow respond`, `arcflow run --detach`; exit code 4; exit code 2 for invalid answers.
+**Implements:** §5.4, §6.11 (`--on-wait prompt|wait|exit`), §7.4 inbox for answers, ADR 0006; `floxim respond`, `floxim run --detach`; exit code 4; exit code 2 for invalid answers.
 
 **Scope**
 
 - `human` node: choices, text, acknowledgement, `show`, `human_waiting`, `run_waiting`, the answer recorded as `human_responded`.
-- `on_wait` hooks from node, flow or config, run detached with a 30 s timeout and `ARCFLOW_*` variables (the hook runner is reused by `notify` in M4b).
+- `on_wait` hooks from node, flow or config, run detached with a 30 s timeout and `FLOXIM_*` variables (the hook runner is reused by `notify` in M4b).
 - The three `--on-wait` behaviours, including the inline terminal prompt that also accepts answers from other clients.
-- `arcflow respond` through the inbox when a runner is live, otherwise by taking the lock, then starting a detached runner unless `--no-continue`.
-- `arcflow run --detach`.
+- `floxim respond` through the inbox when a runner is live, otherwise by taking the lock, then starting a detached runner unless `--no-continue`.
+- `floxim run --detach`.
 
 **Done when**
 
-- A flow started with `--on-wait exit` exits 4 at a human node; `arcflow respond` from another process records the answer, starts a detached runner, and the run finishes.
+- A flow started with `--on-wait exit` exits 4 at a human node; `floxim respond` from another process records the answer, starts a detached runner, and the run finishes.
 - An invalid answer exits 2 and changes nothing.
-- Example A.1 runs end to end with the fake adapter, with its approval answered through `arcflow respond`.
+- Example A.1 runs end to end with the fake adapter, with its approval answered through `floxim respond`.
 - **Brief M4 is complete:** a flow pauses, is answered through the CLI, and continues.
 
 ## M4b. `notify`, `cancel`, human timeouts, `on_resume: ask`
 
-**Implements:** §5.11, §6.7 cancel, §6.11 lazy timeouts, §7.5 `ask`, §7.6 `--due`; `arcflow cancel`; exit code 5.
+**Implements:** §5.11, §6.7 cancel, §6.11 lazy timeouts, §7.5 `ask`, §7.6 `--due`; `floxim cancel`; exit code 5.
 
 **Scope**
 
 - `notify` node with `command` or `webhook` and `required`.
-- `arcflow cancel` through the inbox or directly; a waiting run is cancelled at once.
-- Human timeouts: `default` answers, `timed_out` outcomes, lazy enforcement by any command that touches the run, `arcflow resume --due`.
+- `floxim cancel` through the inbox or directly; a waiting run is cancelled at once.
+- Human timeouts: `default` answers, `timed_out` outcomes, lazy enforcement by any command that touches the run, `floxim resume --due`.
 - `on_resume: ask` as a generated human prompt with `rerun`, `skip` and `fail`.
 
 **Done when**
 
 - A running agent (fake, slow) and a running shell command are both cancelled within the grace period, and the run ends `cancelled` with exit 5.
-- With the injected clock, a human node past its deadline times out when `arcflow status` or `resume --due` touches the run.
-- The dogfooding flow for Arcflow's own milestones validates and runs with the fake adapter.
+- With the injected clock, a human node past its deadline times out when `floxim status` or `resume --due` touches the run.
+- The dogfooding flow for Floxim's own milestones validates and runs with the fake adapter.
 
 ## M4c. `subflow` and `map`
 
@@ -381,12 +381,12 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 
 ## M4d. `handoff`
 
-**Implements:** §5.10, `arcflow handoff`.
+**Implements:** §5.10, `floxim handoff`.
 
 **Scope**
 
 - In the foreground on a TTY: print the message, run the adapter's `interactive_command` attached to the terminal, continue on exit.
-- Otherwise the run waits like a human node, and `arcflow handoff <run>` opens the session later and continues the run.
+- Otherwise the run waits like a human node, and `floxim handoff <run>` opens the session later and continues the run.
 - Validation: the `from` node exists, is an agent node, and its adapter declares `interactive`.
 
 **Done when**
@@ -409,8 +409,8 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 
 **Scope**
 
-- `arcflow init` creates `.arcflow/` with config, `.gitignore` and an example flow that validates.
-- `arcflow schema cli` publishes the JSON Schema of every command's `--json` output; snapshot tests validate against it.
+- `floxim init` creates `.floxim/` with config, `.gitignore` and an example flow that validates.
+- `floxim schema cli` publishes the JSON Schema of every command's `--json` output; snapshot tests validate against it.
 - `gc` with its safety rules (never waiting or locked runs; worktrees by `keep` or merged branch); `doctor` for the environment and for repairing a run's log and state.
 
 **Done when**
@@ -418,13 +418,13 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 - The published CLI schemas validate every command's `--json` output in the test suite.
 - **Brief M5 is complete:** every command marked Core in §9.3 (except `tui`) works, has `--json`, and has documented exit codes.
 
-## M5c. Structured editing library and `arcflow flow`
+## M5c. Structured editing library and `floxim flow`
 
-**Implements:** §10.4 (all operations), `arcflow flow add-node|rm-node|rename-node|set|unset|connect|disconnect`; exit code 7 on conflict.
+**Implements:** §10.4 (all operations), `floxim flow add-node|rm-node|rename-node|set|unset|connect|disconnect`; exit code 7 on conflict.
 
 **Scope**
 
-- `arcflow.edit` on the `ruamel.yaml` round-trip tree: every operation in §10.4, validation of the result, re-read and hash check before writing, atomic write keeping the file mode.
+- `floxim.edit` on the `ruamel.yaml` round-trip tree: every operation in §10.4, validation of the result, re-read and hash check before writing, atomic write keeping the file mode.
 - Renaming rewrites every reference, including inside expressions through the AST, and leaves text outside `${{ }}` untouched.
 
 **Done when**
@@ -434,7 +434,7 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 
 ## M6a. Graph renderer
 
-**Implements:** §10.2; `arcflow graph --format ascii`.
+**Implements:** §10.2; `floxim graph --format ascii`.
 
 **Scope**
 
@@ -451,7 +451,7 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 
 **Scope**
 
-- Textual app launched by `arcflow tui [<flow>|<run>]`; screens read only through the library functions the CLI uses.
+- Textual app launched by `floxim tui [<flow>|<run>]`; screens read only through the library functions the CLI uses.
 - Run detail: live node status on the graph, visit timeline, inspector (prompt, output, streamed activity, stdout/stderr, artifacts, usage and cost), budget and limit gauges, pending-prompt banner (display only in this milestone).
 - File polling every 300 ms with the valid and invalid behaviours of §10.3.
 - Key bindings, command palette, monochrome fallback, 80×24 minimum.
@@ -477,13 +477,13 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 
 **Scope**
 
-- Inspector forms generated from the node type schemas; multi-line prompt editing and `$EDITOR`; add, remove, rename, connect, disconnect, reorder cases, change type, all through `arcflow.edit`.
+- Inspector forms generated from the node type schemas; multi-line prompt editing and `$EDITOR`; add, remove, rename, connect, disconnect, reorder cases, change type, all through `floxim.edit`.
 - Conflicts: reload and ask when the file changed on disk.
 - "Flow changed since this run started" in run detail, with `resume --reload` offered only when allowed.
 
 **Done when**
 
-- Pilot tests perform each edit and assert the resulting file matches the same `arcflow flow` operation byte for byte.
+- Pilot tests perform each edit and assert the resulting file matches the same `floxim flow` operation byte for byte.
 - An external edit made while the editor is open appears in the graph within one polling interval.
 
 ## M8. Docs, examples, first release
@@ -493,11 +493,11 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 - `README.md` quickstart; user docs for the flow format, CLI, cron/CI recipes (§6.11, ADR 0008), security (§12.1, at-least-once side effects), adapters and the conformance kit.
 - `examples/` with the Appendix A flows and their schemas.
 - Release pipeline: wheel and zipapp artifacts, PyPI publishing, version and changelog.
-- The domain and trademark check that ADR 0013 requires before the first public release.
+- The domain and trademark check that ADR 0017 requires before the first public release.
 
 **Done when**
 
-- On clean Linux and macOS machines, `pipx install arcflow` from PyPI and the README quickstart work as written.
+- On clean Linux and macOS machines, `pipx install floxim` from PyPI and the README quickstart work as written.
 - **Brief M8 is complete.**
 
 ---

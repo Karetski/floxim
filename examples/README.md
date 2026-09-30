@@ -1,6 +1,6 @@
 # Examples
 
-The four flows from the [spec's Appendix A](../docs/spec.md#appendix-a-example-flows), with the schemas and shared templates they use. Each is explained there in detail. They are part of Arcflow's test corpus, so they always validate.
+The four flows from the [spec's Appendix A](../docs/spec.md#appendix-a-example-flows), with the schemas and shared templates they use. Each is explained there in detail. They are part of Floxim's test corpus, so they always validate.
 
 | Flow | Shows | Needs |
 |---|---|---|
@@ -12,8 +12,8 @@ The four flows from the [spec's Appendix A](../docs/spec.md#appendix-a-example-f
 Look at one without running anything:
 
 ```sh
-arcflow validate examples/implement-feature.yaml
-arcflow graph examples/implement-feature.yaml
+floxim validate examples/implement-feature.yaml
+floxim graph examples/implement-feature.yaml
 ```
 
 To use one, copy it with its `schemas/` (and `shared/` for the triage flows) into your project's `flows/` directory and adjust the commands, harnesses and budgets to your repository. These flows run real agents and spend money. Each run stops at its budget: the flow's `limits`, or $25 and 10 million tokens when it sets none.

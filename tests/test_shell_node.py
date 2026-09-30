@@ -175,7 +175,7 @@ def test_given_runner_environment_when_command_runs_then_only_allowed_variables_
     # Then
     names = {line.split("=", 1)[0] for line in result.state["nodes"]["e"]["stdout"].splitlines()}
     assert {"PATH", "HOME", "GIT_AUTHOR_NAME", "NPM_TOKEN", "EXTRA"} <= names
-    assert {"ARCFLOW_RUN_ID", "ARCFLOW_NODE_ID", "ARCFLOW_VISIT", "ARCFLOW_ATTEMPT"} <= names
+    assert {"FLOXIM_RUN_ID", "FLOXIM_NODE_ID", "FLOXIM_VISIT", "FLOXIM_ATTEMPT"} <= names
     assert not names & {"SECRET_TOKEN", "CLAUDECODE", "CODEX_SANDBOX_NETWORK_DISABLED", "GIT_DIR"}
 
 

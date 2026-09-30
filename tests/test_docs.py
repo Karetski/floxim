@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from arcflow.validate import validate
+from floxim.validate import validate
 
 ROOT = Path(__file__).parent.parent
 DOCS = [

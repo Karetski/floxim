@@ -1,13 +1,13 @@
 # Writing flows
 
-A flow is one YAML file: a named graph of nodes. Arcflow validates it, snapshots it when a run starts, and executes it one node at a time, recording every step so a run can be inspected and resumed. This guide is a tour; [the spec](../spec.md) is the complete reference, and each section below links to the part that defines it.
+A flow is one YAML file: a named graph of nodes. Floxim validates it, snapshots it when a run starts, and executes it one node at a time, recording every step so a run can be inspected and resumed. This guide is a tour; [the spec](../spec.md) is the complete reference, and each section below links to the part that defines it.
 
-Start from `arcflow init`, which writes `flows/hello.yaml`, or from the flows in [`examples/`](../../examples/). Point your editor's YAML language server at `arcflow schema flow` for completion and inline errors, and run `arcflow validate` often; every problem it reports has a stable code, a line and a column.
+Start from `floxim init`, which writes `flows/hello.yaml`, or from the flows in [`examples/`](../../examples/). Point your editor's YAML language server at `floxim schema flow` for completion and inline errors, and run `floxim validate` often; every problem it reports has a stable code, a line and a column.
 
 ## The shape of a file
 
 ```yaml
-arcflow: 1
+floxim: 1
 name: fix-tests
 description: Ask an agent to fix failing tests, retrying until they pass.
 
@@ -63,7 +63,7 @@ Every node takes the common keys of [§3.8](../spec.md#38-nodes-common-keys): `d
 
 `next` is either a node ID or a list of cases evaluated in order; the first case whose `when` is true wins, and a case without `when` is the default and must come last. The targets `end` and `fail` finish the run; a case to `fail` can carry a `reason`. A node without `next` goes to `end` ([§3.9](../spec.md#39-routing-next)).
 
-When a node fails (a non-zero exit, a timeout, an agent error), `on_error` decides what happens: `fail` (the default) fails the run, `continue` routes with `next` as if it succeeded, and a node ID or a list of cases routes like `next` ([§6.5](../spec.md#65-errors-and-on_error)). Test steps in a fix loop want `on_error: continue`; `arcflow validate` warns when a `next` branches on `exit_code` that `on_error: fail` would never let it see.
+When a node fails (a non-zero exit, a timeout, an agent error), `on_error` decides what happens: `fail` (the default) fails the run, `continue` routes with `next` as if it succeeded, and a node ID or a list of cases routes like `next` ([§6.5](../spec.md#65-errors-and-on_error)). Test steps in a fix loop want `on_error: continue`; `floxim validate` warns when a `next` branches on `exit_code` that `on_error: fail` would never let it see.
 
 ## Expressions and templates
 
@@ -98,7 +98,7 @@ plan:
   budget: { usd: 2 }
 ```
 
-- **Structured output.** With `output_schema`, the agent's final answer must be JSON that validates against it, and it is available as `nodes.plan.output`. Arcflow asks the agent to fix an invalid answer (`schema_retries`) before failing the visit. Require a `status` field and branch on it, so an agent can say it is blocked rather than pretend it succeeded ([§5.1.2](../spec.md#512-structured-output)).
+- **Structured output.** With `output_schema`, the agent's final answer must be JSON that validates against it, and it is available as `nodes.plan.output`. Floxim asks the agent to fix an invalid answer (`schema_retries`) before failing the visit. Require a `status` field and branch on it, so an agent can say it is blocked rather than pretend it succeeded ([§5.1.2](../spec.md#512-structured-output)).
 - **Sessions.** `session: new` (the default) starts fresh; `continue` resumes this node's previous session on later visits; `session: {resume: plan}` and `session: {fork: plan}` start from another node's latest session (same harness) ([§5.1.3](../spec.md#513-sessions)).
 - **Permissions.** Unattended agents never get an interactive prompt: anything that would ask is denied. `edit` can change files in the workspace and run only commands listed in `allow_tools`; `full` needs `--allow-full` ([§8.4](../spec.md#84-permission-profiles)).
 
@@ -114,7 +114,7 @@ approve:
   default: reject
 ```
 
-A human node pauses the run until someone answers from the terminal, `arcflow respond` or the TUI. The answer is `nodes.approve.choice` (or `.text` with `input: text`). With a `timeout` and a `default`, the default is taken when the time passes; without a default, the timeout is an error routed by `on_error` ([§5.4](../spec.md#54-human-core), [§6.11](../spec.md#611-waiting-for-humans-and-the-runner-process)). The [scheduling guide](scheduling.md) shows how runs wait without a process.
+A human node pauses the run until someone answers from the terminal, `floxim respond` or the TUI. The answer is `nodes.approve.choice` (or `.text` with `input: text`). With a `timeout` and a `default`, the default is taken when the time passes; without a default, the timeout is an error routed by `on_error` ([§5.4](../spec.md#54-human-core), [§6.11](../spec.md#611-waiting-for-humans-and-the-runner-process)). The [scheduling guide](scheduling.md) shows how runs wait without a process.
 
 ## Limits, budgets and retries
 
@@ -131,7 +131,7 @@ The run budget is a hard stop: once spent, the next agent node fails the run. A 
 
 ## Workspaces
 
-Nodes run in the run's working directory by default, and see each other's changes. `workspace: worktree` gives a node its own git worktree, and a named worktree (`workspace: {worktree: upgrade}`) is shared by every node that names it. Arcflow creates worktrees under `.arcflow/worktrees/` and never merges, pushes or deletes branches itself; flows do that in shell nodes ([§6.9](../spec.md#69-workspaces)).
+Nodes run in the run's working directory by default, and see each other's changes. `workspace: worktree` gives a node its own git worktree, and a named worktree (`workspace: {worktree: upgrade}`) is shared by every node that names it. Floxim creates worktrees under `.floxim/worktrees/` and never merges, pushes or deletes branches itself; flows do that in shell nodes ([§6.9](../spec.md#69-workspaces)).
 
 ## Reuse
 
@@ -139,8 +139,8 @@ Nodes run in the run's working directory by default, and see each other's change
 
 ## Resuming and side effects
 
-A run survives crashes: `arcflow resume <run>` continues from the last recorded step and never reruns a finished visit. A visit that was cut off in the middle is started again, so its side effects can happen twice (at-least-once). Set `on_resume: ask` on shell steps that must not repeat, such as a deploy ([§7.5](../spec.md#75-resume)).
+A run survives crashes: `floxim resume <run>` continues from the last recorded step and never reruns a finished visit. A visit that was cut off in the middle is started again, so its side effects can happen twice (at-least-once). Set `on_resume: ask` on shell steps that must not repeat, such as a deploy ([§7.5](../spec.md#75-resume)).
 
 ## Editing
 
-The file is the flow: edit it by hand, from the TUI, with `arcflow flow <op>`, or with an agent. The structured edits (`add-node`, `rm-node`, `rename-node`, `set`, `unset`, `connect`, `disconnect`) keep comments and formatting and refuse an edit that would break a valid flow ([§10.4](../spec.md#104-structured-edits)). Runs use their snapshot, so editing a flow never changes a run in progress; `arcflow resume --reload` continues a run with the edited file.
+The file is the flow: edit it by hand, from the TUI, with `floxim flow <op>`, or with an agent. The structured edits (`add-node`, `rm-node`, `rename-node`, `set`, `unset`, `connect`, `disconnect`) keep comments and formatting and refuse an edit that would break a valid flow ([§10.4](../spec.md#104-structured-edits)). Runs use their snapshot, so editing a flow never changes a run in progress; `floxim resume --reload` continues a run with the edited file.

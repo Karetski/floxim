@@ -1,4 +1,4 @@
-You are planning milestone ${{ inputs.milestone }} of Arcflow.
+You are planning milestone ${{ inputs.milestone }} of Floxim.
 
 Read CLAUDE.md, docs/milestones.md (the ${{ inputs.milestone }} section, its "Definition
 of done" and its dependencies), and the spec sections it implements in docs/spec.md.

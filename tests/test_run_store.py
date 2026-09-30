@@ -11,13 +11,13 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from arcflow.clock import FakeClock, iso
-from arcflow.store import inbox
-from arcflow.store.events import CorruptLog, EventWriter, read_log
-from arcflow.store.ids import AmbiguousRun, RunNotFound, new_run_id, resolve_run
-from arcflow.store.lock import STALE_AFTER_S, LockHeld, RunLock, hostname
-from arcflow.store.rundir import RunDir
-from arcflow.store.state import active_seconds, apply, initial_state, reduce
+from floxim.clock import FakeClock, iso
+from floxim.store import inbox
+from floxim.store.events import CorruptLog, EventWriter, read_log
+from floxim.store.ids import AmbiguousRun, RunNotFound, new_run_id, resolve_run
+from floxim.store.lock import STALE_AFTER_S, LockHeld, RunLock, hostname
+from floxim.store.rundir import RunDir
+from floxim.store.state import active_seconds, apply, initial_state, reduce
 
 T0 = datetime.datetime(2026, 9, 30, 14, 15, 3, tzinfo=datetime.timezone.utc)
 

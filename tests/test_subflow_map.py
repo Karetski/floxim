@@ -12,9 +12,9 @@ import pytest
 from engine_support import run_flow
 from test_human_node import cli, project, wait_for_status
 
-from arcflow.store.events import read_log
-from arcflow.store.rundir import RunDir
-from arcflow.validate import validate
+from floxim.store.events import read_log
+from floxim.store.rundir import RunDir
+from floxim.validate import validate
 
 CHILD = """name: child
 inputs:
@@ -190,7 +190,7 @@ def test_given_child_waiting_for_a_person_when_the_parent_is_answered_then_both_
 
     # When
     started = cli(root, "run", "flow.yaml", "--on-wait", "exit")
-    runs = root / ".arcflow" / "runs"
+    runs = root / ".floxim" / "runs"
     parent = next(RunDir(p) for p in runs.iterdir() if not RunDir(p).meta().get("parent"))
     pending = parent.read_state()["pending_human"]
     answered = cli(root, "respond", parent.id, "--choice", "yes")
@@ -212,7 +212,7 @@ def test_given_parent_running_a_child_when_cancelled_then_the_child_is_cancelled
     (root / "child.yaml").write_text("name: slow\nnodes:\n  wait: {type: shell, run: sleep 60}\n")
     env = {"PATH": os.environ["PATH"], "HOME": str(root), "XDG_CONFIG_HOME": str(root / "x")}
     runner = subprocess.Popen(
-        [sys.executable, "-m", "arcflow", "run", "flow.yaml"],
+        [sys.executable, "-m", "floxim", "run", "flow.yaml"],
         cwd=root,
         env=env,
         stderr=subprocess.PIPE,
@@ -220,7 +220,7 @@ def test_given_parent_running_a_child_when_cancelled_then_the_child_is_cancelled
     import time
 
     deadline = time.monotonic() + 20
-    runs = root / ".arcflow" / "runs"
+    runs = root / ".floxim" / "runs"
     while time.monotonic() < deadline:
         children = [
             p
@@ -280,7 +280,7 @@ def test_given_appendix_a4_when_run_with_stubs_then_every_issue_is_triaged(tmp_p
     notify.write_text('#!/bin/sh\necho "$2" > notified.txt\n')
     for script in (gh, notify):
         script.chmod(0o755)
-    (root / ".arcflow").mkdir()
+    (root / ".floxim").mkdir()
     env = {
         "PATH": f"{root / 'bin'}:{os.environ['PATH']}",
         "HOME": str(root),
@@ -292,7 +292,7 @@ def test_given_appendix_a4_when_run_with_stubs_then_every_issue_is_triaged(tmp_p
         [
             sys.executable,
             "-m",
-            "arcflow",
+            "floxim",
             "run",
             "triage-issues.yaml",
             "--input",
@@ -344,18 +344,18 @@ def _cli(
         **(env_extra or {}),
     }
     return subprocess.run(
-        [sys.executable, "-m", "arcflow", *args], cwd=root, env=env, capture_output=True, text=True
+        [sys.executable, "-m", "floxim", *args], cwd=root, env=env, capture_output=True, text=True
     )
 
 
 @pytest.mark.parametrize(
     "crash",
     [
-        {"ARCFLOW_TEST_CRASH_AT": "child_run:1"},
-        {"ARCFLOW_TEST_CRASH_AT": "child_run:2"},
-        {"ARCFLOW_TEST_CRASH_CHILD_AT": "visit_started:1"},
-        {"ARCFLOW_TEST_CRASH_CHILD_AT": "visit_finished:1"},
-        {"ARCFLOW_TEST_CRASH_CHILD_AT": "route_taken:1"},
+        {"FLOXIM_TEST_CRASH_AT": "child_run:1"},
+        {"FLOXIM_TEST_CRASH_AT": "child_run:2"},
+        {"FLOXIM_TEST_CRASH_CHILD_AT": "visit_started:1"},
+        {"FLOXIM_TEST_CRASH_CHILD_AT": "visit_finished:1"},
+        {"FLOXIM_TEST_CRASH_CHILD_AT": "route_taken:1"},
     ],
     ids=[
         "after-first-child-created",
@@ -374,7 +374,7 @@ def test_given_crash_inside_or_between_child_runs_when_resumed_then_the_map_comp
     crashed = _cli(root, "run", "flow.yaml", env_extra=crash)
 
     # When
-    runs = root / ".arcflow" / "runs"
+    runs = root / ".floxim" / "runs"
     parent = next(RunDir(p) for p in runs.iterdir() if not RunDir(p).meta().get("parent"))
     resumed = _cli(root, "resume", parent.id)
 

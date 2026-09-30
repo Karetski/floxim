@@ -1,5 +1,5 @@
 # A hand-written flow with comments.
-arcflow: 1
+floxim: 1
 name: hand   # the name
 
 inputs:

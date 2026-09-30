@@ -1,11 +1,11 @@
-"""`arcflow validate` and `arcflow schema flow` on the command line (spec §9.1, §9.4)."""
+"""`floxim validate` and `floxim schema flow` on the command line (spec §9.1, §9.4)."""
 
 import json
 from pathlib import Path
 
 import pytest
 
-from arcflow import cli
+from floxim import cli
 
 INVALID = Path(__file__).parent / "flows" / "invalid"
 

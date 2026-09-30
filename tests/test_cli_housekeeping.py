@@ -13,7 +13,7 @@ import fastjsonschema
 import pytest
 from test_human_node import cli, latest, project
 
-from arcflow.store.lock import STALE_AFTER_S
+from floxim.store.lock import STALE_AFTER_S
 
 QUICK = "name: quick\nnodes:\n  a: {type: set, vars: {x: 1}}\n"
 ASK = "name: ask\nnodes:\n  ask: {type: human, message: Go?, choices: [go, stop]}\n"
@@ -37,7 +37,7 @@ def test_given_empty_project_when_init_runs_then_config_gitignore_and_a_valid_ex
         "hello.yaml",
     ]
     assert second["created"] == [] and len(second["kept"]) == 3
-    assert (tmp_path / ".arcflow" / ".gitignore").read_text() == "runs/\nworktrees/\n"
+    assert (tmp_path / ".floxim" / ".gitignore").read_text() == "runs/\nworktrees/\n"
     assert cli(tmp_path, "validate", "flows/hello.yaml").returncode == 0
     assert (
         cli(tmp_path, "run", "flows/hello.yaml", "--on-wait", "prompt", stdin="finish\n").returncode
@@ -70,7 +70,7 @@ def test_given_global_flags_when_used_before_or_after_the_command_then_they_appl
     )
 
     # Then
-    assert len(list((elsewhere / ".arcflow" / "runs").iterdir())) == 2
+    assert len(list((elsewhere / ".floxim" / "runs").iterdir())) == 2
     assert len(list((elsewhere / "other-runs").iterdir())) == 1
     assert quiet.stderr == ""
 
@@ -130,7 +130,7 @@ def test_given_old_finished_and_waiting_runs_when_collected_then_only_finished_o
     # Then
     assert dry["dry_run"] and len(dry["removed"]) == 1
     assert real["removed"] == dry["removed"]
-    remaining = [p.name for p in (root / ".arcflow" / "runs").iterdir()]
+    remaining = [p.name for p in (root / ".floxim" / "runs").iterdir()]
     assert len(remaining) == 1 and "ask" in remaining[0]
 
 

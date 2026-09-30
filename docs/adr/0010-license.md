@@ -7,7 +7,7 @@
 
 ## Decision
 
-Arcflow is released under the MIT license.
+Floxim is released under the MIT license.
 
 ## Consequences
 

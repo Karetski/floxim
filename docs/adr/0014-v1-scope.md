@@ -13,11 +13,11 @@ The brief's milestones (M0–M8) cover the five basic node types, the built-in a
 
 v1 (the first release) contains the spec's Core tier plus:
 
-- **Structured editing:** the `arcflow.edit` library, the `arcflow flow <op>` commands, and the TUI graph editor with live two-way sync (spec §10.3–10.4).
+- **Structured editing:** the `floxim.edit` library, the `floxim flow <op>` commands, and the TUI graph editor with live two-way sync (spec §10.3–10.4).
 - **The remaining node types:** `set`, `python`, `subflow`, `map`, `handoff`, `notify` (spec §5.6–5.11), and `include` of templates (spec §3.7).
-- **User-written adapters without Python:** command adapters (spec §8.5), and the conformance kit `arcflow adapter test` (spec §8.8).
+- **User-written adapters without Python:** command adapters (spec §8.5), and the conformance kit `floxim adapter test` (spec §8.8).
 
-These features are marked Core in the spec. The following stay **Planned** (after v1): agent-authored flows (`arcflow new`, `arcflow edit`, the TUI's "Edit with agent"; spec §11), the Arcflow Adapter Protocol (spec §8.6), and the ACP adapter (spec §8.7).
+These features are marked Core in the spec. The following stay **Planned** (after v1): agent-authored flows (`floxim new`, `floxim edit`, the TUI's "Edit with agent"; spec §11), the Agent Adapter Protocol (spec §8.6), and the ACP adapter (spec §8.7).
 
 ## Consequences
 

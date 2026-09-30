@@ -2,9 +2,9 @@
   {
     "branch": "main",
     "data": {
-      "arcflow_version": "<version>",
       "flow": "implement-feature",
-      "flow_sha256": "e2b39f6d73c29e091bbf27de7187017c0f2ce127656622f6a1a3d783ee2b5bef",
+      "flow_sha256": "34f4c346cc35af52f579fba85d49978aeb33d4e715e5d677be4b3413af32e43c",
+      "floxim_version": "<version>",
       "inputs": {
         "feature": "login"
       },
@@ -131,7 +131,7 @@
     "data": {
       "outcome": "succeeded",
       "result": {
-        "artifacts_dir": "<tmp>/.arcflow/runs/<run>/nodes/plan/1/artifacts",
+        "artifacts_dir": "<tmp>/.floxim/runs/<run>/nodes/plan/1/artifacts",
         "attempts": 1,
         "cost_estimated": true,
         "cost_usd": 0.05,
@@ -295,7 +295,7 @@
     "data": {
       "outcome": "succeeded",
       "result": {
-        "artifacts_dir": "<tmp>/.arcflow/runs/<run>/nodes/implement/1/artifacts",
+        "artifacts_dir": "<tmp>/.floxim/runs/<run>/nodes/implement/1/artifacts",
         "attempts": 1,
         "cost_estimated": true,
         "cost_usd": 0.1,
@@ -398,7 +398,7 @@
     "data": {
       "outcome": "failed",
       "result": {
-        "artifacts_dir": "<tmp>/.arcflow/runs/<run>/nodes/test/1/artifacts",
+        "artifacts_dir": "<tmp>/.floxim/runs/<run>/nodes/test/1/artifacts",
         "attempts": 1,
         "duration_s": 0,
         "error": {
@@ -412,10 +412,10 @@
         "signal": null,
         "started_at": "<time>",
         "stderr": "",
-        "stderr_file": "<tmp>/.arcflow/runs/<run>/nodes/test/1/attempt-1/stderr.log",
+        "stderr_file": "<tmp>/.floxim/runs/<run>/nodes/test/1/attempt-1/stderr.log",
         "stderr_truncated": false,
         "stdout": "",
-        "stdout_file": "<tmp>/.arcflow/runs/<run>/nodes/test/1/attempt-1/stdout.log",
+        "stdout_file": "<tmp>/.floxim/runs/<run>/nodes/test/1/attempt-1/stdout.log",
         "stdout_truncated": false,
         "visit": 1,
         "workspace": {
@@ -549,7 +549,7 @@
     "data": {
       "outcome": "succeeded",
       "result": {
-        "artifacts_dir": "<tmp>/.arcflow/runs/<run>/nodes/implement/2/artifacts",
+        "artifacts_dir": "<tmp>/.floxim/runs/<run>/nodes/implement/2/artifacts",
         "attempts": 1,
         "cost_estimated": true,
         "cost_usd": 0.1,
@@ -649,7 +649,7 @@
     "data": {
       "outcome": "succeeded",
       "result": {
-        "artifacts_dir": "<tmp>/.arcflow/runs/<run>/nodes/test/2/artifacts",
+        "artifacts_dir": "<tmp>/.floxim/runs/<run>/nodes/test/2/artifacts",
         "attempts": 1,
         "duration_s": 0,
         "error": null,
@@ -660,10 +660,10 @@
         "signal": null,
         "started_at": "<time>",
         "stderr": "",
-        "stderr_file": "<tmp>/.arcflow/runs/<run>/nodes/test/2/attempt-1/stderr.log",
+        "stderr_file": "<tmp>/.floxim/runs/<run>/nodes/test/2/attempt-1/stderr.log",
         "stderr_truncated": false,
         "stdout": "",
-        "stdout_file": "<tmp>/.arcflow/runs/<run>/nodes/test/2/attempt-1/stdout.log",
+        "stdout_file": "<tmp>/.floxim/runs/<run>/nodes/test/2/attempt-1/stdout.log",
         "stdout_truncated": false,
         "visit": 2,
         "workspace": {

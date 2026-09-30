@@ -15,13 +15,13 @@ from test_human_node import cli, project
 from test_tui import drive, text_of
 from textual.widgets import Input, Static
 
-from arcflow.config import load_config
-from arcflow.store.events import read_log
-from arcflow.store.ids import resolve_run
-from arcflow.store.rundir import RunDir
-from arcflow.tui import actions
-from arcflow.tui.app import ArcflowApp
-from arcflow.tui.screens import RunDetailScreen
+from floxim.config import load_config
+from floxim.store.events import read_log
+from floxim.store.ids import resolve_run
+from floxim.store.rundir import RunDir
+from floxim.tui import actions
+from floxim.tui.app import FloximApp
+from floxim.tui.screens import RunDetailScreen
 
 ASK = """name: ask
 nodes:
@@ -47,7 +47,7 @@ outputs:
 
 
 def run_dir(root: Path) -> RunDir:
-    runs = root / ".arcflow" / "runs"
+    runs = root / ".floxim" / "runs"
     return RunDir(runs / resolve_run(runs, "@last"))
 
 
@@ -88,7 +88,7 @@ def test_given_prompt_when_answered_in_the_tui_then_it_records_what_respond_woul
         await pilot.pause()
 
     # When
-    drive(ArcflowApp(config, target=run.id), scenario)
+    drive(FloximApp(config, target=run.id), scenario)
 
     # Then
     wait_until(lambda: run.read_state()["status"] == "succeeded" and not run.lock.exists())
@@ -121,7 +121,7 @@ def test_given_prompt_with_markup_and_escapes_when_shown_then_they_are_inert(wai
         assert "Ship [bold]it[/]? now" in banner
         assert "\x1b" not in banner
 
-    drive(ArcflowApp(config, target=run_dir(waiting).id), scenario)
+    drive(FloximApp(config, target=run_dir(waiting).id), scenario)
 
 
 def test_given_waiting_run_when_cancelled_from_the_runs_list_then_it_ends_cancelled(
@@ -133,7 +133,7 @@ def test_given_waiting_run_when_cancelled_from_the_runs_list_then_it_ends_cancel
         await pilot.press("c")
         await pilot.pause()
 
-    drive(ArcflowApp(config), scenario)
+    drive(FloximApp(config), scenario)
     assert run_dir(waiting).read_state()["status"] == "cancelled"
 
 
@@ -142,11 +142,11 @@ def test_given_interrupted_run_when_resumed_from_the_tui_then_it_finishes(tmp_pa
     root = project(tmp_path, HELLO)
     env = {
         **os.environ,
-        "ARCFLOW_TEST_CRASH_AT": "visit_started:1",
+        "FLOXIM_TEST_CRASH_AT": "visit_started:1",
         "XDG_CONFIG_HOME": str(root / "x"),
     }
     subprocess.run(
-        [sys.executable, "-m", "arcflow", "run", "flow.yaml", "--input", "who=ada"],
+        [sys.executable, "-m", "floxim", "run", "flow.yaml", "--input", "who=ada"],
         cwd=root, env=env, capture_output=True,
     )  # fmt: skip
     config, _ = load_config(root)
@@ -157,7 +157,7 @@ def test_given_interrupted_run_when_resumed_from_the_tui_then_it_finishes(tmp_pa
         await pilot.pause()
 
     # When
-    drive(ArcflowApp(config, target=run.id), scenario)
+    drive(FloximApp(config, target=run.id), scenario)
 
     # Then
     wait_until(lambda: run.read_state()["status"] == "succeeded")
@@ -184,7 +184,7 @@ def test_given_flow_when_run_from_the_flows_screen_then_the_form_supplies_inputs
         assert isinstance(pilot.app.screen, RunDetailScreen)
 
     # When
-    drive(ArcflowApp(config), scenario)
+    drive(FloximApp(config), scenario)
 
     # Then
     run = run_dir(root)
@@ -212,8 +212,8 @@ nodes:
         return 0
 
     monkeypatch.setattr(actions, "interactive", fake_interactive)
-    monkeypatch.setattr("arcflow.tui.screens.interactive", fake_interactive)
-    monkeypatch.setattr(ArcflowApp, "suspend", lambda self: contextlib.nullcontext())
+    monkeypatch.setattr("floxim.tui.screens.interactive", fake_interactive)
+    monkeypatch.setattr(FloximApp, "suspend", lambda self: contextlib.nullcontext())
 
     async def scenario(pilot: Any) -> None:
         await pilot.press("h")
@@ -223,7 +223,7 @@ nodes:
         assert pilot.app.clipboard == run.read_state()["nodes"]["work"]["session_id"]
 
     # When
-    drive(ArcflowApp(config, target=run.id), scenario)
+    drive(FloximApp(config, target=run.id), scenario)
 
     # Then
     assert opened and opened[0][:2] == ["sh", "-c"]

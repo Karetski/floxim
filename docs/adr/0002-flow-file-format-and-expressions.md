@@ -13,15 +13,15 @@ Alexey requires a single source of truth for each flow that the TUI, an agent, a
 
 - Each flow is **one YAML file** (parsed as YAML 1.2, strict: unknown keys rejected) and is the single source of truth. Nothing generates it; there is no Python builder API or other second representation.
 - A **published JSON Schema** describes the file, for editor completion and for agents authoring flows.
-- Edits by Arcflow (TUI, CLI, agents working through Arcflow) use `ruamel.yaml` round-trip mode, so comments, key order and formatting survive, and are written atomically. If the file changed on disk since it was read, Arcflow reloads and asks before overwriting.
+- Edits by Floxim (TUI, CLI, agents working through Floxim) use `ruamel.yaml` round-trip mode, so comments, key order and formatting survive, and are written atomically. If the file changed on disk since it was read, Floxim reloads and asks before overwriting.
 - Composition lives in the format: `subflow` (call another flow file), `map` (run nodes per list item), reusable node `templates` with per-node overrides, and `include` of shared fragments.
 - Custom logic lives beside the graph: a `python` node references a function (`call: pkg.module:fn`) in an ordinary module.
 - **Expressions** use a restricted Python-syntax subset, evaluated without access to builtins, imports or dunder attributes: bare in `when:`, and interpolated as `${{ expr }}` in strings. Long prompts may live in separate files (`prompt_file:`).
-- `arcflow validate` checks that every `nodes.<id>.<field>` reference exists in the referenced node's declared outputs or output schema.
+- `floxim validate` checks that every `nodes.<id>.<field>` reference exists in the referenced node's declared outputs or output schema.
 
 ## Consequences
 
-- The TUI graph view, agent authoring (`arcflow new`), and manual edits all converge on one file; git diffs are the change history.
+- The TUI graph view, agent authoring (`floxim new`), and manual edits all converge on one file; git diffs are the change history.
 - No CEL type-checking; validate-time reference checks replace most of it.
 - Loops over data or generated graphs must be expressed with `map`/`subflow`/`templates`, not arbitrary code.
 

@@ -1,8 +1,8 @@
 # Harnesses and adapters
 
-Arcflow is not an agent. It drives complete agent applications, called harnesses, in headless mode, through an adapter per harness. A flow names the harness on each agent node (`harness: claude`), so one flow can plan with Claude Code and review with Codex. The adapter contract is defined in [spec §8](../spec.md#8-harness-adapters).
+Floxim is not an agent. It drives complete agent applications, called harnesses, in headless mode, through an adapter per harness. A flow names the harness on each agent node (`harness: claude`), so one flow can plan with Claude Code and review with Codex. The adapter contract is defined in [spec §8](../spec.md#8-harness-adapters).
 
-`arcflow adapters` lists the adapters a project can use, with their source and capabilities; `arcflow adapters --probe` also runs each binary to report its version, whether that version is in the tested range, and whether it looks logged in.
+`floxim adapters` lists the adapters a project can use, with their source and capabilities; `floxim adapters --probe` also runs each binary to report its version, whether that version is in the tested range, and whether it looks logged in.
 
 ## Built-in adapters
 
@@ -10,9 +10,9 @@ Arcflow is not an agent. It drives complete agent applications, called harnesses
 |---|---|---|
 | `claude` | [Claude Code](https://code.claude.com/docs/en/overview), tested with 2.1.285 | Reports cost in USD, supports budgets, turn caps, tool rules, resume and fork. Uses the install's own login, or `ANTHROPIC_API_KEY` with `bare: true` on the node. |
 | `codex` | [Codex CLI](https://github.com/openai/codex), tested with 0.147.0 | Reports tokens, not USD: set `prices` in the project config for USD estimates, or budget in tokens. Network access is off unless `harness_options: {network: true}`. |
-| `fake` | nothing | Deterministic scripted responses, no processes, no cost. For testing flows and Arcflow itself. |
+| `fake` | nothing | Deterministic scripted responses, no processes, no cost. For testing flows and Floxim itself. |
 
-Point Arcflow at a binary that is not on `PATH`, or change the tested range, in the project config:
+Point Floxim at a binary that is not on `PATH`, or change the tested range, in the project config:
 
 ```yaml
 harnesses:
@@ -25,7 +25,7 @@ A version outside `tested_versions` produces a warning, not an error. Harness CL
 
 ## Command adapters: any JSON-lines CLI, no code
 
-A YAML file in `.arcflow/harnesses/<name>.yaml` turns any agent CLI that prints JSON lines into a harness ([§8.5](../spec.md#85-tier-2-command-adapters)). It says how to invoke the CLI, and maps its stream events to Arcflow's session ID, text, usage, result and errors with the same expression language flows use, with `event` bound to each parsed line:
+A YAML file in `.floxim/harnesses/<name>.yaml` turns any agent CLI that prints JSON lines into a harness ([§8.5](../spec.md#85-tier-2-command-adapters)). It says how to invoke the CLI, and maps its stream events to Floxim's session ID, text, usage, result and errors with the same expression language flows use, with `event` bound to each parsed line:
 
 ```yaml
 name: gemini
@@ -54,28 +54,28 @@ This example shows the format; check the CLI's own documentation for its current
 - `env` lists the auth variables the CLI needs; nothing else from your environment reaches it.
 - The engine supplies process handling, timeouts, cancellation, budgets and JSON extraction.
 
-`arcflow schema harness` prints the file's JSON Schema, and validating a flow checks the harness files it uses.
+`floxim schema harness` prints the file's JSON Schema, and validating a flow checks the harness files it uses.
 
 ## Python adapters
 
-A package can provide an adapter class through the `arcflow.adapters` entry-point group ([§8.6](../spec.md#86-tier-3-plugin-adapters)):
+A package can provide an adapter class through the `floxim.adapters` entry-point group ([§8.6](../spec.md#86-tier-3-plugin-adapters)):
 
 ```toml
-[project.entry-points."arcflow.adapters"]
+[project.entry-points."floxim.adapters"]
 myharness = "mypkg.adapter:MyAdapter"
 ```
 
-Arcflow loads it only when a flow names that harness. The class implements the contract in `arcflow.adapters`: capabilities, a request-to-process mapping, stream parsing into normalized results, and interactive commands for `handoff`. Plugins are trusted code.
+Floxim loads it only when a flow names that harness. The class implements the contract in `floxim.adapters`: capabilities, a request-to-process mapping, stream parsing into normalized results, and interactive commands for `handoff`. Plugins are trusted code.
 
-Resolution order is built-ins, then `.arcflow/harnesses/*.yaml`, then entry points.
+Resolution order is built-ins, then `.floxim/harnesses/*.yaml`, then entry points.
 
 ## The conformance kit
 
-`arcflow adapter test <name>` checks an adapter against recorded harness output ([§8.8](../spec.md#88-conformance-kit)):
+`floxim adapter test <name>` checks an adapter against recorded harness output ([§8.8](../spec.md#88-conformance-kit)):
 
-- **Offline** (the default, free): replays fixture streams covering success, structured output, schema failure, budget stop, interrupted and killed runs, auth failure and a missing result through the adapter, and compares each normalized result with `expected.yaml`. Command adapters keep their fixtures in `.arcflow/harnesses/<name>/fixtures/`, one `<case>.jsonl` per case.
+- **Offline** (the default, free): replays fixture streams covering success, structured output, schema failure, budget stop, interrupted and killed runs, auth failure and a missing result through the adapter, and compares each normalized result with `expected.yaml`. Command adapters keep their fixtures in `.floxim/harnesses/<name>/fixtures/`, one `<case>.jsonl` per case.
 - **Live** (`--live`, opt-in, **spends money**): runs a small prompt set against the real harness with a spend cap, and checks session IDs, resume, structured output, cancellation and environment isolation.
 
 The command exits 0 when every case passes and 1 otherwise, so it fits in CI. Re-record fixtures when you raise `tested_versions`.
 
-The fixtures shipped with Arcflow for Claude Code 2.1.285 and Codex 0.147.0 were written from the harnesses' documented stream formats, not recorded from real runs; the live suite is how they get replaced with recordings.
+The fixtures shipped with Floxim for Claude Code 2.1.285 and Codex 0.147.0 were written from the harnesses' documented stream formats, not recorded from real runs; the live suite is how they get replaced with recordings.

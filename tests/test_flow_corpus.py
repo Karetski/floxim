@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from arcflow.validate import validate
+from floxim.validate import validate
 
 CORPUS = Path(__file__).parent / "flows"
 SPEC = Path(__file__).parent.parent / "docs" / "spec.md"

@@ -46,7 +46,7 @@ jobs:
         run: uv build
 
       - name: The wheel is pure Python
-        run: ls dist/arcflow-*-py3-none-any.whl
+        run: ls dist/floxim-*-py3-none-any.whl
 
       - name: Every runtime dependency is pure Python (ADR 0001)
         run: |
@@ -57,20 +57,20 @@ jobs:
       - name: Installs with pipx
         run: |
           pipx install dist/*.whl
-          arcflow --version
-          arcf --version
-          pipx uninstall arcflow
+          floxim --version
+          flx --version
+          pipx uninstall floxim
 
       - name: Installs with uv tool
         run: |
           uv tool install dist/*.whl
-          arcflow --version
-          arcf --version
+          floxim --version
+          flx --version
 
       - name: Zipapp runs on Python 3.10
         run: |
-          uv run python tools/build_zipapp.py dist/arcflow-*.whl dist/arcflow.pyz
-          "${{ steps.py310.outputs.python-path }}" dist/arcflow.pyz --version
+          uv run python tools/build_zipapp.py dist/floxim-*.whl dist/floxim.pyz
+          "${{ steps.py310.outputs.python-path }}" dist/floxim.pyz --version
 
       - uses: actions/upload-artifact@v7
         with:

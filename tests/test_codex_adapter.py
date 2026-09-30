@@ -13,12 +13,12 @@ import pytest
 from engine_support import run_flow
 from test_claude_adapter import request
 
-from arcflow.adapters import AgentRequest, SessionSpec
-from arcflow.adapters.codex import CodexAdapter, CodexStream
-from arcflow.adapters.process import parse_lines
-from arcflow.checks import strict_schema_problem
-from arcflow.conformance import FIXTURES_DIR
-from arcflow.validate import validate
+from floxim.adapters import AgentRequest, SessionSpec
+from floxim.adapters.codex import CodexAdapter, CodexStream
+from floxim.adapters.process import parse_lines
+from floxim.checks import strict_schema_problem
+from floxim.conformance import FIXTURES_DIR
+from floxim.validate import validate
 
 FIXTURES = FIXTURES_DIR / "codex-0.147.0"
 THREAD = "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee"

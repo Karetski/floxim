@@ -1,4 +1,4 @@
-arcflow: 1
+floxim: 1
 name: nightly-deps
 description: Upgrade outdated npm dependencies in a worktree, test, review with a second agent, open a PR.
 

@@ -18,7 +18,7 @@ import pytest
 from engine_support import run_flow
 from test_human_node import cli, latest, project, wait_for_status
 
-from arcflow.store.events import read_log
+from floxim.store.events import read_log
 
 ENV = {"PATH": os.environ["PATH"], "HOME": "/tmp"}
 
@@ -26,7 +26,7 @@ ENV = {"PATH": os.environ["PATH"], "HOME": "/tmp"}
 def start_run(root: Path, *args: str) -> subprocess.Popen[str]:
     env = {"PATH": os.environ["PATH"], "HOME": str(root), "XDG_CONFIG_HOME": str(root / "x")}
     return subprocess.Popen(
-        [sys.executable, "-m", "arcflow", "run", "flow.yaml", *args],
+        [sys.executable, "-m", "floxim", "run", "flow.yaml", *args],
         cwd=root,
         env=env,
         stderr=subprocess.PIPE,
@@ -37,7 +37,7 @@ def start_run(root: Path, *args: str) -> subprocess.Popen[str]:
 def wait_for_event(root: Path, kind: str, timeout: float = 20) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        logs = list((root / ".arcflow" / "runs").glob("*/events.jsonl"))
+        logs = list((root / ".floxim" / "runs").glob("*/events.jsonl"))
         if logs and f'"type":"{kind}"' in logs[0].read_text():
             return
         time.sleep(0.05)
@@ -109,7 +109,7 @@ nodes:
   tell:
     type: notify
     message: "Done: ${{ 1 + 1 }}"
-    command: 'printf "%s" "$ARCFLOW_MESSAGE" > told.txt'
+    command: 'printf "%s" "$FLOXIM_MESSAGE" > told.txt'
 """
 
     # When
@@ -225,7 +225,7 @@ ASK = """name: careful
 nodes:
   deploy:
     type: shell
-    run: echo "$ARCFLOW_ATTEMPT" >> deploys.txt
+    run: echo "$FLOXIM_ATTEMPT" >> deploys.txt
     on_resume: ask
     next: after
   after:
@@ -247,11 +247,11 @@ def test_given_interrupted_visit_with_on_resume_ask_when_resumed_then_a_person_d
     assert env_crash.returncode == 0
     (root / "deploys.txt").unlink()
     crashed = subprocess.run(
-        [sys.executable, "-m", "arcflow", "run", "flow.yaml"],
+        [sys.executable, "-m", "floxim", "run", "flow.yaml"],
         cwd=root,
         env={
             **os.environ,
-            "ARCFLOW_TEST_CRASH_AT": "attempt_started:1",
+            "FLOXIM_TEST_CRASH_AT": "attempt_started:1",
             "XDG_CONFIG_HOME": str(root / "x"),
         },
         capture_output=True,
@@ -282,7 +282,7 @@ def test_given_interrupted_visit_with_on_resume_ask_when_resumed_then_a_person_d
 def test_given_the_build_milestone_flow_when_run_on_the_fake_adapter_then_it_commits(
     tmp_path: Path,
 ) -> None:
-    # Given: Arcflow's own flow, with the harnesses swapped for scripted fakes
+    # Given: Floxim's own flow, with the harnesses swapped for scripted fakes
     repo = Path(__file__).parent.parent
     flow = (repo / "flows" / "build-milestone.yaml").read_text()
     flow = flow.replace(

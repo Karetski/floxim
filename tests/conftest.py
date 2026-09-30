@@ -11,16 +11,16 @@ GOLDEN = Path(__file__).parent / "golden"
 class Golden:
     """Compare a JSON-serializable value with a checked-in golden file.
 
-    Run with ARCFLOW_UPDATE_GOLDEN=1 to rewrite the files, then review the diff.
+    Run with FLOXIM_UPDATE_GOLDEN=1 to rewrite the files, then review the diff.
     """
 
     def check(self, name: str, value: Any) -> None:
         path = GOLDEN / name
         text = json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
-        if os.environ.get("ARCFLOW_UPDATE_GOLDEN"):
+        if os.environ.get("FLOXIM_UPDATE_GOLDEN"):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text)
-        assert path.exists(), f"missing golden file {path}; run with ARCFLOW_UPDATE_GOLDEN=1"
+        assert path.exists(), f"missing golden file {path}; run with FLOXIM_UPDATE_GOLDEN=1"
         assert json.loads(path.read_text()) == json.loads(text), f"{name} differs from golden"
 
 
@@ -47,7 +47,7 @@ def write_flow(tmp_path: Path) -> Any:
 
 @pytest.fixture(autouse=True)
 def isolated_user_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Never read the developer's own ~/.config/arcflow in tests."""
+    """Never read the developer's own ~/.config/floxim in tests."""
     home = tmp_path / "xdg"
     monkeypatch.setenv("XDG_CONFIG_HOME", str(home))
-    return home / "arcflow" / "config.yaml"
+    return home / "floxim" / "config.yaml"

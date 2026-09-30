@@ -1,38 +1,38 @@
-# Arcflow
+# Floxim
 
-Arcflow is a terminal-first workflow orchestrator for AI coding agents. You describe a flow (plan with one agent, implement with another, run the tests, loop until they pass, ask a person before merging) as a graph in one YAML file. Arcflow runs it durably by driving the agent applications you already use, Claude Code and Codex CLI, in headless mode.
+Floxim is a terminal-first workflow orchestrator for AI coding agents. You describe a flow (plan with one agent, implement with another, run the tests, loop until they pass, ask a person before merging) as a graph in one YAML file. Floxim runs it durably by driving the agent applications you already use, Claude Code and Codex CLI, in headless mode.
 
 - **Flows are files.** One YAML file per flow, validated with line-and-column errors, editable by hand, from the TUI, from scripts, or by an agent, with comments and formatting kept.
 - **Runs survive anything.** Every step is recorded before the next one starts. A crashed, killed or rebooted run resumes where it stopped, and a run can wait days for an approval with no process alive.
-- **Harness-agnostic.** Mix Claude Code and Codex in one flow, or add any JSON-lines agent CLI with a short YAML file. Arcflow never calls model APIs itself.
+- **Harness-agnostic.** Mix Claude Code and Codex in one flow, or add any JSON-lines agent CLI with a short YAML file. Floxim never calls model APIs itself.
 - **Bounded.** Budgets in USD and tokens, per node and per run; visit limits on every loop; timeouts on every step.
 - **No daemon.** Schedule with cron, systemd or CI; stable exit codes and `--json` everywhere.
 
 ## Install
 
-Arcflow needs Python 3.10 or later on Linux or macOS, and git.
+Floxim needs Python 3.10 or later on Linux or macOS, and git.
 
 ```sh
-pipx install arcflow        # or: uv tool install arcflow
-arcflow --version
+pipx install floxim        # or: uv tool install floxim
+floxim --version
 ```
 
-Every dependency is pure Python. There is also a single-file `arcflow.pyz` on each [release](https://github.com/Karetski/arcflow/releases) that runs with any Python 3.10+: `python3 arcflow.pyz --version`.
+Every dependency is pure Python. There is also a single-file `floxim.pyz` on each [release](https://github.com/Karetski/floxim/releases) that runs with any Python 3.10+: `python3 floxim.pyz --version`.
 
-To run agent nodes, install and log in to the harnesses your flows use: [Claude Code](https://code.claude.com/docs/en/overview) and/or [Codex CLI](https://github.com/openai/codex). `arcflow adapters --probe` shows what Arcflow can find.
+To run agent nodes, install and log in to the harnesses your flows use: [Claude Code](https://code.claude.com/docs/en/overview) and/or [Codex CLI](https://github.com/openai/codex). `floxim adapters --probe` shows what Floxim can find.
 
 ## Quickstart
 
 In a project (ideally a git repository):
 
 ```sh
-arcflow init
+floxim init
 ```
 
-This creates `.arcflow/config.yaml` and a first flow, `flows/hello.yaml`: a shell step that greets someone, then a question for you. It needs no agent and costs nothing. Run it:
+This creates `.floxim/config.yaml` and a first flow, `flows/hello.yaml`: a shell step that greets someone, then a question for you. It needs no agent and costs nothing. Run it:
 
 ```console
-$ arcflow run flows/hello.yaml --input name=Ada
+$ floxim run flows/hello.yaml --input name=Ada
 run 20260930T045556-hello-ihqk
 note: flows/hello.yaml is not tracked by git; a flow runs commands as you, so review it before running it
 ▶ greet (shell)
@@ -47,28 +47,28 @@ note: flows/hello.yaml is not tracked by git; a flow runs commands as you, so re
 run succeeded
 ```
 
-The note appears because the new file is not committed yet: a flow runs commands with your privileges, so Arcflow points out flow files that git does not track.
+The note appears because the new file is not committed yet: a flow runs commands with your privileges, so Floxim points out flow files that git does not track.
 
-Every run is recorded under `.arcflow/runs/`. Look at it:
+Every run is recorded under `.floxim/runs/`. Look at it:
 
 ```sh
-arcflow status @last        # outcome of each step, totals and outputs
-arcflow logs @last          # the full event log
-arcflow tui                 # the live terminal UI
+floxim status @last        # outcome of each step, totals and outputs
+floxim logs @last          # the full event log
+floxim tui                 # the live terminal UI
 ```
 
 Runs do not need a terminal to wait. Without one (in cron or CI, or with `--on-wait exit`), a run that reaches a question stops with exit code 4, and anyone can answer later; the run then continues in the background:
 
 ```sh
-arcflow run flows/hello.yaml --input name=Ada --on-wait exit   # exits 4 at the question
-arcflow status                                                  # … waiting on ask
-arcflow respond @last --choice finish                           # answers and continues it
+floxim run flows/hello.yaml --input name=Ada --on-wait exit   # exits 4 at the question
+floxim status                                                  # … waiting on ask
+floxim respond @last --choice finish                           # answers and continues it
 ```
 
 Next, look at [`examples/implement-feature.yaml`](examples/implement-feature.yaml): Claude Code plans, Codex implements, the tests loop back into the implementation until they pass, and a person approves the merge.
 
 ```sh
-arcflow graph examples/implement-feature.yaml
+floxim graph examples/implement-feature.yaml
 ```
 
 ## Documentation
@@ -83,7 +83,7 @@ arcflow graph examples/implement-feature.yaml
 
 ## Status
 
-Arcflow is at its first release, 0.1. The flow format is version 1 (`arcflow: 1`), and the CLI's exit codes and `--json` documents are part of its public interface. The Claude Code and Codex adapters are tested against recorded stream formats; see [Harnesses and adapters](docs/guide/adapters.md#the-conformance-kit) for what has been checked against live harnesses. Agent-authored flows (`arcflow new`, `arcflow edit`) are planned.
+Floxim is at its first release, 0.1. The flow format is version 1 (`floxim: 1`), and the CLI's exit codes and `--json` documents are part of its public interface. The Claude Code and Codex adapters are tested against recorded stream formats; see [Harnesses and adapters](docs/guide/adapters.md#the-conformance-kit) for what has been checked against live harnesses. Agent-authored flows (`floxim new`, `floxim edit`) are planned.
 
 ## Development
 

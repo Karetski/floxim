@@ -2,9 +2,9 @@
   {
     "branch": "main",
     "data": {
-      "arcflow_version": "<version>",
       "flow": "counter",
       "flow_sha256": "071ff790738101b7b957a8514614c5525f3522ec4da9765c410d99b3bb3359da",
+      "floxim_version": "<version>",
       "inputs": {
         "rounds": 3
       },

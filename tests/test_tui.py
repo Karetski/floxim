@@ -11,14 +11,14 @@ import pytest
 from engine_support import run_flow
 from textual.widgets import DataTable, ListView, Static
 
-from arcflow.clock import Clock
-from arcflow.config import load_config
-from arcflow.engine.human import Answer
-from arcflow.engine.respond import respond
-from arcflow.engine.runner import Runner
-from arcflow.testing import VirtualClock, run_virtual
-from arcflow.tui.app import ArcflowApp
-from arcflow.tui.screens import FlowGraphScreen, FlowsScreen, RunDetailScreen, RunsScreen
+from floxim.clock import Clock
+from floxim.config import load_config
+from floxim.engine.human import Answer
+from floxim.engine.respond import respond
+from floxim.engine.runner import Runner
+from floxim.testing import VirtualClock, run_virtual
+from floxim.tui.app import FloximApp
+from floxim.tui.screens import FlowGraphScreen, FlowsScreen, RunDetailScreen, RunsScreen
 
 FLOW = """name: demo
 nodes:
@@ -36,7 +36,7 @@ nodes:
 QUICK = "name: quick\nnodes:\n  a: {type: set, vars: {x: 1}}\n"
 
 
-def drive(app: ArcflowApp, scenario: Callable[[Any], Awaitable[None]]) -> None:
+def drive(app: FloximApp, scenario: Callable[[Any], Awaitable[None]]) -> None:
     async def main() -> None:
         async with app.run_test(size=(140, 45)) as pilot:
             await pilot.pause()
@@ -70,7 +70,7 @@ def test_given_runs_when_the_tui_opens_then_waiting_runs_come_first(project: Pat
         await pilot.press("s", "s")  # running, then failed: nothing
         assert table.row_count == 0
 
-    drive(ArcflowApp(config), scenario)
+    drive(FloximApp(config), scenario)
 
 
 def test_given_waiting_run_when_opened_then_graph_banner_and_inspector_show_it(
@@ -91,7 +91,7 @@ def test_given_waiting_run_when_opened_then_graph_banner_and_inspector_show_it(
         assert "Plan the demo." in text_of(screen.query_one("#inspect-prompt", Static))
         assert "~$0.10" in text_of(screen.query_one("#summary", Static))
 
-    drive(ArcflowApp(config), scenario)
+    drive(FloximApp(config), scenario)
 
 
 def test_given_run_that_finishes_while_open_when_refreshed_then_the_screen_follows(
@@ -105,7 +105,7 @@ def test_given_run_that_finishes_while_open_when_refreshed_then_the_screen_follo
         assert isinstance(screen, RunDetailScreen)
         assert "waiting" in text_of(screen.query_one("#summary", Static))
         # Another process answers and finishes the run.
-        from arcflow.store.rundir import RunDir
+        from floxim.store.rundir import RunDir
 
         run = RunDir(waiting)
         respond(
@@ -126,7 +126,7 @@ def test_given_run_that_finishes_while_open_when_refreshed_then_the_screen_follo
         assert "succeeded" in text_of(screen.query_one("#summary", Static))
         assert "✓ ☺ approve" in text_of(screen.query_one("#graph", Static))
 
-    drive(ArcflowApp(config, target=waiting.name), scenario)
+    drive(FloximApp(config, target=waiting.name), scenario)
 
 
 def test_given_flow_files_when_listed_then_validity_and_last_run_show(project: Path) -> None:
@@ -146,7 +146,7 @@ def test_given_flow_files_when_listed_then_validity_and_last_run_show(project: P
         assert [(str(r[0]), r[1]) for r in rows] == [("✗", "broken"), ("✓", "demo")]
         assert "waiting" in str(rows[1][3])
 
-    drive(ArcflowApp(config), scenario)
+    drive(FloximApp(config), scenario)
 
 
 def test_given_flow_file_edited_while_shown_then_the_graph_follows_and_survives_bad_saves(
@@ -155,7 +155,7 @@ def test_given_flow_file_edited_while_shown_then_the_graph_follows_and_survives_
     # Given
     path = tmp_path / "flow.yaml"
     path.write_text(QUICK)
-    (tmp_path / ".arcflow").mkdir()
+    (tmp_path / ".floxim").mkdir()
     config, _ = load_config(tmp_path)
 
     async def scenario(pilot: Any) -> None:
@@ -177,7 +177,7 @@ def test_given_flow_file_edited_while_shown_then_the_graph_follows_and_survives_
         assert "◷ b" in text_of(graph)
         assert "E-UNKNOWN-TARGET" in text_of(screen.query_one("#problems", Static))
 
-    drive(ArcflowApp(config, target=str(path)), scenario)
+    drive(FloximApp(config, target=str(path)), scenario)
 
 
 def test_given_flow_graph_screen_when_rendered_then_it_matches_the_snapshot(
@@ -185,8 +185,6 @@ def test_given_flow_graph_screen_when_rendered_then_it_matches_the_snapshot(
 ) -> None:
     corpus = Path(__file__).parent / "flows" / "valid"
     monkeypatch.chdir(corpus)
-    (tmp_path / ".arcflow").mkdir()
+    (tmp_path / ".floxim").mkdir()
     config, _ = load_config(tmp_path)
-    assert snap_compare(
-        ArcflowApp(config, target="implement-feature.yaml"), terminal_size=(120, 50)
-    )
+    assert snap_compare(FloximApp(config, target="implement-feature.yaml"), terminal_size=(120, 50))

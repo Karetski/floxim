@@ -10,12 +10,12 @@ from pathlib import Path
 import pytest
 from engine_support import run_flow
 
-from arcflow.clock import Clock
-from arcflow.config import load_config
-from arcflow.engine.runner import ResumeRefused, Runner
-from arcflow.store.events import read_log
-from arcflow.store.ids import resolve_run
-from arcflow.store.rundir import RunDir
+from floxim.clock import Clock
+from floxim.config import load_config
+from floxim.engine.runner import ResumeRefused, Runner
+from floxim.store.events import read_log
+from floxim.store.ids import resolve_run
+from floxim.store.rundir import RunDir
 
 GIT_ENV = {
     "PATH": os.environ["PATH"],
@@ -62,7 +62,7 @@ nodes:
     next: artifact
   artifact:
     type: shell
-    run: echo report > "$ARCFLOW_ARTIFACTS_DIR/report.txt"
+    run: echo report > "$FLOXIM_ARTIFACTS_DIR/report.txt"
 """
 
 
@@ -78,8 +78,8 @@ def test_given_named_worktree_when_two_nodes_use_it_then_they_share_its_files(re
     created = [e for e in result.events if e["type"] == "workspace_created"]
     assert len(created) == 1
     workspace = nodes["write"]["workspace"]
-    assert workspace["branch"] == f"arcflow/{result.run.id}/feature"
-    assert Path(workspace["path"]) == repo / ".arcflow" / "worktrees" / result.run.id / "feature"
+    assert workspace["branch"] == f"floxim/{result.run.id}/feature"
+    assert Path(workspace["path"]) == repo / ".floxim" / "worktrees" / result.run.id / "feature"
     assert created[0]["data"]["base_commit"] == _git(repo, "rev-parse", "HEAD")
     assert nodes["outside"]["workspace"] == {"path": str(repo), "branch": None}
     report = Path(nodes["artifact"]["artifacts_dir"]) / "report.txt"
@@ -114,9 +114,9 @@ def _cli(
 ) -> subprocess.CompletedProcess[str]:
     env = {**GIT_ENV, "XDG_CONFIG_HOME": str(project / "xdg")}
     if crash_at:
-        env["ARCFLOW_TEST_CRASH_AT"] = crash_at
+        env["FLOXIM_TEST_CRASH_AT"] = crash_at
     return subprocess.run(
-        [sys.executable, "-m", "arcflow", *args],
+        [sys.executable, "-m", "floxim", *args],
         cwd=project,
         env=env,
         capture_output=True,
@@ -128,7 +128,7 @@ def test_given_crash_after_worktree_creation_when_resumed_then_the_same_worktree
     repo: Path,
 ) -> None:
     # Given
-    (repo / ".arcflow").mkdir()
+    (repo / ".floxim").mkdir()
     (repo / "flow.yaml").write_text(SHARED_TREE)
     assert _cli(repo, "run", "flow.yaml", crash_at="workspace_created:1").returncode == 137
 
@@ -137,7 +137,7 @@ def test_given_crash_after_worktree_creation_when_resumed_then_the_same_worktree
 
     # Then
     assert resumed.returncode == 0, resumed.stderr
-    runs = repo / ".arcflow" / "runs"
+    runs = repo / ".floxim" / "runs"
     events = read_log(RunDir(runs / resolve_run(runs, "@last")).events).events
     assert [e["type"] for e in events].count("workspace_created") == 1
 
@@ -152,10 +152,10 @@ def test_given_deleted_worktree_when_resumed_then_it_is_refused_unless_recreated
     repo: Path,
 ) -> None:
     # Given: the run stops after `write` committed its file on the worktree's branch
-    (repo / ".arcflow").mkdir()
+    (repo / ".floxim").mkdir()
     (repo / "flow.yaml").write_text(COMMITTING_TREE)
     assert _cli(repo, "run", "flow.yaml", crash_at="route_taken:1").returncode == 137
-    runs = repo / ".arcflow" / "runs"
+    runs = repo / ".floxim" / "runs"
     run = RunDir(runs / resolve_run(runs, "@last"))
     tree = Path(run.read_state()["workspaces"]["feature"]["path"])
     subprocess.run(["rm", "-rf", str(tree)], check=True)

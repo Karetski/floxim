@@ -1,4 +1,4 @@
-arcflow: 1
+floxim: 1
 name: implement-feature
 description: Plan with Claude, implement with Codex, loop on tests, ask before merging.
 

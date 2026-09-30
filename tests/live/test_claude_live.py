@@ -1,7 +1,7 @@
 """Live contract tests against a real Claude Code install (spec §8.8, §13).
 
 They spend money, so they are marked `live`, excluded by default, and run only
-with ARCFLOW_LIVE=1: `ARCFLOW_LIVE=1 uv run pytest -m live tests/live`. Each
+with FLOXIM_LIVE=1: `FLOXIM_LIVE=1 uv run pytest -m live tests/live`. Each
 call is capped with --max-budget-usd through a node budget.
 """
 
@@ -17,8 +17,8 @@ from engine_support import run_flow
 pytestmark = [
     pytest.mark.live,
     pytest.mark.skipif(
-        os.environ.get("ARCFLOW_LIVE") != "1" or shutil.which("claude") is None,
-        reason="live tests need ARCFLOW_LIVE=1 and the claude CLI",
+        os.environ.get("FLOXIM_LIVE") != "1" or shutil.which("claude") is None,
+        reason="live tests need FLOXIM_LIVE=1 and the claude CLI",
     ),
 ]
 ENV = {k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "ANTHROPIC_API_KEY")}

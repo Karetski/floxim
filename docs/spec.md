@@ -1,4 +1,4 @@
-# Arcflow Specification
+# Floxim Specification
 
 | | |
 |---|---|
@@ -7,16 +7,16 @@
 | Stage | 2 (Spec), per PROJECT_BRIEF.md §15 |
 | Inputs | PROJECT_BRIEF.md, docs/research.md, ADRs 0001–0014 |
 | Build plan | `docs/milestones.md` |
-| Format version | `arcflow: 1` |
+| Format version | `floxim: 1` |
 
-This document is the authoritative definition of Arcflow v1. Where it disagrees with the brief or research.md, this document wins; where it disagrees with an ADR, the ADR wins until the conflict is raised and resolved (see §15). Every choice the ADRs left open is made here; §15 lists the ones that were open questions in the draft and how the review resolved them.
+This document is the authoritative definition of Floxim v1. Where it disagrees with the brief or research.md, this document wins; where it disagrees with an ADR, the ADR wins until the conflict is raised and resolved (see §15). Every choice the ADRs left open is made here; §15 lists the ones that were open questions in the draft and how the review resolved them.
 
-Keywords: **must**, **must not**, **should** and **may** have their RFC 2119 meanings. The project is named Arcflow (ADR 0013): the command `arcflow` (with the short alias `arcf`), the directory `.arcflow/`, the `ARCFLOW_*` environment variables and the Python package `arcflow`.
+Keywords: **must**, **must not**, **should** and **may** have their RFC 2119 meanings. The project is named Floxim (ADR 0017): the command `floxim` (with the short alias `flx`), the directory `.floxim/`, the `FLOXIM_*` environment variables and the Python package `floxim`.
 
 **Tiers.** Every feature carries one of three tiers:
 
 - **Core**: required for the v1 release, and scheduled in `docs/milestones.md` (ADR 0014).
-- **Planned**: fully specified here so the format and state model leave room for it, and the validator recognizes it, but it is scheduled after v1. Until implemented, `arcflow validate` reports `E-NOT-IMPLEMENTED` for it. A Core feature whose milestone has not landed yet is reported the same way.
+- **Planned**: fully specified here so the format and state model leave room for it, and the validator recognizes it, but it is scheduled after v1. Until implemented, `floxim validate` reports `E-NOT-IMPLEMENTED` for it. A Core feature whose milestone has not landed yet is reported the same way.
 - **Future**: named only, to reserve the word.
 
 ## Contents
@@ -56,9 +56,9 @@ Appendix A: example flows. Appendix B: event reference. Appendix C: validation e
 | **State** | Everything expressions can read during a run: inputs, node results, visit counts, variables and run metadata (§4.3, ADR 0003). |
 | **Event** | One line of `events.jsonl`. The event log is the source of truth for a run; state is derived from it (ADR 0012). |
 | **Checkpoint** | The durable point after each recorded transition. Because events are appended and flushed before the runner moves on, every event boundary is a checkpoint. |
-| **Harness** | A complete agent application (Claude Code, Codex CLI) that Arcflow drives headlessly. Arcflow is not a harness and never calls model APIs itself. |
-| **Adapter** | The module that drives one harness through Arcflow's adapter contract (§8, ADR 0011). |
-| **Workspace** | The directory a node's process runs in: the run's shared working directory, or a Arcflow-managed git worktree (§6.9, ADR 0004). |
+| **Harness** | A complete agent application (Claude Code, Codex CLI) that Floxim drives headlessly. Floxim is not a harness and never calls model APIs itself. |
+| **Adapter** | The module that drives one harness through Floxim's adapter contract (§8, ADR 0011). |
+| **Workspace** | The directory a node's process runs in: the run's shared working directory, or a Floxim-managed git worktree (§6.9, ADR 0004). |
 | **Artifact** | A file a node writes into its visit's artifact directory, for later nodes or the user (§6.10). |
 | **Runner** | The process that executes a run. At most one runner holds a run at a time (§7.4). |
 | **Template** | A named, reusable partial node definition inside a flow file that nodes `extends` (§3.6). |
@@ -74,7 +74,7 @@ Appendix A: example flows. Appendix B: event reference. Appendix C: validation e
 | `failed` | Reached `fail`, an unhandled node error, a limit, or an engine error. | yes |
 | `cancelled` | Cancelled by a user. | yes |
 
-`interrupted` is a **derived display status**, not a stored one: a run whose stored status is `running` but whose runner lock is stale (§7.4) is shown as `interrupted` by `arcflow status`, `arcflow list` and the TUI, and can be resumed.
+`interrupted` is a **derived display status**, not a stored one: a run whose stored status is `running` but whose runner lock is stale (§7.4) is shown as `interrupted` by `floxim status`, `floxim list` and the TUI, and can be resumed.
 
 ```
 pending → running ⇄ waiting
@@ -90,7 +90,7 @@ A `failed` or `cancelled` run can be resumed only with an explicit override (§7
 
 ### 2.1 Project root
 
-The **project root** is the nearest ancestor of the current directory containing a `.arcflow/` directory; failing that, the root of the enclosing git repository; failing that, the current directory. `arcflow init` creates `.arcflow/` with a starter `config.yaml` and a `.gitignore`.
+The **project root** is the nearest ancestor of the current directory containing a `.floxim/` directory; failing that, the root of the enclosing git repository; failing that, the current directory. `floxim init` creates `.floxim/` with a starter `config.yaml` and a `.gitignore`.
 
 ```
 <project root>/
@@ -98,12 +98,12 @@ The **project root** is the nearest ancestor of the current directory containing
     implement-feature.yaml
     schemas/plan.json         # referenced by flows, relative to the flow file
     prompts/plan.md
-  .arcflow/
+  .floxim/
     config.yaml               # project configuration (committed)
     harnesses/<name>.yaml     # command adapters (committed, §8.5)
     .gitignore                # ignores runs/ and worktrees/
     runs/<run-id>/            # one directory per run (§7)
-    worktrees/<run-id>/<name> # Arcflow-managed worktrees (§6.9)
+    worktrees/<run-id>/<name> # Floxim-managed worktrees (§6.9)
 ```
 
 A flow file may live anywhere; `flows/` is only where discovery looks by default. All relative paths inside a flow file (`prompt_file`, `output_schema`, `subflow.flow`, …) resolve against **the flow file's directory**, never the current directory. Process working directories resolve against the **run workdir** (§6.9).
@@ -112,12 +112,12 @@ A flow file may live anywhere; `flows/` is only where discovery looks by default
 
 Configuration never changes what a flow means; it describes the environment the flow runs in (binaries, credentials pass-through, prices, notification hooks). Anything that changes behaviour lives in the flow file (brief principle 1).
 
-Precedence, lowest to highest: built-in defaults → user config (`$XDG_CONFIG_HOME/arcflow/config.yaml`, default `~/.config/arcflow/config.yaml`) → project config (`.arcflow/config.yaml`) → environment variables (`ARCFLOW_*`) → command-line flags.
+Precedence, lowest to highest: built-in defaults → user config (`$XDG_CONFIG_HOME/floxim/config.yaml`, default `~/.config/floxim/config.yaml`) → project config (`.floxim/config.yaml`) → environment variables (`FLOXIM_*`) → command-line flags.
 
 ```yaml
-# .arcflow/config.yaml
-flow_paths: [flows]            # discovery roots for `arcflow list-flows` and the TUI
-runs_dir: .arcflow/runs           # relative to the project root
+# .floxim/config.yaml
+flow_paths: [flows]            # discovery roots for `floxim list-flows` and the TUI
+runs_dir: .floxim/runs           # relative to the project root
 harnesses:
   claude:
     command: claude            # binary; may be an absolute path
@@ -128,9 +128,9 @@ env_passthrough: [AWS_PROFILE, NPM_TOKEN]   # extra variables allowed into nodes
 prices:                        # optional; used to estimate USD where a harness reports only tokens
   codex:
     gpt-5-codex: { input_per_mtok: 1.25, cached_input_per_mtok: 0.125, output_per_mtok: 10.0 }
-on_wait: 'notify-send "Arcflow" "$ARCFLOW_MESSAGE"'   # default human-node hook (§5.4); values arrive as env vars
-retention: { keep_days: 30 }   # used by `arcflow gc`
-redact: ['sk-[A-Za-z0-9_-]{20,}']  # regexes masked in logs Arcflow writes (§12.4)
+on_wait: 'notify-send "Floxim" "$FLOXIM_MESSAGE"'   # default human-node hook (§5.4); values arrive as env vars
+retention: { keep_days: 30 }   # used by `floxim gc`
+redact: ['sk-[A-Za-z0-9_-]{20,}']  # regexes masked in logs Floxim writes (§12.4)
 redact_streams: true           # also redact raw harness streams (§12.4)
 allow_full: false              # allow `permissions: full` without --allow-full (§12.2)
 risky_commands: ['\bgit\s+push\b', '\bkubectl\b']   # regexes for W-NO-HUMAN-BEFORE-RISKY (§12.7); replaces the built-in list
@@ -150,7 +150,7 @@ The config file is validated against a published JSON Schema like flow files; un
 - **Strict:** unknown keys are errors, except keys starting with `x-`, which are preserved and ignored (for tools and comments that need structure).
 - Anchors, aliases and merge keys (`<<:`) are **rejected**. They make round-trip editing ambiguous; use `templates` instead (§3.6).
 - Duplicate keys are errors.
-- A **published JSON Schema** (`arcflow schema flow`) describes the file for editors (yaml-language-server) and authoring agents. The schema and this section must stay in sync; the schema is generated from the same declarations the validator checks against, so the two cannot disagree.
+- A **published JSON Schema** (`floxim schema flow`) describes the file for editors (yaml-language-server) and authoring agents. The schema and this section must stay in sync; the schema is generated from the same declarations the validator checks against, so the two cannot disagree.
 - **Durations** are strings of one or more `<int><unit>` groups with units `s`, `m`, `h`, `d` (`90s`, `1h30m`, `3d`), or a bare integer meaning seconds. `none` is accepted where this spec says so.
 - **Identifiers** (node IDs, template names, input names, variable names) match `^[a-z][a-z0-9_]{0,63}$`. Node IDs must not be a reserved word: `end`, `fail`, `self`, `inputs`, `nodes`, `visits`, `vars`, `run`, `env`, `node`, `item`.
 
@@ -158,7 +158,7 @@ The config file is validated against a published JSON Schema like flow files; un
 
 | Key | Type | Required | Description |
 |---|---|---|---|
-| `arcflow` | integer | no (default `1`) | Format version. Arcflow refuses files with a higher major version than it supports. |
+| `floxim` | integer | no (default `1`) | Format version. Floxim refuses files with a higher major version than it supports. |
 | `name` | identifier-ish string (`^[a-z0-9][a-z0-9_-]*$`) | yes | Flow name, used in run IDs and listings. Need not match the file name. |
 | `description` | string | no | One or more sentences; shown in listings and given to authoring agents. |
 | `inputs` | map name → input spec | no | Run inputs (§3.3). |
@@ -168,7 +168,7 @@ The config file is validated against a published JSON Schema like flow files; un
 | `include` | list of paths | no | Template fragments shared between flows (§3.7). |
 | `start` | node ID | no | Entry node. Default: the first key under `nodes`. |
 | `nodes` | map ID → node | yes | The graph. Key order is preserved and meaningful only for the default `start` and for display. |
-| `outputs` | map name → template string | no | Values computed when the run reaches `end`, stored as the run's outputs and returned by `arcflow run --json` and to a parent `subflow` node. |
+| `outputs` | map name → template string | no | Values computed when the run reaches `end`, stored as the run's outputs and returned by `floxim run --json` and to a parent `subflow` node. |
 | `on_wait` | string (shell command) | no | Hook run when any human node in this flow starts waiting (§5.4). Overrides config. |
 | `x-*` | any | no | Ignored extension keys. |
 
@@ -240,7 +240,7 @@ limits:
     tokens: 3_000_000   # input + output tokens across all agent visits
 ```
 
-A limit may be set to `none` to disable it; `arcflow validate` warns when it is (`W-UNBOUNDED`). Budget enforcement is defined in §6.8.
+A limit may be set to `none` to disable it; `floxim validate` warns when it is (`W-UNBOUNDED`). Budget enforcement is defined in §6.8.
 
 ### 3.6 Templates and `extends`
 
@@ -312,7 +312,7 @@ next:                             # conditional: first matching case wins
 - A target is a node ID or one of the reserved targets **`end`** (the run succeeds) and **`fail`** (the run fails).
 - A case may add `reason:` (template string), recorded in the `route_taken` event; for `to: fail` it becomes the run's failure message.
 - Cases are evaluated in order; the first whose `when` is true is taken. A default case must be last and there may be only one.
-- If no case matches and there is no default, the run fails with `E-NO-ROUTE` at run time; `arcflow validate` warns (`W-NO-DEFAULT-ROUTE`) when a list has no default.
+- If no case matches and there is no default, the run fails with `E-NO-ROUTE` at run time; `floxim validate` warns (`W-NO-DEFAULT-ROUTE`) when a list has no default.
 - `when` is an expression (§4). It must evaluate to a boolean; any other type is a run-time error (no truthiness).
 - Omitting `next` is equivalent to `next: end`.
 - Targets are static strings, never templates, so the graph is known without running anything.
@@ -323,7 +323,7 @@ next:                             # conditional: first matching case wins
 
 ### 4.1 Expression language
 
-Expressions are a **restricted subset of Python expression syntax** (ADR 0002), parsed with Python's `ast` module and evaluated by Arcflow's own whitelist evaluator (no `eval`, no builtins, no imports).
+Expressions are a **restricted subset of Python expression syntax** (ADR 0002), parsed with Python's `ast` module and evaluated by Floxim's own whitelist evaluator (no `eval`, no builtins, no imports).
 
 Allowed:
 
@@ -396,12 +396,12 @@ Strings in templated fields (marked "T" in §5) may contain `${{ expression }}`.
 - **Interpolation rule.** Otherwise each `${{ }}` is replaced by its value rendered as text: strings as-is, `None` as the empty string, booleans as `true`/`false`, numbers as JSON, lists and objects as indented JSON (`json(x)`).
 - `$${{` produces a literal `${{`.
 - Templates are rendered **once, at the start of each visit** (and again for each retry attempt), and the rendered values are recorded (§7.2), so resume never re-renders a finished visit.
-- Brief-style `{{ x | filter }}` syntax is not supported; `arcflow validate` flags `{{` without `$` as `W-JINJA-LIKE` since it is almost always a mistake.
+- Brief-style `{{ x | filter }}` syntax is not supported; `floxim validate` flags `{{` without `$` as `W-JINJA-LIKE` since it is almost always a mistake.
 - `prompt_file`, `instructions_file` and `message_file` contents are templates too.
 
 ### 4.5 Static checks on expressions
 
-`arcflow validate` parses every expression and template and checks each reference:
+`floxim validate` parses every expression and template and checks each reference:
 
 - `inputs.x`: `x` is a declared input.
 - `nodes.x`: `x` is a node ID. `nodes.x.<field>`: the field exists for that node's type (§5). `nodes.x.output.<path>`: when `x` has an `output_schema`, the path exists in it (following `properties`, `items`, and `$ref` within the same file); when it has none, access to `output` is allowed but unchecked (`I-UNCHECKED-OUTPUT`).
@@ -451,7 +451,7 @@ plan:
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `harness` | string | `defaults.agent.harness`, else required | Adapter name: `claude`, `codex`, `fake`, or a custom adapter (§8). |
-| `model` | string T | harness default | Passed through; Arcflow does not interpret model names. |
+| `model` | string T | harness default | Passed through; Floxim does not interpret model names. |
 | `effort` | `low` \| `medium` \| `high` \| `max` | harness default | Mapped by the adapter when supported, else `W-IGNORED-OPTION`. |
 | `prompt` / `prompt_file` | string T / path | exactly one required | The task. Sent on stdin (Claude, Codex) or as the adapter requires. |
 | `instructions` / `instructions_file` | string T / path | — | Extra system instructions (Claude `--append-system-prompt-file`; Codex: prepended to the prompt under a heading, since `codex exec` has no equivalent flag). |
@@ -477,7 +477,7 @@ plan:
 | `harness`, `harness_version`, `model` | string | As reported by the harness. |
 | `usage` | object | `input_tokens`, `cached_input_tokens`, `output_tokens`, `reasoning_tokens`, `total_tokens` (missing counters are 0). |
 | `cost_usd` | number or `None` | This visit's spend. |
-| `cost_estimated` | boolean | `true` when computed from Arcflow's price table or reported by the harness as a client-side estimate (always true in v1: see research §1.2). |
+| `cost_estimated` | boolean | `true` when computed from Floxim's price table or reported by the harness as a client-side estimate (always true in v1: see research §1.2). |
 | `num_turns` | integer or `None` | |
 | `permission_denials` | list | `{tool, reason}` entries reported by the harness (ADR 0005). |
 | `schema_errors` | list | Remaining validation errors when outcome is `schema_invalid`. |
@@ -494,8 +494,8 @@ Flows that care whether the agent really did the work should require a `status` 
 
 - Schemas use **JSON Schema draft-07**, the newest dialect `fastjsonschema` implements (ADR 0001 rules out the native-code validators that support later drafts). A `$schema` naming another dialect is `E-BAD-JSON-SCHEMA`, and so is a remote `$ref`: schemas must be self-contained. Schema files are JSON.
 - The schema file is loaded and checked as a valid JSON Schema at validate time.
-- If the adapter declares native structured output, the schema is passed to the harness (Claude `--json-schema`, Codex `--output-schema`). Arcflow validates the result again with `fastjsonschema` in all cases.
-- Without native support, Arcflow appends an instruction to reply with only a JSON object matching the schema, extracts the last fenced or bare JSON object from the final text, and validates it.
+- If the adapter declares native structured output, the schema is passed to the harness (Claude `--json-schema`, Codex `--output-schema`). Floxim validates the result again with `fastjsonschema` in all cases.
+- Without native support, Floxim appends an instruction to reply with only a JSON object matching the schema, extracts the last fenced or bare JSON object from the final text, and validates it.
 - On failure, if `schema_retries` remain: the adapter resumes the same session (when it can) with a message listing the validation errors and asking for corrected JSON only; otherwise it re-runs the prompt with the errors appended. Each fix is recorded as `schema_retry`, counts toward the visit's budget but not toward `retry.max_attempts`, and happens within the same attempt, whose `usage` and `cost_usd` are the sums over all its calls.
 - Without an `output_schema`, `output` is `None` whatever the harness returned. Extraction takes the last fenced JSON block, else the last top-level JSON object in the final text.
 - For `harness: codex`, `validate` warns (`W-CODEX-STRICT-SCHEMA`) when the schema lacks `additionalProperties: false` on objects or does not list every property in `required`, pending the M3 contract test (research §7.3).
@@ -504,7 +504,7 @@ Flows that care whether the agent really did the work should require a `status` 
 
 | `session` | Behaviour |
 |---|---|
-| `new` | A fresh session. Adapters that let the caller choose IDs (Claude) receive a new UUIDv4 from Arcflow. |
+| `new` | A fresh session. Adapters that let the caller choose IDs (Claude) receive a new UUIDv4 from Floxim. |
 | `continue` | On the node's second and later visits, resume the session of its own previous visit, so a fix loop keeps its context. First visit behaves as `new`. |
 | `{resume: <id>}` | Resume the latest session of node `<id>`, which must use the same harness (`E-SESSION-HARNESS`). The harness's view of the session changes. |
 | `{fork: <id>}` | Start a copy of node `<id>`'s latest session (Claude `--resume … --fork-session --session-id <new>`; Codex `exec fork`). Falls back to `resume` with a warning when the adapter lacks `fork`. |
@@ -538,7 +538,7 @@ test:
 
 Result fields: `exit_code` (integer, or `None` if killed), `signal` (name or `None`), `stdout`, `stderr` (tails), `stdout_file`, `stderr_file` (absolute paths), `stdout_truncated`, `stderr_truncated`, `output`, `workspace`, `artifacts_dir`.
 
-Behaviour: `bash`, `zsh` and `ksh` given as `shell` run with `-eo pipefail`, any other interpreter with `-e`. Output is written to `stdout.log`/`stderr.log` as it arrives, as UTF-8 text with `redact` patterns applied line by line (§12.4). The command runs in its own process group with the node environment (§12.3) plus `ARCFLOW_RUN_ID`, `ARCFLOW_RUN_DIR`, `ARCFLOW_NODE_ID`, `ARCFLOW_VISIT`, `ARCFLOW_ATTEMPT`, `ARCFLOW_ARTIFACTS_DIR`. An exit code outside `ok_codes` is outcome `failed` with error kind `exit_code`. Timeouts and cancellation stop the whole process group (§6.7).
+Behaviour: `bash`, `zsh` and `ksh` given as `shell` run with `-eo pipefail`, any other interpreter with `-e`. Output is written to `stdout.log`/`stderr.log` as it arrives, as UTF-8 text with `redact` patterns applied line by line (§12.4). The command runs in its own process group with the node environment (§12.3) plus `FLOXIM_RUN_ID`, `FLOXIM_RUN_DIR`, `FLOXIM_NODE_ID`, `FLOXIM_VISIT`, `FLOXIM_ATTEMPT`, `FLOXIM_ARTIFACTS_DIR`. An exit code outside `ok_codes` is outcome `failed` with error kind `exit_code`. Timeouts and cancellation stop the whole process group (§6.7).
 
 ### 5.3 `condition` (Core)
 
@@ -587,7 +587,7 @@ Result fields: `choice`, `text`, `acknowledged`, `responder` (from `--as`, else 
 
 **Answers.** With `choices`, the answer must be one choice value; free text (`--comment`) is accepted alongside only with `input: text`. Without choices, `input: text` needs non-blank text. With `ack`, only an acknowledgement is accepted. A timeout is recorded as `human_responded` with `via: timeout` and the `default` as its choice (none without a default, and the visit's outcome is then `timed_out`). The visit's deadline is recorded in `visit_started`.
 
-**Waiting.** On entering a human node the runner records `human_waiting`, runs the `on_wait` hook (its failure is logged, never fatal; it runs detached with a 30 s timeout and receives `ARCFLOW_RUN_ID`, `ARCFLOW_NODE_ID`, `ARCFLOW_MESSAGE`, `ARCFLOW_RESPOND_CMD`), sets the run to `waiting`, and then either keeps the process alive or exits (§6.11). An answer arrives through `arcflow respond` or the TUI (§7.4). Validation of an answer (choice in list, text present) happens at `respond` time; an invalid answer is rejected with exit code 2 and changes nothing.
+**Waiting.** On entering a human node the runner records `human_waiting`, runs the `on_wait` hook (its failure is logged, never fatal; it runs detached with a 30 s timeout and receives `FLOXIM_RUN_ID`, `FLOXIM_NODE_ID`, `FLOXIM_MESSAGE`, `FLOXIM_RESPOND_CMD`), sets the run to `waiting`, and then either keeps the process alive or exits (§6.11). An answer arrives through `floxim respond` or the TUI (§7.4). Validation of an answer (choice in list, text present) happens at `respond` time; an invalid answer is rejected with exit code 2 and changes nothing.
 
 ### 5.5 `sleep` (Core)
 
@@ -598,7 +598,7 @@ wait_for_ci:
   # until: ${{ inputs.start_at }}   # ISO 8601 timestamp; past times return at once
 ```
 
-Exactly one of `duration` (duration, T) or `until` (timestamp, T). The runner records `wake_at` in the `visit_started` event, so a resumed run sleeps only for the remainder. A sleep longer than the remaining `limits.max_duration` fails validation when static and fails the visit at run time otherwise. Result fields: `woke_at`. While sleeping the run stays `running`; `arcflow run --detach` is the way to leave a long sleep unattended.
+Exactly one of `duration` (duration, T) or `until` (timestamp, T). The runner records `wake_at` in the `visit_started` event, so a resumed run sleeps only for the remainder. A sleep longer than the remaining `limits.max_duration` fails validation when static and fails the visit at run time otherwise. Result fields: `woke_at`. While sleeping the run stays `running`; `floxim run --detach` is the way to leave a long sleep unattended.
 
 ### 5.6 `set` (Core)
 
@@ -624,9 +624,9 @@ coverage_ok:
   output_schema: schemas/coverage.json
 ```
 
-- Runs in a **child process**, not in the runner, so timeouts and cancellation work and a crash cannot corrupt the runner. The child runs Arcflow's stdlib-only `pycall.py` script by path, so the node's `interpreter:` key can select any Python 3 executable, with or without Arcflow installed (default: the one running Arcflow); the project root is first on `sys.path`, and the process runs in the node's workspace.
+- Runs in a **child process**, not in the runner, so timeouts and cancellation work and a crash cannot corrupt the runner. The child runs Floxim's stdlib-only `pycall.py` script by path, so the node's `interpreter:` key can select any Python 3 executable, with or without Floxim installed (default: the one running Floxim); the project root is first on `sys.path`, and the process runs in the node's workspace.
 - The function receives `args` as keyword arguments (JSON values) and, when its signature accepts `ctx` (or `**kwargs`), a read-only `ctx` with the attributes `run_id`, `node_id`, `visit`, `artifacts_dir`, `workdir`. Its prints go to the attempt's `stdout.log` and `stderr.log`. It returns a JSON-serializable value, which becomes `output`. An exception is outcome `failed` with kind `exception` and the traceback in the visit directory.
-- Arcflow never reads or edits the function body; the TUI shows `call` as a reference that opens the module in `$EDITOR` (research §8.2).
+- Floxim never reads or edits the function body; the TUI shows `call` as a reference that opens the module in `$EDITOR` (research §8.2).
 
 ### 5.8 `subflow` (Core)
 
@@ -638,7 +638,7 @@ triage_one:
     issue: ${{ nodes.fetch.output[0] }}
 ```
 
-Starts a **child run** of the referenced flow with its own run directory, linked by `parent` in `run.json` and by `child_run` in the parent's events. The child runs in the parent's runner process. The parent's remaining budget and `max_duration` are passed down as the child's limits (the smaller of the two wins; recorded as `limits_cap` in the child's `run.json`), and the child's spend is added to the parent's totals when it ends. Result fields: `run_id`, `status`, `outputs` (the child flow's `outputs`), and `output` (alias of `outputs`). A failed child is outcome `failed`, error kind `child_failed`, as is a child that cannot be created (invalid flow or inputs). Cancelling the parent cancels the child; a `timeout` on the node cancels the child and the outcome is `timed_out`. A human node in the child makes the parent `waiting` as well: the parent records a `human_waiting` with `kind: "child"`, `child_run` and `child_node`, and `arcflow respond` on the parent's run ID forwards the answer to the child. Recursion depth is limited to 8 (`depth` in `run.json`). The child flow is part of the parent's snapshot, with its own referenced files. `validate` loads the child flow, reports its errors, and checks that the node passes only declared inputs and every required one.
+Starts a **child run** of the referenced flow with its own run directory, linked by `parent` in `run.json` and by `child_run` in the parent's events. The child runs in the parent's runner process. The parent's remaining budget and `max_duration` are passed down as the child's limits (the smaller of the two wins; recorded as `limits_cap` in the child's `run.json`), and the child's spend is added to the parent's totals when it ends. Result fields: `run_id`, `status`, `outputs` (the child flow's `outputs`), and `output` (alias of `outputs`). A failed child is outcome `failed`, error kind `child_failed`, as is a child that cannot be created (invalid flow or inputs). Cancelling the parent cancels the child; a `timeout` on the node cancels the child and the outcome is `timed_out`. A human node in the child makes the parent `waiting` as well: the parent records a `human_waiting` with `kind: "child"`, `child_run` and `child_node`, and `floxim respond` on the parent's run ID forwards the answer to the child. Recursion depth is limited to 8 (`depth` in `run.json`). The child flow is part of the parent's snapshot, with its own referenced files. `validate` loads the child flow, reports its errors, and checks that the node passes only declared inputs and every required one.
 
 ### 5.9 `map` (Core)
 
@@ -664,7 +664,7 @@ take_over:
   message: Tests keep failing. Over to you; exit the session to continue the flow.
 ```
 
-When the runner is in the foreground with a person at the terminal (`--on-wait prompt`, the default on a TTY), Arcflow prints the message and runs the adapter's interactive command (Claude `claude --resume <id>`, Codex `codex resume <id>`) attached to the terminal, in the `from` node's workspace, then continues when it exits. Otherwise the run becomes `waiting` like a human node (a `human_waiting` of `kind: "handoff"` carrying `session_id` and `command`), and `arcflow handoff <run> [<node>]` opens the session later, records its exit code (`human_responded` with `via: "handoff"`), and continues the run in the foreground (`--no-continue` to only open it). Result fields: `session_id`, `exit_code`. Requires adapter capability `interactive`; `validate` rejects a `from` that is not an agent node (`E-SCHEMA`), does not exist (`E-UNKNOWN-REF`), or uses an adapter without it (`E-SCHEMA`). A `from` node that has no session yet fails the visit.
+When the runner is in the foreground with a person at the terminal (`--on-wait prompt`, the default on a TTY), Floxim prints the message and runs the adapter's interactive command (Claude `claude --resume <id>`, Codex `codex resume <id>`) attached to the terminal, in the `from` node's workspace, then continues when it exits. Otherwise the run becomes `waiting` like a human node (a `human_waiting` of `kind: "handoff"` carrying `session_id` and `command`), and `floxim handoff <run> [<node>]` opens the session later, records its exit code (`human_responded` with `via: "handoff"`), and continues the run in the foreground (`--no-continue` to only open it). Result fields: `session_id`, `exit_code`. Requires adapter capability `interactive`; `validate` rejects a `from` that is not an agent node (`E-SCHEMA`), does not exist (`E-UNKNOWN-REF`), or uses an adapter without it (`E-SCHEMA`). A `from` node that has no session yet fails the visit.
 
 ### 5.11 `notify` (Core)
 
@@ -672,11 +672,11 @@ When the runner is in the foreground with a person at the terminal (`--on-wait p
 tell_me:
   type: notify
   message: "Review finished: ${{ nodes.review.output.verdict }}"
-  command: 'notify-send "Arcflow" "$ARCFLOW_MESSAGE"'        # or:
+  command: 'notify-send "Floxim" "$FLOXIM_MESSAGE"'        # or:
   # webhook: { url: "${{ env.SLACK_WEBHOOK }}", body: { text: "${{ node.message }}" } }
 ```
 
-Keys: `message` (T, required; passed to `command` as `ARCFLOW_MESSAGE` and available as `node.message` in the node's other fields), exactly one of `command` (run like `on_wait`, 30 s timeout) or `webhook` (`{url, method: POST, headers, body}`, JSON body, 10 s timeout; any 2xx status is success), and `required` (default `false`). Fire-and-forget: a failure is recorded as a `W-NOTIFY-FAILED` warning event and the node still succeeds unless `required: true`. The node has no type-specific result fields.
+Keys: `message` (T, required; passed to `command` as `FLOXIM_MESSAGE` and available as `node.message` in the node's other fields), exactly one of `command` (run like `on_wait`, 30 s timeout) or `webhook` (`{url, method: POST, headers, body}`, JSON body, 10 s timeout; any 2xx status is success), and `required` (default `false`). Fire-and-forget: a failure is recorded as a `W-NOTIFY-FAILED` warning event and the node still succeeds unless `required: true`. The node has no type-specific result fields.
 
 ---
 
@@ -689,7 +689,7 @@ Keys: `message` (T, required; passed to `command` as `ARCFLOW_MESSAGE` and avail
 3. **Step loop** (§6.2) until a terminal target, a wait, a cancel, or a limit.
 4. **Finish.** Evaluate `outputs` on `end` (an error there fails the run), append `run_succeeded`/`run_failed`/`run_cancelled`, release the lock.
 
-A run always executes the **snapshot**, never the live flow file, so editing a flow in the TUI or by an agent never changes a run in progress. `arcflow resume --reload` is the explicit way to continue with an edited flow (§7.6).
+A run always executes the **snapshot**, never the live flow file, so editing a flow in the TUI or by an agent never changes a run in progress. `floxim resume --reload` is the explicit way to continue with an edited flow (§7.6).
 
 ### 6.2 The step loop
 
@@ -706,13 +706,13 @@ Every append in steps 2, 4 and 5 is flushed and `fsync`ed before the runner cont
 
 ### 6.3 Data passing
 
-Nodes communicate only through state (§4.3) and the filesystem (the workspace and artifact directories). There are no implicit inputs: an agent sees another node's output only if its prompt references it. Rendered templates are recorded, so the exact text each agent received is always inspectable (`arcflow logs --node plan --prompt`).
+Nodes communicate only through state (§4.3) and the filesystem (the workspace and artifact directories). There are no implicit inputs: an agent sees another node's output only if its prompt references it. Rendered templates are recorded, so the exact text each agent received is always inspectable (`floxim logs --node plan --prompt`).
 
 **Size limits in state.** String result fields are capped: `stdout`/`stderr` by `max_output` (tail kept), agent `text` at 256 KiB (head kept, full text in the visit directory), and `output` objects at 1 MiB serialized (larger output is outcome `failed`, kind `output_too_large`). This keeps `state.json` and prompts bounded.
 
 ### 6.4 Loops and visit limits
 
-Cycles are ordinary edges back to an earlier node. Each node allows `max_visits` visits per run (default 10); the run allows `limits.max_steps` visits in total (default 200). Exceeding either fails the run, naming the node, so an unguarded loop always terminates. Flows should guard loops with `visits.<id>` in a `when:` so they can route somewhere useful (an escalation node) before the hard limit; `arcflow validate` warns (`W-UNGUARDED-CYCLE`) for a cycle in which no `when:` of a node in the cycle (including cases that leave it) references `visits` of a node in the cycle.
+Cycles are ordinary edges back to an earlier node. Each node allows `max_visits` visits per run (default 10); the run allows `limits.max_steps` visits in total (default 200). Exceeding either fails the run, naming the node, so an unguarded loop always terminates. Flows should guard loops with `visits.<id>` in a `when:` so they can route somewhere useful (an escalation node) before the hard limit; `floxim validate` warns (`W-UNGUARDED-CYCLE`) for a cycle in which no `when:` of a node in the cycle (including cases that leave it) references `visits` of a node in the cycle.
 
 ### 6.5 Errors and `on_error`
 
@@ -727,7 +727,7 @@ A visit whose final attempt is not `succeeded` is an **error**. `on_error` decid
 
 `cancelled` is never routed: cancellation stops the run. `interrupted` exists only for visits cut off by a runner crash and is handled by resume (§7.5), not by `on_error`.
 
-`arcflow validate` warns (`W-ERROR-NEVER-ROUTED`) when a node's `next` references its own `exit_code` or `outcome` but `on_error` is `fail`, since the failing branch could never be taken. This is the typical mistake with a test step in a fix loop; Appendix A shows the right pattern (`on_error: continue`).
+`floxim validate` warns (`W-ERROR-NEVER-ROUTED`) when a node's `next` references its own `exit_code` or `outcome` but `on_error` is `fail`, since the failing branch could never be taken. This is the typical mistake with a test step in a fix loop; Appendix A shows the right pattern (`on_error: continue`).
 
 Error kinds (`nodes.<id>.error.kind`): `exit_code`, `harness_error`, `no_result`, `timeout`, `budget`, `schema`, `output_parse`, `output_too_large`, `expression_error`, `exception`, `spawn_failed`, `workspace_error`, `limit`, `child_failed`.
 
@@ -749,8 +749,8 @@ retry:
 
 - `timeout` limits one attempt's wall-clock time. The runner enforces it; harness timeouts are never relied on (ADR 0011).
 - **Stopping a process** (timeout, cancel, runner shutdown): send `SIGINT` to the process group; wait up to 10 s (configurable per adapter as `grace`) for the adapter to report a final result; then `SIGTERM`; after 5 more seconds `SIGKILL`. The visit records which step ended it (`stopped_by`). A result that arrives during the grace period is kept (partial usage and cost still count toward the budget).
-- **Cancel** (`arcflow cancel`, TUI) stops the current attempt as above, records outcome `cancelled`, skips routing and ends the run `cancelled`. A waiting run, or any run without a live runner, is cancelled immediately by the cancelling process. With a live runner the request goes through the inbox, and `arcflow cancel` waits up to 30 s for the run to end cancelled. It prints `{run_id, status, delivered: "requested" | "cancelled"}` with `--json` and exits 0; a run that already finished is exit 2 (`E-ALREADY-FINISHED`).
-- **Runner signals.** `SIGINT`/`SIGTERM` to a foreground `arcflow run` stops the current attempt and leaves the run **resumable** (`runner_detached` event, status stays `running`, displayed as `interrupted`), rather than cancelling it. A second `SIGINT` within 3 s skips the grace period. Use `arcflow cancel` to end a run for good.
+- **Cancel** (`floxim cancel`, TUI) stops the current attempt as above, records outcome `cancelled`, skips routing and ends the run `cancelled`. A waiting run, or any run without a live runner, is cancelled immediately by the cancelling process. With a live runner the request goes through the inbox, and `floxim cancel` waits up to 30 s for the run to end cancelled. It prints `{run_id, status, delivered: "requested" | "cancelled"}` with `--json` and exits 0; a run that already finished is exit 2 (`E-ALREADY-FINISHED`).
+- **Runner signals.** `SIGINT`/`SIGTERM` to a foreground `floxim run` stops the current attempt and leaves the run **resumable** (`runner_detached` event, status stays `running`, displayed as `interrupted`), rather than cancelling it. A second `SIGINT` within 3 s skips the grace period. Use `floxim cancel` to end a run for good.
 - On Windows (unsupported in v1, §15 Q10) process groups are replaced by job objects.
 
 ### 6.8 Budgets and cost
@@ -759,36 +759,36 @@ Budgets exist at two levels: the run (`limits.budget`) and the agent visit (`bud
 
 - **Accounting.** After every call to the harness (each attempt, and each schema fix within it), its `usage` and `cost_usd` are added to the run's totals (`budget_updated` event). USD comes from the harness where it reports it (Claude `total_cost_usd`, delta on resume), otherwise from `prices` in config (§2.2), otherwise it is unknown. Prices apply per million tokens, with `cached_input_tokens` counted as part of `input_tokens` (adapters normalize to this) and billed at `cached_input_per_mtok` when given; when the model has no entry and the harness has exactly one, that one is used. `tokens` budgets count `input_tokens + output_tokens`. A node's budget covers its whole visit, across attempts, schema fixes and a resume.
 - **Before a visit starts:** if either run total has reached its limit, the run fails with `budget_exceeded` (not routed; the run budget is a hard stop).
-- **During a visit:** the adapter receives the remaining allowance, `min(node budget, run budget − spent)`, and passes it to the harness when it has a budget cap (Claude `--max-budget-usd`) as a backstop. Arcflow also watches streamed usage and stops the attempt (§6.7) when the node or run budget is crossed. Overshoot of one model response is expected (research §1.4) and reported.
+- **During a visit:** the adapter receives the remaining allowance, `min(node budget, run budget − spent)`, and passes it to the harness when it has a budget cap (Claude `--max-budget-usd`) as a backstop. Floxim also watches streamed usage and stops the attempt (§6.7) when the node or run budget is crossed. Overshoot of one model response is expected (research §1.4) and reported.
 - **Unknown USD.** When a node has a `usd` budget but its adapter reports no cost and no price is configured, `validate` warns (`W-USD-UNENFORCEABLE`) and only the `tokens` budget is enforced for that node.
 - **Estimates.** All USD figures are labelled estimates in the CLI and TUI (`~$1.24`). Subscription users can budget in tokens only by setting `usd: none`.
 
 ### 6.9 Workspaces
 
-The **run workdir** is the directory given by `arcflow run --workdir`, default the project root. Nodes with `workspace: shared` (the default) run there, and see each other's changes (ADR 0004).
+The **run workdir** is the directory given by `floxim run --workdir`, default the project root. Nodes with `workspace: shared` (the default) run there, and see each other's changes (ADR 0004).
 
-`workspace: worktree` gives a node a **Arcflow-managed git worktree** (ADR 0004):
+`workspace: worktree` gives a node a **Floxim-managed git worktree** (ADR 0004):
 
 ```yaml
 workspace: worktree                 # a worktree private to this node, reused by all its visits
 workspace:
   worktree: feature                 # a named worktree, shared by every node that names it in this run
   base: ${{ inputs.base_branch }}   # commit-ish to branch from (default: HEAD of the run workdir at run start)
-  branch: arcflow/${{ run.id }}/feature  # default: arcflow/<run-id>/<name>
+  branch: floxim/${{ run.id }}/feature  # default: floxim/<run-id>/<name>
   keep: true                        # default true; false removes it when the run succeeds
 ```
 
-- Created on first use with `git worktree add -b <branch> .arcflow/worktrees/<run-id>/<name> <base>` (under the project root). `<name>` defaults to the node ID. The default base is the run workdir's `HEAD` when the run was created, recorded as `git_head` in `run.json`. Base commit and branch are recorded (`workspace_created`) so resume reuses the same worktree. When several nodes name one worktree, the first to run creates it and its `base`/`branch` apply.
+- Created on first use with `git worktree add -b <branch> .floxim/worktrees/<run-id>/<name> <base>` (under the project root). `<name>` defaults to the node ID. The default base is the run workdir's `HEAD` when the run was created, recorded as `git_head` in `run.json`. Base commit and branch are recorded (`workspace_created`) so resume reuses the same worktree. When several nodes name one worktree, the first to run creates it and its `base`/`branch` apply.
 - `keep: false` worktrees are removed with `git worktree remove --force` when the run succeeds (`workspace_removed`); their branches stay. `--recreate-workspaces` recreates a missing worktree from its recorded branch, so only what was committed there comes back.
 - A worktree that cannot be created fails the visit with error kind `workspace_error`.
 - The run workdir must be inside a git repository, otherwise `E-WORKSPACE-NO-GIT` at validate/run start.
-- Arcflow never merges, pushes or deletes branches by itself; flows do that with shell nodes (Appendix A, example 2). `arcflow gc` removes worktrees of finished runs older than `retention.keep_days` whose `keep` is false or whose branch is fully merged.
+- Floxim never merges, pushes or deletes branches by itself; flows do that with shell nodes (Appendix A, example 2). `floxim gc` removes worktrees of finished runs older than `retention.keep_days` whose `keep` is false or whose branch is fully merged.
 - Harness-native worktree flags (`claude -w`, `codex --worktree`) are not used.
 - Result fields `workspace.path` and `workspace.branch` let later nodes (including `shared` ones) refer to a worktree.
 
 ### 6.10 Artifacts
 
-Each visit has `nodes/<id>/<visit>/artifacts/` in the run directory, exposed as `node.artifacts_dir` in templates, `ARCFLOW_ARTIFACTS_DIR` in the environment, and `nodes.<id>.artifacts_dir` to later nodes. Agents are told the path only if the prompt mentions it. `arcflow artifacts <run-id> [--node N]` lists them; the TUI shows them in the node inspector. Artifacts are never deleted before the run directory itself.
+Each visit has `nodes/<id>/<visit>/artifacts/` in the run directory, exposed as `node.artifacts_dir` in templates, `FLOXIM_ARTIFACTS_DIR` in the environment, and `nodes.<id>.artifacts_dir` to later nodes. Agents are told the path only if the prompt mentions it. `floxim artifacts <run-id> [--node N]` lists them; the TUI shows them in the node inspector. Artifacts are never deleted before the run directory itself.
 
 ### 6.11 Waiting for humans and the runner process
 
@@ -796,15 +796,15 @@ When a run reaches a human node (or a `handoff` without a TTY), what the runner 
 
 | `--on-wait` | Behaviour | Default when |
 |---|---|---|
-| `prompt` | Ask on the terminal inline (the same answer `arcflow respond` would record), while also accepting answers from other clients. | foreground run with a TTY on stdin |
+| `prompt` | Ask on the terminal inline (the same answer `floxim respond` would record), while also accepting answers from other clients. | foreground run with a TTY on stdin |
 | `wait` | Keep the process alive, polling the run's inbox (§7.4) once per second, until answered. | — |
 | `exit` | Release the lock and exit with code **4** (`waiting`). | `--detach`, or no TTY |
 
-Whoever answers later (`arcflow respond`, the TUI) records the answer, and if no runner holds the lock, **starts a detached runner** to continue the run (`--no-continue` to only record). A runner that exits at a wait records `runner_detached` with `reason: "waiting"`. A detached runner is `arcflow resume <run> --on-wait exit` in its own session, writing its output to `runner.log` in the run directory; `arcflow run --detach` and `arcflow resume --detach` start one and return at once. A resumed human or sleep visit continues its open attempt rather than starting a new one.
+Whoever answers later (`floxim respond`, the TUI) records the answer, and if no runner holds the lock, **starts a detached runner** to continue the run (`--no-continue` to only record). A runner that exits at a wait records `runner_detached` with `reason: "waiting"`. A detached runner is `floxim resume <run> --on-wait exit` in its own session, writing its output to `runner.log` in the run directory; `floxim run --detach` and `floxim resume --detach` start one and return at once. A resumed human or sleep visit continues its open attempt rather than starting a new one.
 
-`arcflow respond` prints `{run_id, node, delivered: "inbox" | "recorded", continued}` with `--json`; it exits 2 (`E-INVALID-ANSWER`) for an answer that does not fit, 6 when the run or node is not waiting, 7 when the lock is held but not live enough to take. This is how a CI job or cron entry can start a flow, exit at an approval step, and have the flow finish after a person responds hours later, with no daemon (ADR 0008).
+`floxim respond` prints `{run_id, node, delivered: "inbox" | "recorded", continued}` with `--json`; it exits 2 (`E-INVALID-ANSWER`) for an answer that does not fit, 6 when the run or node is not waiting, 7 when the lock is held but not live enough to take. This is how a CI job or cron entry can start a flow, exit at an approval step, and have the flow finish after a person responds hours later, with no daemon (ADR 0008).
 
-A human node's `timeout` is enforced by whichever runner holds the run; if none does, it is enforced when the next `arcflow status`, `list`, `respond`, `resume` or TUI refresh touches the run (lazy timeout). A scheduled `arcflow resume --due` (cron recipe in the docs) makes timeouts fire without a person touching the run.
+A human node's `timeout` is enforced by whichever runner holds the run; if none does, it is enforced when the next `floxim status`, `list`, `respond`, `resume` or TUI refresh touches the run (lazy timeout). A scheduled `floxim resume --due` (cron recipe in the docs) makes timeouts fire without a person touching the run.
 
 ---
 
@@ -817,8 +817,8 @@ A human node's `timeout` is enforced by whichever runner holds the run; if none 
 ### 7.2 Run directory
 
 ```
-.arcflow/runs/<run-id>/
-  run.json              # immutable: id, flow name, flow path, flow SHA-256, arcflow version,
+.floxim/runs/<run-id>/
+  run.json              # immutable: id, flow name, flow path, flow SHA-256, floxim version,
                         #   inputs, workdir, created_at, parent run (subflow), host, user
   snapshot/             # the flow file and every file it references, as run
   events.jsonl          # append-only source of truth (ADR 0012)
@@ -848,7 +848,7 @@ Each line is a JSON object with at least:
 
 - `seq` increases by one per event; a gap or duplicate is corruption.
 - `branch` is always `"main"` in v1; it is the key that parallel branches will use (ADR 0007).
-- A final line that is not valid JSON (torn write after a crash) is ignored and reported as a warning; any other invalid line is corruption and blocks resume until repaired (`arcflow doctor <run>`).
+- A final line that is not valid JSON (torn write after a crash) is ignored and reported as a warning; any other invalid line is corruption and blocks resume until repaired (`floxim doctor <run>`).
 - Event types are listed in Appendix B. The set is versioned by `v`; readers must ignore unknown types, so new ones can be added without a version bump.
 
 `state.json` contains `{status, current, nodes, visits, vars, totals, pending_human, last_seq}` and is valid iff its `last_seq` equals the last event's `seq`; otherwise readers rebuild it from events.
@@ -857,13 +857,13 @@ Each line is a JSON object with at least:
 
 - **Single writer.** Only the process holding the run lock appends to `events.jsonl`.
 - **Lock.** `lock` is created with `O_CREAT|O_EXCL` and holds `{pid, host, started_at, heartbeat_at}`; the holder refreshes `heartbeat_at` every 5 s. A lock is **stale** when its host is this host and the PID is gone, or when `heartbeat_at` is older than 30 s. Taking over a stale lock is recorded (`runner_takeover`).
-- **Inbox.** Other processes (`arcflow respond`, `arcflow cancel`, the TUI) never append events while a runner is live. They write a request file into `inbox/` (atomic rename, named `<ts>-<random>.json`); the runner consumes it within one second, appends the resulting event, and deletes the file. If no live runner exists, the requesting process takes the lock itself, applies the request, and (for `respond`) starts a detached runner unless told not to.
+- **Inbox.** Other processes (`floxim respond`, `floxim cancel`, the TUI) never append events while a runner is live. They write a request file into `inbox/` (atomic rename, named `<ts>-<random>.json`); the runner consumes it within one second, appends the resulting event, and deletes the file. If no live runner exists, the requesting process takes the lock itself, applies the request, and (for `respond`) starts a detached runner unless told not to.
 - **Readers** (status, logs, TUI) need no lock: they read `state.json` and tail `events.jsonl`.
-- Run directories on network filesystems are unsupported (lock semantics); `arcflow doctor` warns.
+- Run directories on network filesystems are unsupported (lock semantics); `floxim doctor` warns.
 
 ### 7.5 Resume
 
-`arcflow resume <run>` takes the lock, rebuilds state from events, and continues:
+`floxim resume <run>` takes the lock, rebuilds state from events, and continues:
 
 - **Finished visits are never rerun** (ADR 0012). Their recorded results and routing decisions are reused as is.
 - **A visit that started but did not finish** is `interrupted`. What happens depends on its node's `on_resume`:
@@ -872,7 +872,7 @@ Each line is a JSON object with at least:
 |---|---|---|
 | `resume` | Agent: if a session ID was recorded and the adapter can resume, start a new attempt that resumes that session with the prompt "Your previous run was interrupted. Continue the task and finish with the required output." Otherwise behaves as `restart`. Other types: same as `restart`. | `agent` |
 | `restart` | Start a new attempt of the same visit from scratch, with the templates rendered at visit start. | `shell`, `python`, `set`, `condition`, `notify`, `subflow` (resumes the child run instead), `map` (continues with the next unfinished item) |
-| `ask` | Turn the interruption into a human prompt: *"`<node>` was interrupted. Rerun, skip, or fail?"* with choices `rerun` (a new attempt, as `restart`), `skip` (record `succeeded` with empty results and route via `next`), `fail` (route to `fail`). The prompt is a `human_waiting` event with `kind: "resume"`, answered with `arcflow respond` like any other. | — |
+| `ask` | Turn the interruption into a human prompt: *"`<node>` was interrupted. Rerun, skip, or fail?"* with choices `rerun` (a new attempt, as `restart`), `skip` (record `succeeded` with empty results and route via `next`), `fail` (route to `fail`). The prompt is a `human_waiting` event with `kind: "resume"`, answered with `floxim respond` like any other. | — |
 
   `human` and `sleep` nodes simply continue waiting (sleep for the remaining time).
 
@@ -881,7 +881,7 @@ Each line is a JSON object with at least:
 - Workspaces are reused as recorded; if a recorded worktree is missing, resume fails with `E-WORKSPACE-MISSING` unless `--recreate-workspaces`.
 - An attempt's normalized result (`result.json`) is written before its `attempt_finished` event. A visit whose last attempt finished but whose `visit_finished` was not written is completed from that result without running anything again; a visit that finished but whose `route_taken` was not written is routed from its recorded result.
 - `--from` and `--force` record the jump as `route_taken` with `via: "resume"`. `--from` closes an interrupted visit as `interrupted` without rerunning it.
-- `arcflow resume` exits 2 with `E-RESUME-REFUSED` when the run cannot be resumed as asked (a succeeded run, a failed or cancelled run without `--force`, an unknown `--from` node, a `--reload` that removes or retypes a visited node), 6 when the run is not found, and 7 with `E-LOCKED` when a live runner holds it.
+- `floxim resume` exits 2 with `E-RESUME-REFUSED` when the run cannot be resumed as asked (a succeeded run, a failed or cancelled run without `--force`, an unknown `--from` node, a `--reload` that removes or retypes a visited node), 6 when the run is not found, and 7 with `E-LOCKED` when a live runner holds it.
 
 ### 7.6 Resume options
 
@@ -891,11 +891,11 @@ Each line is a JSON object with at least:
 | `--from <node>` | Continue at `<node>` (as if routed there), leaving earlier visits recorded. Implies nothing is rerun automatically. |
 | `--rerun` | Rerun the interrupted visit from scratch regardless of `on_resume`: a new attempt with freshly rendered templates. |
 | `--force` | Allow resuming a `failed` or `cancelled` run (recorded as `run_reopened`); it continues from the node that failed (a new visit) or with `--from`. A run that failed outside a node (a limit reached before a visit, an `outputs` error) needs `--from`. |
-| `--due` | Resume only runs whose waiting human timeout or sleep has passed and that no runner holds: timed-out prompts are answered with their `default` (or time out), then a detached runner continues each run. Takes no run ID; meant for cron. `--json` gives `{resumed: [run IDs]}`. An `arcflow respond` that arrives after a deadline finds the timeout applied first and exits 6. |
+| `--due` | Resume only runs whose waiting human timeout or sleep has passed and that no runner holds: timed-out prompts are answered with their `default` (or time out), then a detached runner continues each run. Takes no run ID; meant for cron. `--json` gives `{resumed: [run IDs]}`. An `floxim respond` that arrives after a deadline finds the timeout applied first and exits 6. |
 
 ### 7.7 Retention
 
-Nothing is deleted automatically. `arcflow gc [--older-than 30d] [--status succeeded,cancelled] [--dry-run]` deletes finished run directories and their worktrees (§6.9 rules). `--older-than` counts from when the run finished and defaults to `retention.keep_days`; `--status` defaults to every finished status. Runs that are not finished (including `waiting`) or have a live lock are never collected.
+Nothing is deleted automatically. `floxim gc [--older-than 30d] [--status succeeded,cancelled] [--dry-run]` deletes finished run directories and their worktrees (§6.9 rules). `--older-than` counts from when the run finished and defaults to `retention.keep_days`; `--status` defaults to every finished status. Runs that are not finished (including `waiting`) or have a live lock are never collected.
 
 ---
 
@@ -918,9 +918,9 @@ class Adapter(Protocol):
 
 - **Resume cost.** `SessionSpec.previous_cost_usd` carries the running total the harness last reported for the session being resumed or forked, and `AgentResult.session_total_usd` returns the new total; the engine records totals per session (`attempt_finished`), so an adapter whose harness reports session totals (Claude) can report the call's own delta.
 - Process adapters take `command` (the binary), `grace` and `tested_versions` from `harnesses.<name>` in config (§2.2).
-- **`run`** starts the harness, emits normalized events while it runs, and returns the result. The brief's `start`/`stream`/`result` are this one coroutine; **cancellation** is `asyncio` task cancellation, on which the adapter must perform the stop sequence of §6.7 and then return (not raise) an `AgentResult` with outcome `cancelled` or `timed_out` as the engine instructs through `req.stop_reason`. Adapters built on `arcflow.adapters.ProcessAdapter` get the process-group handling for free.
+- **`run`** starts the harness, emits normalized events while it runs, and returns the result. The brief's `start`/`stream`/`result` are this one coroutine; **cancellation** is `asyncio` task cancellation, on which the adapter must perform the stop sequence of §6.7 and then return (not raise) an `AgentResult` with outcome `cancelled` or `timed_out` as the engine instructs through `req.stop_reason`. Adapters built on `floxim.adapters.ProcessAdapter` get the process-group handling for free.
 - Adapters also declare `auth_env`, the environment variables their harness needs for authentication (§12.3). The engine keeps one adapter instance per runner process.
-- **`emit`** must be called with `SessionStarted` **as soon as** the session ID is known (Claude: before spawning, since Arcflow chose it; Codex: on `thread.started`). The engine writes it to the event log and `fsync`s before anything else, so a crash after that point can resume the session.
+- **`emit`** must be called with `SessionStarted` **as soon as** the session ID is known (Claude: before spawning, since Floxim chose it; Codex: on `thread.started`). The engine writes it to the event log and `fsync`s before anything else, so a crash after that point can resume the session.
 
 ```python
 @dataclass
@@ -936,7 +936,7 @@ class Capabilities:
     turn_cap: bool
     permission_profiles: frozenset[str]   # subset of {"read-only", "edit", "full"}
     tool_rules: bool              # honours allow_tools/deny_tools
-    permission_hook: bool         # can route permission prompts to Arcflow (Future)
+    permission_hook: bool         # can route permission prompts to Floxim (Future)
     streaming: bool               # emits progress during the run
     effort: bool                  # maps `effort`
     bare: bool                    # supports `bare`
@@ -995,7 +995,7 @@ class AgentResult:
 | `fork` | Falls back to `resume` with a warning. |
 | `cost_usd` | Uses `prices` if configured, else token budgets only (§6.8). |
 | `tokens` | Only wall-clock limits apply; `validate` warns for any node budget. |
-| `budget_cap` / `turn_cap` | Arcflow-side enforcement only (always present anyway). |
+| `budget_cap` / `turn_cap` | Floxim-side enforcement only (always present anyway). |
 | a permission profile | `E-PERMISSION-UNSUPPORTED` at validate time. |
 | `interactive` | `handoff` nodes naming it fail validation. |
 
@@ -1016,7 +1016,7 @@ claude -p [--bare] --session-id <uuid> \
   [--resume <id> [--fork-session]]
 ```
 
-Capabilities: all true except `permission_hook` (Future). Maps result `subtype`/`terminal_reason` to outcomes (`error_max_budget_usd` → `budget_exceeded`, `error_during_execution` after Arcflow's SIGINT → `cancelled`/`timed_out` per `stop_reason`, other errors → `failed`). Requires `ANTHROPIC_API_KEY` for `bare: true`; otherwise uses whatever auth the Claude Code install has.
+Capabilities: all true except `permission_hook` (Future). Maps result `subtype`/`terminal_reason` to outcomes (`error_max_budget_usd` → `budget_exceeded`, `error_during_execution` after Floxim's SIGINT → `cancelled`/`timed_out` per `stop_reason`, other errors → `failed`). Requires `ANTHROPIC_API_KEY` for `bare: true`; otherwise uses whatever auth the Claude Code install has.
 
 **`codex`** (tier 1). Invocation, checked against `codex exec --help` of codex-cli 0.147.0 (2026-09-29), with the prompt on stdin:
 
@@ -1072,7 +1072,7 @@ The Claude flags above follow the Claude Code 2.1.285 CLI reference and permissi
 
 ### 8.5 Tier 2: command adapters
 
-A YAML file `.arcflow/harnesses/<name>.yaml` defines an adapter for any CLI with JSON-lines output, without code (research §8.1):
+A YAML file `.floxim/harnesses/<name>.yaml` defines an adapter for any CLI with JSON-lines output, without code (research §8.1):
 
 ```yaml
 name: gemini
@@ -1096,16 +1096,16 @@ tested_versions: ">=0.9"
 
 - Placeholders (`{prompt}`, `{prompt_file}`, `{schema_file}`, `{session_id}`, `{cwd}`, `{model}`, `{attempt_dir}`) are substituted **per argv element** (never through a shell). An element whose placeholder resolves to empty/None is dropped along with a preceding flag element when written as `["-m", "{model}"]` pairs (documented rule: an argv pair `[flag, "{x}"]` is omitted when `x` is unset).
 - Mapping expressions use the §4 language with `event` bound to the parsed JSON line; `event` is the only name available.
-- `name` must match the file name. `prompt_via` defaults to `stdin`; `{prompt}` is set only with `prompt_via: argv` and `{prompt_file}` only with `file`. The keys of `permissions` are the profiles the adapter supports (a node asking for another is `E-PERMISSION-UNSUPPORTED`). Optional keys: `interactive_command` (for `handoff`), `version_command` (default `[<command>, --version]`), `grace`, `usage.cached_input_tokens`, `usage.cost_usd`, `result.output`. `protocol: aap` marks an AAP executable (Planned). `arcflow schema harness` publishes the file's JSON Schema, and a flow's validation reports problems in the harness files it uses.
+- `name` must match the file name. `prompt_via` defaults to `stdin`; `{prompt}` is set only with `prompt_via: argv` and `{prompt_file}` only with `file`. The keys of `permissions` are the profiles the adapter supports (a node asking for another is `E-PERMISSION-UNSUPPORTED`). Optional keys: `interactive_command` (for `handoff`), `version_command` (default `[<command>, --version]`), `grace`, `usage.cached_input_tokens`, `usage.cost_usd`, `result.output`. `protocol: aap` marks an AAP executable (Planned). `floxim schema harness` publishes the file's JSON Schema, and a flow's validation reports problems in the harness files it uses.
 - Command adapters get the process handling, env filtering, JSON extraction and budget/timeouts of the engine for free.
 
 ### 8.6 Tier 3: plugin adapters
 
-- **Python entry points.** A package declares `[project.entry-points."arcflow.adapters"] myharness = "mypkg.adapter:MyAdapter"`. Arcflow loads entry points lazily, only when a flow names that harness (keeps CLI start fast). Plugins are trusted code (§12.6).
-- **Arcflow Adapter Protocol (AAP)** (Planned). An executable in any language, declared in `.arcflow/harnesses/<name>.yaml` with `protocol: aap` and `command: [...]`. JSON-lines over stdio:
-  - Arcflow → adapter: `{"type":"hello","aap":1}`, `{"type":"run","request":{AgentRequest as JSON}}`, `{"type":"cancel","reason":"timeout"}`.
-  - Adapter → Arcflow: `{"type":"hello","aap":1,"capabilities":{…},"version":"…"}`, `{"type":"event","event":{AdapterEvent}}`, `{"type":"result","result":{AgentResult}}`.
-  - Exactly one `run` per process. Stderr is logged. Arcflow still owns the process group and the stop sequence.
+- **Python entry points.** A package declares `[project.entry-points."floxim.adapters"] myharness = "mypkg.adapter:MyAdapter"`. Floxim loads entry points lazily, only when a flow names that harness (keeps CLI start fast). Plugins are trusted code (§12.6).
+- **Agent Adapter Protocol (AAP)** (Planned). An executable in any language, declared in `.floxim/harnesses/<name>.yaml` with `protocol: aap` and `command: [...]`. JSON-lines over stdio:
+  - Floxim → adapter: `{"type":"hello","aap":1}`, `{"type":"run","request":{AgentRequest as JSON}}`, `{"type":"cancel","reason":"timeout"}`.
+  - Adapter → Floxim: `{"type":"hello","aap":1,"capabilities":{…},"version":"…"}`, `{"type":"event","event":{AdapterEvent}}`, `{"type":"result","result":{AgentResult}}`.
+  - Exactly one `run` per process. Stderr is logged. Floxim still owns the process group and the stop sequence.
 
 ### 8.7 Tier 4: ACP (Planned)
 
@@ -1113,12 +1113,12 @@ A generic adapter for agents speaking the Agent Client Protocol (`session/new`, 
 
 ### 8.8 Conformance kit
 
-`arcflow adapter test <name> [--live]` runs the published conformance suite against an adapter:
+`floxim adapter test <name> [--live]` runs the published conformance suite against an adapter:
 
 - **Offline** (default): feeds recorded fixture streams (success, structured output, schema failure, budget stop, SIGINT result, SIGTERM without result, auth failure, missing result) through the adapter's parser, or, for command/AAP adapters, through a stub executable that replays them, and checks the normalized results.
 - **Live** (`--live`, opt-in, costs money): runs a small prompt set with a spend cap and checks session IDs, resume, schema output, cancel within the grace period, and env isolation.
 
-Built-in adapters ship fixtures per tested harness version inside the package (`arcflow/conformance/fixtures/<harness>-<version>/`); a command adapter keeps its own in `.arcflow/harnesses/<name>/fixtures/`. Each set has one `<case>.jsonl` stream per case and an `expected.yaml` giving the normalized result each must produce (`outcome`, `error_kind`, `session_id`, `text`, `output`, `cost_usd`, `usage.*`, `permission_denials`). The command exits 0 when every case passes, 1 otherwise, 6 for an unknown adapter. A version bump in `tested_versions` requires re-recording them. The fixtures shipped for Claude Code 2.1.285 and Codex 0.147.0 are synthetic, written from the documented stream formats; the live suite is how they get replaced with recordings.
+Built-in adapters ship fixtures per tested harness version inside the package (`floxim/conformance/fixtures/<harness>-<version>/`); a command adapter keeps its own in `.floxim/harnesses/<name>/fixtures/`. Each set has one `<case>.jsonl` stream per case and an `expected.yaml` giving the normalized result each must produce (`outcome`, `error_kind`, `session_id`, `text`, `output`, `cost_usd`, `usage.*`, `permission_denials`). The command exits 0 when every case passes, 1 otherwise, 6 for an unknown adapter. A version bump in `tested_versions` requires re-recording them. The fixtures shipped for Claude Code 2.1.285 and Codex 0.147.0 are synthetic, written from the documented stream formats; the live suite is how they get replaced with recordings.
 
 ---
 
@@ -1129,10 +1129,10 @@ The CLI is the engine's scripting surface; the TUI calls the same library functi
 ### 9.1 Conventions
 
 - **`--json`** on every command prints exactly one JSON document to stdout: `{"ok": true, "data": …}` or `{"ok": false, "error": {"code": "E-…", "message": "…", "details": …}}`. Human-readable progress goes to stderr, so `--json` output is always parseable. `--events` (on `run`, `resume`, `logs --follow`) instead streams event JSON lines to stdout.
-- The command is `arcflow`; the package also installs `arcf` as a short alias for the same entry point (ADR 0013).
+- The command is `floxim`; the package also installs `flx` as a short alias for the same entry point (ADR 0017).
 - Global flags, accepted before or after the command name: `--project <dir>` (the project root, instead of discovering it), `--config <file>` (an extra config file, highest precedence), `--quiet` (no progress on stderr), `--verbose` (every event on stderr), `--no-color` (also `NO_COLOR`), `--as <name>` (who is acting: the responder of `respond` and `handoff`, the canceller of `cancel`; `respond --responder` and `cancel --by` override it for one command; the default is `$USER`).
 - Run arguments accept the forms of §7.1 (`@last`, prefixes).
-- The JSON shapes of every command are part of the public interface, published as JSON Schemas (`arcflow schema cli`, one envelope definition per command), and versioned with the format. The test suite validates real command output against them.
+- The JSON shapes of every command are part of the public interface, published as JSON Schemas (`floxim schema cli`, one envelope definition per command), and versioned with the format. The test suite validates real command output against them.
 
 ### 9.2 Exit codes
 
@@ -1155,33 +1155,33 @@ Stable and documented (ADR 0008):
 
 | Command | Tier | Description |
 |---|---|---|
-| `arcflow init` | Core | Create `.arcflow/` with a commented `config.yaml` and a `.gitignore` for `runs/` and `worktrees/`, and `flows/hello.yaml`, an example that validates; existing files are kept. |
-| `arcflow validate <flow>… [--strict]` | Core | Check files (§9.4). `--strict` turns warnings into errors. |
-| `arcflow graph <flow> [--format ascii\|mermaid\|dot\|json]` | Core | Render the graph; `json` gives nodes and edges with conditions, for tools. |
-| `arcflow run <flow> [--input k=v]… [--inputs-file f] [--workdir d] [--detach] [--on-wait prompt\|wait\|exit] [--events]` | Core | Create and start a run. Foreground by default. `--input k=@file` reads a value from a file. Prints the run ID first on stderr (and in `--json`). With `--json`, a succeeded run gives `{"ok": true, "data": {run_id, status, outputs, failure, totals}}`; any other end gives `ok: false` with error code `E-RUN-FAILED`, `E-RUN-CANCELLED`, `E-RUN-WAITING` or `E-RUN-DETACHED` and the same object as `details`. Invalid inputs are `E-INVALID-INPUT` and an invalid flow `E-INVALID-FLOW`, both exit 3. |
-| `arcflow resume <run> [options of §7.6]` | Core | Continue a run. |
-| `arcflow wait <run> [--timeout d]` | Core | Block until the run is terminal or waiting; exit code by status. For scripts that used `--detach`. When the timeout passes first it exits 8 (`E-TIMEOUT`): the run is still in progress. |
-| `arcflow status [<run>]` | Core | One run in detail (current node, visits, pending human prompt, totals); without an argument, active runs. |
-| `arcflow list [--flow X] [--status S] [--since d] [--limit n]` | Core | Runs, newest first. |
-| `arcflow logs <run> [--node N] [--visit n] [--follow] [--raw] [--prompt]` | Core | Human-readable event log; `--raw` prints the harness stream; `--prompt` the rendered prompt. |
-| `arcflow respond <run> [<node>] (--choice X \| --text T \| --ack) [--no-continue]` | Core | Answer a pending human node (node optional when only one is pending). |
-| `arcflow cancel <run> [--reason T]` | Core | Cancel. |
-| `arcflow flows` | Core | Flow files found under `flow_paths`, with name, description and validity. |
-| `arcflow schema flow\|config\|cli\|harness` | Core | Print JSON Schemas. |
-| `arcflow adapters [--probe]` | Core | Installed adapters (built-in, command adapter files, entry points) with their source and capabilities, and with `--probe` binary versions, whether they are in `tested_versions`, and auth hints. |
-| `arcflow artifacts <run> [--node N]` | Core | List artifact files. |
-| `arcflow tui [<flow>\|<run>]` | Core | Open the TUI (§10). |
-| `arcflow gc` | Core | §7.7. |
-| `arcflow doctor [<run>] [--truncate]` | Core | Check environment (Python, git, harness versions, pure-Python deps, a network filesystem under the runs directory); with a run, check and repair its event log and state: trim a torn last line, rebuild `state.json`, remove a stale lock and unfinished inbox files. A corrupt log is reported (exit 1); `--truncate` cuts it before its first bad line, keeping the old log as `events.jsonl.corrupt`. |
-| `arcflow new <path> "<description>" [--harness h]` | Planned | Agent-authored flow (§11). |
-| `arcflow edit <flow> "<instruction>" [--harness h] [--yes]` | Planned | Agent edit of an existing flow (§11). |
-| `arcflow flow <op> <flow> …` | Core | Structured edits (§10.4): `add-node`, `rm-node`, `rename-node`, `set`, `unset`, `connect`, `disconnect`. |
-| `arcflow handoff <run> [<node>]` | Core | Open a pending handoff session interactively. |
-| `arcflow adapter test <name> [--live]` | Core | Conformance kit (§8.8). |
+| `floxim init` | Core | Create `.floxim/` with a commented `config.yaml` and a `.gitignore` for `runs/` and `worktrees/`, and `flows/hello.yaml`, an example that validates; existing files are kept. |
+| `floxim validate <flow>… [--strict]` | Core | Check files (§9.4). `--strict` turns warnings into errors. |
+| `floxim graph <flow> [--format ascii\|mermaid\|dot\|json]` | Core | Render the graph; `json` gives nodes and edges with conditions, for tools. |
+| `floxim run <flow> [--input k=v]… [--inputs-file f] [--workdir d] [--detach] [--on-wait prompt\|wait\|exit] [--events]` | Core | Create and start a run. Foreground by default. `--input k=@file` reads a value from a file. Prints the run ID first on stderr (and in `--json`). With `--json`, a succeeded run gives `{"ok": true, "data": {run_id, status, outputs, failure, totals}}`; any other end gives `ok: false` with error code `E-RUN-FAILED`, `E-RUN-CANCELLED`, `E-RUN-WAITING` or `E-RUN-DETACHED` and the same object as `details`. Invalid inputs are `E-INVALID-INPUT` and an invalid flow `E-INVALID-FLOW`, both exit 3. |
+| `floxim resume <run> [options of §7.6]` | Core | Continue a run. |
+| `floxim wait <run> [--timeout d]` | Core | Block until the run is terminal or waiting; exit code by status. For scripts that used `--detach`. When the timeout passes first it exits 8 (`E-TIMEOUT`): the run is still in progress. |
+| `floxim status [<run>]` | Core | One run in detail (current node, visits, pending human prompt, totals); without an argument, active runs. |
+| `floxim list [--flow X] [--status S] [--since d] [--limit n]` | Core | Runs, newest first. |
+| `floxim logs <run> [--node N] [--visit n] [--follow] [--raw] [--prompt]` | Core | Human-readable event log; `--raw` prints the harness stream; `--prompt` the rendered prompt. |
+| `floxim respond <run> [<node>] (--choice X \| --text T \| --ack) [--no-continue]` | Core | Answer a pending human node (node optional when only one is pending). |
+| `floxim cancel <run> [--reason T]` | Core | Cancel. |
+| `floxim flows` | Core | Flow files found under `flow_paths`, with name, description and validity. |
+| `floxim schema flow\|config\|cli\|harness` | Core | Print JSON Schemas. |
+| `floxim adapters [--probe]` | Core | Installed adapters (built-in, command adapter files, entry points) with their source and capabilities, and with `--probe` binary versions, whether they are in `tested_versions`, and auth hints. |
+| `floxim artifacts <run> [--node N]` | Core | List artifact files. |
+| `floxim tui [<flow>\|<run>]` | Core | Open the TUI (§10). |
+| `floxim gc` | Core | §7.7. |
+| `floxim doctor [<run>] [--truncate]` | Core | Check environment (Python, git, harness versions, pure-Python deps, a network filesystem under the runs directory); with a run, check and repair its event log and state: trim a torn last line, rebuild `state.json`, remove a stale lock and unfinished inbox files. A corrupt log is reported (exit 1); `--truncate` cuts it before its first bad line, keeping the old log as `events.jsonl.corrupt`. |
+| `floxim new <path> "<description>" [--harness h]` | Planned | Agent-authored flow (§11). |
+| `floxim edit <flow> "<instruction>" [--harness h] [--yes]` | Planned | Agent edit of an existing flow (§11). |
+| `floxim flow <op> <flow> …` | Core | Structured edits (§10.4): `add-node`, `rm-node`, `rename-node`, `set`, `unset`, `connect`, `disconnect`. |
+| `floxim handoff <run> [<node>]` | Core | Open a pending handoff session interactively. |
+| `floxim adapter test <name> [--live]` | Core | Conformance kit (§8.8). |
 
 **Inspection output.** `status` and `list` describe a run as `{run_id, flow, status, current, pending, created_at, started_at, finished_at, parent, totals: {usd_spent, tokens_spent, steps, active_s}, failure}`, with `status` the display status (§1.1). `status <run>` adds `inputs`, `workdir`, `visits`, `nodes` (`{outcome, visit, error}` per node), `in_progress`, `pending_human`, `outputs` and `vars`; `status` alone lists the active runs (`pending`, `running`, `waiting`, `interrupted`). `list --status` takes a comma-separated list and `--since` a duration. `logs --events` (or `--json`) prints events as JSON lines; `--raw` and `--prompt` need `--node`. `artifacts` gives `{node, visit, path, size}` entries and `flows` `{file, name, description, valid, errors, warnings}` for every YAML file under `flow_paths` that has a `nodes` key. `graph --format json` gives `{name, start, nodes: [{id, type, description}], edges: [{from, to, via, case_index, when, explicit}]}`, leaving out the implicit `on_error: fail` edges. Commands that read a waiting run (`status`, `logs`, `wait`, `artifacts`, `respond`) first apply any passed human deadline (§6.11).
 
-### 9.4 `arcflow validate`
+### 9.4 `floxim validate`
 
 Checks, in order, stopping at the first stage with errors: YAML syntax; schema (types, unknown keys, required keys); identifiers and reserved words; templates (`extends` resolution, cycles); referenced files exist (`prompt_file`, schemas, subflows, `python` modules are *not* imported); JSON Schemas valid; graph (targets exist, `start` exists, reachability from `start` (`W-UNREACHABLE`), a path to `end` or `fail` from every node (`E-NO-EXIT`), default routes, unguarded cycles); expressions parse and references resolve (§4.5); harness known and `harness_options` valid; capability checks (§8.1); security lints (§12). Each problem has a stable code (Appendix C), a severity, a message, the file, line and column (from `ruamel.yaml` positions) and a JSON pointer:
 
@@ -1210,14 +1210,14 @@ The TUI is a Textual application in the same package. It is a client: it reads f
 
 Human prompts: a pending prompt shows as a banner in every screen and as a modal in run detail with the message, `show` lines, choices, and a text field when allowed. Answering writes through `respond`.
 
-`arcflow tui` opens on Runs; given a flow file it opens that flow's graph, given a run (ID, prefix, `@last`) that run's detail. Keys: `r` runs, `f` flows, `enter` open, `s` cycle the runs' status filter, `escape` back, `q` quit, `ctrl+p` the command palette; on runs and run detail `a` answer the pending prompt, `c` cancel, `u` resume (a detached runner); on run detail `h` open a pending handoff, `g` open the selected visit's session in its harness, `y` copy its session ID, `o` open its first artifact; on flows `x` run (a form built from `inputs`, starting a detached run) and `v` validate; on the flow graph, a node list selects the node the inspector shows, and `e` edits one of its fields, `p` opens its `prompt` (or `message`, `run`) in `$VISUAL`/`$EDITOR`, `n` adds a node after it, `d` removes it, `R` renames it, `k` and `x` connect and disconnect it, `o` reorders its cases and `t` changes its type (§10.4); on run detail `L` resumes with the edited flow (`resume --reload`, a detached runner) when that is allowed. Every action goes through the same library functions as the CLI and records the same events (`via: "tui"` for answers). Screens refresh from disk (runs every second, run detail every half second, a shown flow file every 300 ms), so a run driven by another process updates live. Node status in the graph is a marker (`✓` succeeded, `✗` failed, `▶` running, `…` waiting, `‖` interrupted, `⊘` cancelled, `⌛` timed out) plus colour, with `×n` for repeated visits.
+`floxim tui` opens on Runs; given a flow file it opens that flow's graph, given a run (ID, prefix, `@last`) that run's detail. Keys: `r` runs, `f` flows, `enter` open, `s` cycle the runs' status filter, `escape` back, `q` quit, `ctrl+p` the command palette; on runs and run detail `a` answer the pending prompt, `c` cancel, `u` resume (a detached runner); on run detail `h` open a pending handoff, `g` open the selected visit's session in its harness, `y` copy its session ID, `o` open its first artifact; on flows `x` run (a form built from `inputs`, starting a detached run) and `v` validate; on the flow graph, a node list selects the node the inspector shows, and `e` edits one of its fields, `p` opens its `prompt` (or `message`, `run`) in `$VISUAL`/`$EDITOR`, `n` adds a node after it, `d` removes it, `R` renames it, `k` and `x` connect and disconnect it, `o` reorders its cases and `t` changes its type (§10.4); on run detail `L` resumes with the edited flow (`resume --reload`, a detached runner) when that is allowed. Every action goes through the same library functions as the CLI and records the same events (`via: "tui"` for answers). Screens refresh from disk (runs every second, run detail every half second, a shown flow file every 300 ms), so a run driven by another process updates live. Node status in the graph is a marker (`✓` succeeded, `✗` failed, `▶` running, `…` waiting, `‖` interrupted, `⊘` cancelled, `⌛` timed out) plus colour, with `×n` for repeated visits.
 
 ### 10.2 Graph rendering
 
 - Layered (Sugiyama) layout with `grandalf` (pure Python), drawn with box-drawing characters: nodes as boxes labelled `id` and type icon, forward edges downward, back edges (loops) routed on the side in a distinct style, edge labels showing a shortened `when`.
 - Node status colours in run detail: not visited, running (animated), succeeded, failed, waiting, skipped path; visit counts as a badge (`×3`).
 - Graphs larger than the viewport pan and zoom (two zoom levels: full boxes, compact dots). Above 60 nodes, or when layout takes more than 200 ms, the view falls back to a vertical list in topological order with edges shown as "→ target" lines (research §4).
-- `arcflow graph --format ascii` (the default format) uses the same renderer, so the CLI and TUI never disagree. Boxes show a type icon (◆ agent, $ shell, ? condition, ☺ human, ◷ sleep, = set, λ python, ⊂ subflow, ∀ map, ↪ handoff, ✉ notify, ● end, ✖ fail) and an optional status marker; `on_error` edges are dashed; `on_error: continue` draws no separate edges, since it routes with `next`. `when` labels are shortened to 18 characters and placed where they fit, truncated further when space is tight. The list fallback shows each node with its edges as `→ target  if <when>` lines. The renderer reports each node's box position, so the TUI can colour it by status.
+- `floxim graph --format ascii` (the default format) uses the same renderer, so the CLI and TUI never disagree. Boxes show a type icon (◆ agent, $ shell, ? condition, ☺ human, ◷ sleep, = set, λ python, ⊂ subflow, ∀ map, ↪ handoff, ✉ notify, ● end, ✖ fail) and an optional status marker; `on_error` edges are dashed; `on_error: continue` draws no separate edges, since it routes with `next`. `when` labels are shortened to 18 characters and placed where they fit, truncated further when space is tight. The list fallback shows each node with its edges as `→ target  if <when>` lines. The renderer reports each node's box position, so the TUI can colour it by status.
 
 ### 10.3 Live two-way sync with the file
 
@@ -1229,7 +1229,7 @@ Alexey's requirement: one YAML file edited equally from the TUI, by agents and b
 
 ### 10.4 Structured edits
 
-All edits, from the TUI or from `arcflow flow <op>`, go through one library, `arcflow.edit`, which:
+All edits, from the TUI or from `floxim flow <op>`, go through one library, `floxim.edit`, which:
 
 1. Reads the file with `ruamel.yaml` round-trip mode and records its SHA-256.
 2. Applies the operation to the round-trip tree, preserving comments, key order, quoting and block styles of everything it does not touch.
@@ -1250,7 +1250,7 @@ Operations:
 
 Only the lines an edit changes are rewritten: the library dumps the original and the edited tree in the same normalized style, diffs the two, and applies only the changed hunks to the original text, so untouched lines keep their exact formatting (spacing inside flow mappings included) and changed lines take the file's detected indentation. Blank lines that separate a block from the next stay in place when the block's last line changes. A new node starts with a minimal body for its type (`add-node --set key=value` adds fields): `agent` a `prompt`, `shell` a `run`, `condition` a default `next`, `human` a `message` with `ack`, `sleep` a `duration`, `set` empty `vars`, `notify` a `message` and `command`. A type change adds the same starter keys when the node lacks them, skipping one that another key of its one-of group already covers (a `message_file` covers `message`). Keys that need a project-specific value have no starter (`agent.harness`, `python.call`, `subflow.flow`, `map.items` and `map.flow`, `handoff.from`): the TUI's add and change-type forms ask for them, and an edit without them is refused unless defaults or templates supply them. Removing a node with `--remove-edges` also removes the cases that route to it, and a single `next`/`on_error` naming it (which then falls back to its default).
 
-`arcflow flow` exits 0 after a write, 3 (`E-EDIT-REFUSED`, with the problems) when the edit would make a valid flow invalid, 2 when the operation itself does not apply (an unknown node, a node still routed to), 6 when the file does not exist, and 7 (`E-CONFLICT`) when the file changed on disk since it was read. Its `--json` data is `{file, problems}` (the warnings left after the edit). Operation syntax: `add-node <flow> <id> --type T [--after N] [--set k=v]…`, `rm-node <flow> <id> [--remove-edges]`, `rename-node <flow> <old> <new>`, `set <flow> <node> <path> <yaml value>`, `unset <flow> <node> <path>`, `connect <flow> <from> <to> [--when E] [--on-error] [--position n]`, `disconnect <flow> <from> <to> [--on-error]`.
+`floxim flow` exits 0 after a write, 3 (`E-EDIT-REFUSED`, with the problems) when the edit would make a valid flow invalid, 2 when the operation itself does not apply (an unknown node, a node still routed to), 6 when the file does not exist, and 7 (`E-CONFLICT`) when the file changed on disk since it was read. Its `--json` data is `{file, problems}` (the warnings left after the edit). Operation syntax: `add-node <flow> <id> --type T [--after N] [--set k=v]…`, `rm-node <flow> <id> [--remove-edges]`, `rename-node <flow> <old> <new>`, `set <flow> <node> <path> <yaml value>`, `unset <flow> <node> <path>`, `connect <flow> <from> <to> [--when E] [--on-error] [--position n]`, `disconnect <flow> <from> <to> [--on-error]`.
 
 Positions are never stored: the layout is recomputed, so a hand edit and a TUI edit produce the same picture. Free-form drag-and-drop layout remains a non-goal.
 
@@ -1268,17 +1268,17 @@ Every action has a key binding and appears in a command palette (`ctrl+p`); mous
 
 Flows are data, so agents can author and edit them with the same safety as a person (research §8.2).
 
-**`arcflow new <path> "<description>"`** runs a built-in flow shipped inside Arcflow (`builtin:author-flow`, itself a normal flow file, so Arcflow dogfoods its own format). Its agent node:
+**`floxim new <path> "<description>"`** runs a built-in flow shipped inside Floxim (`builtin:author-flow`, itself a normal flow file, so Floxim dogfoods its own format). Its agent node:
 
 - gets as instructions a bundled authoring guide: the flow JSON Schema, the node catalog (§5, generated from the same source as the schema), the expression function list, the example flows from Appendix A, the project's existing flows and schemas list, and the installed adapters with capabilities;
-- has permission profile `edit` limited to writing `<path>` and new files under the flow's directory (prompt and schema files), plus running `arcflow validate --json <path>`;
+- has permission profile `edit` limited to writing `<path>` and new files under the flow's directory (prompt and schema files), plus running `floxim validate --json <path>`;
 - loops: write → validate → fix, up to 5 validation rounds (a guarded cycle in the built-in flow), then ends with a human node showing the file and the final validation result: `accept`, `revise` (asks for feedback text and loops), `discard`.
 
-**`arcflow edit <flow> "<instruction>"`** and the TUI's **"Edit with agent"** do the same against an existing file: Arcflow snapshots the file, the agent edits it in place (the TUI graph updates live as it saves, §10.3), and at the end the person sees a diff and chooses accept or revert. Revert restores the snapshot byte for byte. If the person also edited the file during the agent's run, Arcflow shows a three-way view and never silently drops either change.
+**`floxim edit <flow> "<instruction>"`** and the TUI's **"Edit with agent"** do the same against an existing file: Floxim snapshots the file, the agent edits it in place (the TUI graph updates live as it saves, §10.3), and at the end the person sees a diff and chooses accept or revert. Revert restores the snapshot byte for byte. If the person also edited the file during the agent's run, Floxim shows a three-way view and never silently drops either change.
 
 **Never run automatically.** Neither command runs the resulting flow. A flow written by an agent is reviewed like code (§12.1).
 
-Authoring agents can also be used outside Arcflow: `arcflow schema flow` plus `arcflow validate --json` is the whole interface an external agent needs.
+Authoring agents can also be used outside Floxim: `floxim schema flow` plus `floxim validate --json` is the whole interface an external agent needs.
 
 ---
 
@@ -1286,14 +1286,14 @@ Authoring agents can also be used outside Arcflow: `arcflow schema flow` plus `a
 
 ### 12.1 Threat model
 
-- **A flow file is code.** It runs shell commands and agents with the user's privileges. Running an untrusted flow is like running an untrusted Makefile. Arcflow does not sandbox shell or python nodes. The docs say this plainly, and `arcflow run` of a flow file that is not tracked by git or was modified by `arcflow new/edit` in the last session prints a one-line notice (not a prompt).
-- **Agent output is untrusted input.** Agents read repositories, issues and web pages that may contain prompt injections, and their outputs flow into later prompts, shell commands and human prompts. Arcflow's defences: permission profiles (§8.4), safe interpolation rules (§12.5), structured outputs validated against schemas, and human nodes before risky steps (a documented pattern, and a lint, §12.7).
+- **A flow file is code.** It runs shell commands and agents with the user's privileges. Running an untrusted flow is like running an untrusted Makefile. Floxim does not sandbox shell or python nodes. The docs say this plainly, and `floxim run` of a flow file that is not tracked by git or was modified by `floxim new/edit` in the last session prints a one-line notice (not a prompt).
+- **Agent output is untrusted input.** Agents read repositories, issues and web pages that may contain prompt injections, and their outputs flow into later prompts, shell commands and human prompts. Floxim's defences: permission profiles (§8.4), safe interpolation rules (§12.5), structured outputs validated against schemas, and human nodes before risky steps (a documented pattern, and a lint, §12.7).
 - **Out of scope:** multi-user isolation, protecting run directories from the local user, authenticating responders (`responder` is informational: anyone who can write the run directory can answer).
 
 ### 12.2 Agent autonomy
 
 - Default profile `edit`, prompts auto-denied (ADR 0005). Nested orchestration denied (Claude `Workflow` tool).
-- `permissions: full` produces a validate warning (`W-FULL-PERMISSIONS`) and `arcflow run` refuses it (`E-FULL-PERMISSIONS`, exit 3) unless the flow is run with `--allow-full` or the project config sets `allow_full: true`.
+- `permissions: full` produces a validate warning (`W-FULL-PERMISSIONS`) and `floxim run` refuses it (`E-FULL-PERMISSIONS`, exit 3) unless the flow is run with `--allow-full` or the project config sets `allow_full: true`.
 - Permission denials are recorded per visit and can be routed on.
 
 ### 12.3 Environment control
@@ -1304,7 +1304,7 @@ Harness and command processes start from an **empty environment** plus:
 2. auth variables each adapter declares (`claude`: `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_BASE_URL`, cloud-provider variables for Bedrock/Vertex; `codex`: `CODEX_API_KEY`, `OPENAI_API_KEY`, `OPENAI_BASE_URL`);
 3. `env_passthrough` from config;
 4. the flow's and node's `env` (templated);
-5. `ARCFLOW_*` run variables.
+5. `FLOXIM_*` run variables.
 
 Always removed, even if listed above: `CLAUDECODE`, `CLAUDE_CODE_SESSION_ID`, `CLAUDE_CODE_CHILD_SESSION`, `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_AUTO_BACKGROUND_TASKS`, `CODEX_THREAD_ID`, `CODEX_SANDBOX*`, and any other variable matching the adapters' declared session denylist (research §1.4, §1.5.4). The denylist is refined in M3 (§15 Q7).
 
@@ -1312,20 +1312,20 @@ Templates see `env.X` only for variables allowed by 1–3.
 
 ### 12.4 Secrets and logs
 
-- Arcflow never writes environment values to events, `visit.json` or logs; `env` entries are recorded by name only.
-- Rendered prompts and harness streams are stored as is, because they are the audit trail. They can contain secrets that agents printed; run directories are `0700`, and `.arcflow/.gitignore` excludes `runs/` and `worktrees/`.
-- `redact` patterns from config are applied to everything Arcflow writes itself (events, `stdout.log`, `stderr.log`, TUI display). Raw `stream.jsonl` is redacted too, once its attempt ends, unless `redact_streams: false` (keeping byte-exact fixtures for adapter debugging).
+- Floxim never writes environment values to events, `visit.json` or logs; `env` entries are recorded by name only.
+- Rendered prompts and harness streams are stored as is, because they are the audit trail. They can contain secrets that agents printed; run directories are `0700`, and `.floxim/.gitignore` excludes `runs/` and `worktrees/`.
+- `redact` patterns from config are applied to everything Floxim writes itself (events, `stdout.log`, `stderr.log`, TUI display). Raw `stream.jsonl` is redacted too, once its attempt ends, unless `redact_streams: false` (keeping byte-exact fixtures for adapter debugging).
 
 ### 12.5 Injection-safe interpolation
 
-- `shell.run` is a shell script: interpolating agent output into it can execute attacker-chosen commands. `arcflow validate` warns (`W-SHELL-INTERPOLATION`) whenever `run` contains `${{ }}` that references `nodes.*` or `vars.*` without wrapping it in `shq(…)`. The recommended forms are `args:` (no shell) or passing values through `env:` and referring to `"$VAR"` in the script.
+- `shell.run` is a shell script: interpolating agent output into it can execute attacker-chosen commands. `floxim validate` warns (`W-SHELL-INTERPOLATION`) whenever `run` contains `${{ }}` that references `nodes.*` or `vars.*` without wrapping it in `shq(…)`. The recommended forms are `args:` (no shell) or passing values through `env:` and referring to `"$VAR"` in the script.
 - Human `message` rendering in the TUI escapes Textual markup; terminal control sequences in any displayed agent text are stripped.
 - Command adapters substitute placeholders per argv element, never through a shell (§8.5).
-- `on_wait` hooks receive values through `ARCFLOW_*` environment variables, not interpolation.
+- `on_wait` hooks receive values through `FLOXIM_*` environment variables, not interpolation.
 
 ### 12.6 Extensions
 
-Entry-point plugins, `python` nodes and command adapters run with full user privileges; installing one is trusting it. `arcflow adapters` shows each adapter's source (built-in, file path, or package and version).
+Entry-point plugins, `python` nodes and command adapters run with full user privileges; installing one is trusting it. `floxim adapters` shows each adapter's source (built-in, file path, or package and version).
 
 ### 12.7 Lints
 
@@ -1342,15 +1342,15 @@ Brief §16: tests first; engine tests use the fake adapter; unit tests never cal
 | Parser and validator | Every rule in §3–§5 and every code in Appendix C | A corpus `tests/flows/invalid/*.yaml`, each file annotated with its expected codes and positions (`# expect: E-UNKNOWN-TARGET @ 41:13`); `tests/flows/valid/*.yaml` including all Appendix A examples. The M1 acceptance criterion is this corpus. |
 | Expressions | Grammar, forbidden constructs, null-safety, functions, rendering rules | Table-driven tests plus property tests (Hypothesis, a dev-only dependency) that no accepted expression can reach builtins or dunders. |
 | Engine | Routing, loops, limits, retries, `on_error`, budgets, timeouts, cancellation, human waits, workspaces | Fake adapter scripts; assertions on the resulting **event log** (golden files, normalized for timestamps and IDs). Time is injected (fake clock) so sleeps and timeouts run instantly. |
-| Crash and resume | At-least-once guarantees, `on_resume` modes, torn last line, stale locks | A fault-injection hook (`ARCFLOW_TEST_CRASH_AT=<event type>:<n>`) that kills the runner right after the n-th event of that type in the run's log (counting events earlier processes wrote), and `ARCFLOW_TEST_CRASH_CHILD_AT` doing the same inside child runs; for each example flow, crash at every event boundary, resume, and assert the final state equals the uncrashed run and no finished visit ran twice. |
+| Crash and resume | At-least-once guarantees, `on_resume` modes, torn last line, stale locks | A fault-injection hook (`FLOXIM_TEST_CRASH_AT=<event type>:<n>`) that kills the runner right after the n-th event of that type in the run's log (counting events earlier processes wrote), and `FLOXIM_TEST_CRASH_CHILD_AT` doing the same inside child runs; for each example flow, crash at every event boundary, resume, and assert the final state equals the uncrashed run and no finished visit ran twice. |
 | Adapters (offline) | Stream parsing and outcome mapping for `claude`, `codex`, command adapters | Recorded fixtures per pinned harness version (§8.8). |
-| Adapters (live) | Real harness smoke tests | Marked `live`, excluded by default, run manually or in a scheduled CI job with a spend cap (`--max-budget-usd` plus Arcflow's budget) and secrets; never on pull requests from forks. |
+| Adapters (live) | Real harness smoke tests | Marked `live`, excluded by default, run manually or in a scheduled CI job with a spend cap (`--max-budget-usd` plus Floxim's budget) and secrets; never on pull requests from forks. |
 | CLI | Every command's `--json` shape and exit code | Snapshot tests against the published CLI schemas. |
 | TUI | Screens render and actions work | Textual's `App.run_test()` pilot and SVG snapshot tests, against run directories produced by fake-adapter runs. |
 | Round-trip editing | Comments, order and formatting preserved; rename rewrites all references | For a corpus of hand-formatted flows: apply each operation and assert that the diff touches only the expected lines; round-trip with no operation is byte-identical. |
 | Packaging | Pure-Python rule (ADR 0001) | CI builds the wheel and zipapp and fails if any runtime dependency (transitively) ships a non-`py3-none-any` wheel; install tests on Python 3.10–3.13, Linux and macOS. |
 
-Dogfooding (brief §15, after M4): Arcflow's own build loop runs as a Arcflow flow, which serves as a long-running integration test.
+Dogfooding (brief §15, after M4): Floxim's own build loop runs as a Floxim flow, which serves as a long-running integration test.
 
 ---
 
@@ -1378,12 +1378,12 @@ Draft 1 left these questions open, each with a default. Alexey's review on 2026-
 | Q1 | ADR 0003 names a node field `status`, which collides with the `status` field agents are encouraged to put in their structured output. | The field is **`outcome`** (§4.3); ADR 0003 carries an amendment note. |
 | Q2 | Accept `true`/`false`/`null` in expressions next to Python's `True`/`False`/`None`? | Both spellings are accepted (§4.1). |
 | Q3 | ADR 0002 lists `include` of "shared fragments"; should it be limited to templates so the graph stays in one file? | Templates only (§3.7); ADR 0002 carries an amendment note. |
-| Q4 | Which features beyond the brief's M0–M8 belong in v1? | ADR 0014: v1 adds structured editing (§10.4, TUI editor, `arcflow flow`), the `set`, `python`, `subflow`, `map`, `handoff` and `notify` nodes, `include`, command adapters (§8.5) and the conformance kit (§8.8). Agent authoring (§11), AAP (§8.6) and ACP (§8.7) stay Planned. |
+| Q4 | Which features beyond the brief's M0–M8 belong in v1? | ADR 0014: v1 adds structured editing (§10.4, TUI editor, `floxim flow`), the `set`, `python`, `subflow`, `map`, `handoff` and `notify` nodes, `include`, command adapters (§8.5) and the conformance kit (§8.8). Agent authoring (§11), AAP (§8.6) and ACP (§8.7) stay Planned. |
 | Q5 | Default run budget. | `usd: 25`, `tokens: 10_000_000` (§3.4). |
 | Q6 | Exact Claude flag set per permission profile. | Intent fixed in §8.4; the flags are fixed by contract tests against the pinned harness versions, and §8.4 is updated from them. |
 | Q7 | Full env denylist for nested agent sessions (research §7.6). | The list in §12.3, refined by the same contract tests. |
 | Q8 | Codex behaviours: signals, exit codes, default sandbox, schema subset (research §7.1–7.4). | Treated conservatively (§8.3) until the contract tests decide. |
-| Q9 | Human node timeout default. | 7 days, with lazy enforcement and `arcflow resume --due` (§6.11). |
+| Q9 | Human node timeout default. | 7 days, with lazy enforcement and `floxim resume --due` (§6.11). |
 | Q10 | Windows support. | Not in v1; Linux and macOS only. Process-group code stays behind one module so Windows (job objects) can be added. |
 | Q11 | Does `respond` auto-start a detached runner? | Yes, unless `--no-continue` (§6.11). |
 | Q12 | Price table for harnesses that report tokens only. | Config only; no built-in prices (§2.2, §6.8). |
@@ -1406,7 +1406,8 @@ Draft 1 left these questions open, each with a default. Alexey's review on 2026-
 | 0007 No parallelism | §5.9, §7.3 (`branch` key), §14 |
 | 0008 External scheduling | §6.11, §9.2, Appendix A example 2 |
 | 0009 Name deferred | Superseded by 0013 |
-| 0013 Name: Arcflow | Header note; §9.1 (`arcf` alias) |
+| 0013 Name: Arcflow | Superseded by 0017 |
+| 0017 Name: Floxim | Header note; §9.1 (`flx` alias) |
 | 0010 MIT | No spec impact |
 | 0011 Adapters | §8 |
 | 0012 Run storage and resume | §7 |
@@ -1423,7 +1424,7 @@ All four are part of the valid-flow test corpus (§13) and ship, with their sche
 The brief's example in final syntax. Shows structured output with a `status` field, `session: continue` in a fix loop, the `on_error: continue` test pattern, visit guards, a human approval, and `to: fail`.
 
 ```yaml
-arcflow: 1
+floxim: 1
 name: implement-feature
 description: Plan with Claude, implement with Codex, loop on tests, ask before merging.
 
@@ -1533,10 +1534,10 @@ nodes:
 
 ### A.2 `nightly-deps`: scheduled upgrade in a worktree with cross-harness review
 
-Run from cron, CI or a systemd timer (ADR 0008): `arcflow run flows/nightly-deps.yaml --on-wait exit --json`. Shows `output: json`, `ok_codes`, templates, a named worktree shared by several nodes, a reviewer on a different harness, `args` for safe interpolation, and a fully unattended design: instead of waiting on a person, it opens a PR that a person reviews.
+Run from cron, CI or a systemd timer (ADR 0008): `floxim run flows/nightly-deps.yaml --on-wait exit --json`. Shows `output: json`, `ok_codes`, templates, a named worktree shared by several nodes, a reviewer on a different harness, `args` for safe interpolation, and a fully unattended design: instead of waiting on a person, it opens a PR that a person reviews.
 
 ```yaml
-arcflow: 1
+floxim: 1
 name: nightly-deps
 description: Upgrade outdated npm dependencies in a worktree, test, review with a second agent, open a PR.
 
@@ -1641,7 +1642,7 @@ nodes:
 Shows `sleep` in a polling loop bounded by `max_visits`, JSON from a CLI, token budgets for a harness without USD, an agent `status` of `blocked` routed to a person, and a free-text human answer fed back to the agent.
 
 ```yaml
-arcflow: 1
+floxim: 1
 name: babysit-pr
 description: Watch a pull request's CI; when it fails, have an agent fix it; ask a person when the agent is stuck.
 
@@ -1712,7 +1713,7 @@ nodes:
 Shows `include`, `python`, `map` over a subflow, `set` and `notify`.
 
 ```yaml
-arcflow: 1
+floxim: 1
 name: triage-issues
 description: Label and answer new GitHub issues, one subflow run per issue.
 
@@ -1757,7 +1758,7 @@ nodes:
 
   report:
     type: notify
-    command: 'notify-send "Arcflow triage" "$ARCFLOW_MESSAGE"'
+    command: 'notify-send "Floxim triage" "$FLOXIM_MESSAGE"'
     message: "${{ vars.failed }} of ${{ vars.triaged + vars.failed }} issues failed triage."
 
 outputs:
@@ -1768,7 +1769,7 @@ outputs:
 `triage-one.yaml` (the subflow body):
 
 ```yaml
-arcflow: 1
+floxim: 1
 name: triage-one
 include: [shared/templates.yaml]
 inputs:
@@ -1805,7 +1806,7 @@ All events carry `v`, `seq`, `ts`, `type`, and where relevant `branch`, `node`, 
 
 | Type | Data |
 |---|---|
-| `run_created` | `flow`, `flow_sha256`, `inputs`, `workdir`, `arcflow_version`, `parent` |
+| `run_created` | `flow`, `flow_sha256`, `inputs`, `workdir`, `floxim_version`, `parent` |
 | `run_started` | `pid`, `host`, `on_wait` |
 | `runner_attached` / `runner_detached` / `runner_takeover` | `pid`, `host`, `reason` |
 | `flow_reloaded` | `old_sha256`, `new_sha256`, `snapshot` |
@@ -1846,7 +1847,7 @@ Severity prefix: `E` error, `W` warning, `I` info. The list is stable; codes are
 | `E-DUPLICATE-KEY` | Duplicate mapping key, or a template defined both locally and in an `include` |
 | `E-SCHEMA` | Type or structure does not match the flow schema |
 | `E-UNKNOWN-KEY` | Key not allowed here |
-| `E-VERSION` | `arcflow:` version not supported |
+| `E-VERSION` | `floxim:` version not supported |
 | `E-BAD-ID` / `E-RESERVED-ID` | Identifier malformed / reserved |
 | `E-UNKNOWN-TEMPLATE` / `E-TEMPLATE-CYCLE` / `E-TEMPLATE-ROUTING` | `extends` problems; routing keys in a template |
 | `E-UNKNOWN-TARGET` / `E-UNKNOWN-START` | Edge or start target does not exist |

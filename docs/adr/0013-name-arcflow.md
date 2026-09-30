@@ -1,6 +1,6 @@
 # 0013. Project name: Arcflow
 
-- Status: Accepted
+- Status: Superseded by [0017](0017-name-floxim.md)
 - Date: 2026-09-29
 - Decided by: Alexey
 - Supersedes: [0009](0009-name-deferred.md)

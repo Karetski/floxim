@@ -1,7 +1,7 @@
-arcflow: 1
+floxim: 1
 name: build-milestone
 description: >
-  Arcflow's own build loop for one milestone of docs/milestones.md: plan, implement with
+  Floxim's own build loop for one milestone of docs/milestones.md: plan, implement with
   tests, check, review on a second harness, and commit after a person approves.
 
 inputs:

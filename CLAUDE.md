@@ -1,6 +1,6 @@
-# Arcflow
+# Floxim
 
-Arcflow is a terminal-first, harness-agnostic workflow orchestrator for AI coding agents. Users define flows (graphs of `agent`, `shell`, `condition`, `human` and `sleep` nodes) in YAML files; Arcflow runs them durably by driving existing harnesses (Claude Code, Codex CLI) in headless mode. The CLI is the engine; a TUI is a client on top.
+Floxim is a terminal-first, harness-agnostic workflow orchestrator for AI coding agents. Users define flows (graphs of `agent`, `shell`, `condition`, `human` and `sleep` nodes) in YAML files; Floxim runs them durably by driving existing harnesses (Claude Code, Codex CLI) in headless mode. The CLI is the engine; a TUI is a client on top.
 
 ## Where things are
 
@@ -30,7 +30,7 @@ Precedence: ADRs and the spec override the brief. When they disagree, the more s
 
 ## Vendored agentkit
 
-`.claude/conduct.md` and `.claude/skills/` are verbatim copies from [agentkit](https://github.com/Karetski/agentkit) at commit `e8216e1`. Edit them upstream in agentkit and re-copy; don't edit the copies here. `hot-path-budget-audit` is intentionally not vendored: Arcflow's engine is I/O-bound, with no per-tick latency budget. Ignore mentions of it in the conduct and other skills.
+`.claude/conduct.md` and `.claude/skills/` are verbatim copies from [agentkit](https://github.com/Karetski/agentkit) at commit `e8216e1`. Edit them upstream in agentkit and re-copy; don't edit the copies here. `hot-path-budget-audit` is intentionally not vendored: Floxim's engine is I/O-bound, with no per-tick latency budget. Ignore mentions of it in the conduct and other skills.
 
 Re-sync from a local agentkit checkout:
 
