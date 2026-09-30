@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from arcflow.cli.common import EventPrinter, print_problems, project_context, stderr
+from arcflow.cli.common import EventPrinter, identity, print_problems, project_context, stderr
 from arcflow.clock import Clock
 from arcflow.engine.human import Answer, InvalidAnswer
 from arcflow.engine.inputs import InputError, load_inputs_file, parse_assignments
@@ -110,7 +110,7 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
     answer.add_argument("--text", help="a free-text answer")
     answer.add_argument("--ack", action="store_true", help="acknowledge")
     respond.add_argument("--comment", help="free text with a choice, when the prompt allows it")
-    respond.add_argument("--as", dest="responder", help="who is answering (default: $USER)")
+    respond.add_argument("--responder", help="who is answering (default: --as, else $USER)")
     respond.add_argument(
         "--no-continue", action="store_true", help="only record the answer; do not continue the run"
     )
@@ -121,7 +121,7 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
     )
     cancel_parser.add_argument("run", help="run ID, unique prefix or suffix, @last or @last:<flow>")
     cancel_parser.add_argument("--reason", help="why, recorded with the cancellation")
-    cancel_parser.add_argument("--as", dest="by", help="who is cancelling (default: $USER)")
+    cancel_parser.add_argument("--by", help="who is cancelling (default: --as, else $USER)")
     cancel_parser.set_defaults(handler=cmd_cancel)
 
     handoff = commands.add_parser(
@@ -151,9 +151,7 @@ def cmd_handoff(args: argparse.Namespace) -> int:
     stderr(f"→ {node}: {str(prompt.get('message') or '').strip()}")
     stderr(f"  opening: {' '.join(command)}")
     code = subprocess.run(command, cwd=context.root, check=False).returncode
-    answer = Answer(
-        acknowledged=True, responder=os.environ.get("USER"), via="handoff", exit_code=code
-    )
+    answer = Answer(acknowledged=True, responder=identity(), via="handoff", exit_code=code)
     respond(run, node, answer, clock=Clock(), project_root=context.root, continue_run=False)
     if args.no_continue:
         return ExitCode.OK
@@ -175,7 +173,7 @@ def cmd_cancel(args: argparse.Namespace) -> int:
         return _fail(args, "E-NOT-FOUND", str(exc), ExitCode.NOT_FOUND)
     clock = Clock()
     try:
-        how = cancel(run, by=args.by or os.environ.get("USER"), reason=args.reason, clock=clock)
+        how = cancel(run, by=identity(args.by), reason=args.reason, clock=clock)
     except AlreadyFinished as exc:
         return _fail(args, "E-ALREADY-FINISHED", str(exc), ExitCode.USAGE)
     except LockHeld as exc:
@@ -221,7 +219,7 @@ def cmd_respond(args: argparse.Namespace) -> int:
         choice=args.choice,
         text=args.text if args.text is not None else args.comment,
         acknowledged=args.ack,
-        responder=args.responder or os.environ.get("USER"),
+        responder=identity(args.responder),
         via="cli",
     )
     try:

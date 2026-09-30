@@ -895,7 +895,7 @@ Each line is a JSON object with at least:
 
 ### 7.7 Retention
 
-Nothing is deleted automatically. `arcflow gc [--older-than 30d] [--status succeeded,cancelled] [--dry-run]` deletes finished run directories and their worktrees (§6.9 rules). Runs with status `waiting` or a live lock are never collected.
+Nothing is deleted automatically. `arcflow gc [--older-than 30d] [--status succeeded,cancelled] [--dry-run]` deletes finished run directories and their worktrees (§6.9 rules). `--older-than` counts from when the run finished and defaults to `retention.keep_days`; `--status` defaults to every finished status. Runs that are not finished (including `waiting`) or have a live lock are never collected.
 
 ---
 
@@ -1130,9 +1130,9 @@ The CLI is the engine's scripting surface; the TUI calls the same library functi
 
 - **`--json`** on every command prints exactly one JSON document to stdout: `{"ok": true, "data": …}` or `{"ok": false, "error": {"code": "E-…", "message": "…", "details": …}}`. Human-readable progress goes to stderr, so `--json` output is always parseable. `--events` (on `run`, `resume`, `logs --follow`) instead streams event JSON lines to stdout.
 - The command is `arcflow`; the package also installs `arcf` as a short alias for the same entry point (ADR 0013).
-- Global flags: `--project <dir>`, `--config <file>`, `--quiet`, `--verbose`, `--no-color` (also `NO_COLOR`), `--as <name>` (responder identity).
+- Global flags, accepted before or after the command name: `--project <dir>` (the project root, instead of discovering it), `--config <file>` (an extra config file, highest precedence), `--quiet` (no progress on stderr), `--verbose` (every event on stderr), `--no-color` (also `NO_COLOR`), `--as <name>` (who is acting: the responder of `respond` and `handoff`, the canceller of `cancel`; `respond --responder` and `cancel --by` override it for one command; the default is `$USER`).
 - Run arguments accept the forms of §7.1 (`@last`, prefixes).
-- The JSON shapes of every command are part of the public interface, published as JSON Schemas (`arcflow schema cli`), and versioned with the format.
+- The JSON shapes of every command are part of the public interface, published as JSON Schemas (`arcflow schema cli`, one envelope definition per command), and versioned with the format. The test suite validates real command output against them.
 
 ### 9.2 Exit codes
 
@@ -1155,7 +1155,7 @@ Stable and documented (ADR 0008):
 
 | Command | Tier | Description |
 |---|---|---|
-| `arcflow init` | Core | Create `.arcflow/` with config, `.gitignore`, and an example flow. |
+| `arcflow init` | Core | Create `.arcflow/` with a commented `config.yaml` and a `.gitignore` for `runs/` and `worktrees/`, and `flows/hello.yaml`, an example that validates; existing files are kept. |
 | `arcflow validate <flow>… [--strict]` | Core | Check files (§9.4). `--strict` turns warnings into errors. |
 | `arcflow graph <flow> [--format ascii\|mermaid\|dot\|json]` | Core | Render the graph; `json` gives nodes and edges with conditions, for tools. |
 | `arcflow run <flow> [--input k=v]… [--inputs-file f] [--workdir d] [--detach] [--on-wait prompt\|wait\|exit] [--events]` | Core | Create and start a run. Foreground by default. `--input k=@file` reads a value from a file. Prints the run ID first on stderr (and in `--json`). With `--json`, a succeeded run gives `{"ok": true, "data": {run_id, status, outputs, failure, totals}}`; any other end gives `ok: false` with error code `E-RUN-FAILED`, `E-RUN-CANCELLED`, `E-RUN-WAITING` or `E-RUN-DETACHED` and the same object as `details`. Invalid inputs are `E-INVALID-INPUT` and an invalid flow `E-INVALID-FLOW`, both exit 3. |
@@ -1168,11 +1168,11 @@ Stable and documented (ADR 0008):
 | `arcflow cancel <run> [--reason T]` | Core | Cancel. |
 | `arcflow flows` | Core | Flow files found under `flow_paths`, with name, description and validity. |
 | `arcflow schema flow\|config\|cli\|harness` | Core | Print JSON Schemas. |
-| `arcflow adapters [--probe]` | Core | Installed adapters, capabilities, and with `--probe` binary versions and auth hints. |
+| `arcflow adapters [--probe]` | Core | Installed adapters (built-in, command adapter files, entry points) with their source and capabilities, and with `--probe` binary versions, whether they are in `tested_versions`, and auth hints. |
 | `arcflow artifacts <run> [--node N]` | Core | List artifact files. |
 | `arcflow tui [<flow>\|<run>]` | Core | Open the TUI (§10). |
 | `arcflow gc` | Core | §7.7. |
-| `arcflow doctor [<run>]` | Core | Check environment (Python, git, harness versions, pure-Python deps, filesystem); with a run, check and repair its event log and state. |
+| `arcflow doctor [<run>] [--truncate]` | Core | Check environment (Python, git, harness versions, pure-Python deps, a network filesystem under the runs directory); with a run, check and repair its event log and state: trim a torn last line, rebuild `state.json`, remove a stale lock and unfinished inbox files. A corrupt log is reported (exit 1); `--truncate` cuts it before its first bad line, keeping the old log as `events.jsonl.corrupt`. |
 | `arcflow new <path> "<description>" [--harness h]` | Planned | Agent-authored flow (§11). |
 | `arcflow edit <flow> "<instruction>" [--harness h] [--yes]` | Planned | Agent edit of an existing flow (§11). |
 | `arcflow flow <op> <flow> …` | Core | Structured edits (§10.4): `add-node`, `rm-node`, `rename-node`, `set`, `unset`, `connect`, `disconnect`. |

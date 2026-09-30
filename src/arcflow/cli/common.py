@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -15,15 +16,49 @@ from arcflow.store.events import Event
 
 
 @dataclass
+class GlobalOptions:
+    """Flags every command accepts (spec §9.1), set once by `main`."""
+
+    project: Path | None = None
+    config: Path | None = None
+    quiet: bool = False
+    verbose: bool = False
+    no_color: bool = False
+    as_: str | None = None
+
+
+OPTIONS = GlobalOptions()
+
+
+def set_options(args: object) -> None:
+    global OPTIONS
+    project = getattr(args, "project", None)
+    config = getattr(args, "config", None)
+    OPTIONS = GlobalOptions(
+        project=Path(project) if project else None,
+        config=Path(config) if config else None,
+        quiet=bool(getattr(args, "quiet", False)),
+        verbose=bool(getattr(args, "verbose", False)),
+        no_color=bool(getattr(args, "no_color", False)) or bool(os.environ.get("NO_COLOR")),
+        as_=getattr(args, "as_", None),
+    )
+
+
+def identity(explicit: str | None = None) -> str | None:
+    """Who is acting: a command's own flag, else --as, else $USER."""
+    return explicit or OPTIONS.as_ or os.environ.get("USER")
+
+
+@dataclass
 class Context:
     root: Path
     config: Config
     config_problems: list[Problem]
 
 
-def project_context(explicit_config: Path | None = None) -> Context:
-    root = find_project_root(Path.cwd())
-    config, problems = load_config(root, explicit_config)
+def project_context() -> Context:
+    root = OPTIONS.project.resolve() if OPTIONS.project else find_project_root(Path.cwd())
+    config, problems = load_config(root, OPTIONS.config)
     return Context(root, config, problems)
 
 
@@ -33,7 +68,8 @@ def print_problems(problems: Iterable[Problem]) -> None:
 
 
 def stderr(message: str) -> None:
-    print(message, file=sys.stderr, flush=True)
+    if not OPTIONS.quiet:
+        print(message, file=sys.stderr, flush=True)
 
 
 class EventPrinter:
@@ -48,11 +84,17 @@ class EventPrinter:
             sys.stdout.write(json.dumps(event, ensure_ascii=False) + "\n")
             sys.stdout.flush()
             return
-        if self.quiet:
+        if self.quiet or OPTIONS.quiet:
             return
-        line = describe(event)
+        line = describe(event) if not OPTIONS.verbose else _verbose(event)
         if line:
             stderr(line)
+
+
+def _verbose(event: Event) -> str:
+    from arcflow.cli.inspection import format_event
+
+    return format_event(event)
 
 
 def describe(event: Event) -> str | None:

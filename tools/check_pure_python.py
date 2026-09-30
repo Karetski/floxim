@@ -8,43 +8,14 @@ installed, so every distribution it sees is Arcflow or a runtime dependency.
 from __future__ import annotations
 
 import sys
-from collections.abc import Mapping
-from importlib import metadata
 
+from arcflow.purity import find_impure, installed_wheels
 
-def _is_pure_tag(tag: str) -> bool:
-    interpreters, abi, platform = tag.split("-")
-    return (
-        all(i.startswith("py") for i in interpreters.split("."))
-        and abi == "none"
-        and platform == "any"
-    )
-
-
-def find_impure(wheels: Mapping[str, str | None]) -> list[tuple[str, str]]:
-    """Return (name, reason) for each distribution that is not a pure wheel.
-
-    `wheels` maps a distribution name to the text of its `WHEEL` metadata file,
-    or None when it has none (installed from something other than a wheel).
-    """
-    impure: list[tuple[str, str]] = []
-    for name, text in sorted(wheels.items()):
-        if text is None:
-            impure.append((name, "no WHEEL metadata; cannot verify it is pure Python"))
-            continue
-        fields = [line.split(":", 1) for line in text.splitlines() if ":" in line]
-        tags = [value.strip() for key, value in fields if key.strip() == "Tag"]
-        purelib = any(
-            key.strip() == "Root-Is-Purelib" and value.strip() == "true" for key, value in fields
-        )
-        bad_tags = [tag for tag in tags if not _is_pure_tag(tag)]
-        if not tags or bad_tags or not purelib:
-            impure.append((name, f"tags {tags or 'missing'}, Root-Is-Purelib {purelib}"))
-    return impure
+__all__ = ["find_impure", "main"]
 
 
 def main() -> int:
-    wheels = {dist.metadata["Name"]: dist.read_text("WHEEL") for dist in metadata.distributions()}
+    wheels = installed_wheels()
     impure = find_impure(wheels)
     for name, reason in impure:
         print(f"not pure Python: {name}: {reason}", file=sys.stderr)
