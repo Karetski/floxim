@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from arcflow.engine.nodes import ConditionExecutor, Executor, SetExecutor, SleepExecutor
+from arcflow.engine.python import PythonExecutor
 from arcflow.engine.shell import ShellExecutor
 
 EXECUTORS: dict[str, Executor] = {
@@ -10,4 +11,5 @@ EXECUTORS: dict[str, Executor] = {
     "sleep": SleepExecutor(),
     "set": SetExecutor(),
     "shell": ShellExecutor(),
+    "python": PythonExecutor(),
 }

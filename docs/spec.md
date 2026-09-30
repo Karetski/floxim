@@ -621,8 +621,8 @@ coverage_ok:
   output_schema: schemas/coverage.json
 ```
 
-- Runs in a **child process** (`<interpreter> -m arcflow.pycall`), not in the runner, so timeouts and cancellation work and a crash cannot corrupt the runner. The node's `interpreter:` key selects the Python executable (default: the one running Arcflow); the project root is on `sys.path`.
-- The function receives `args` as keyword arguments (JSON values) and a read-only `ctx` keyword with `run_id`, `node_id`, `visit`, `artifacts_dir`, `workdir`. It returns a JSON-serializable value, which becomes `output`. An exception is outcome `failed` with kind `exception` and the traceback in the visit directory.
+- Runs in a **child process**, not in the runner, so timeouts and cancellation work and a crash cannot corrupt the runner. The child runs Arcflow's stdlib-only `pycall.py` script by path, so the node's `interpreter:` key can select any Python 3 executable, with or without Arcflow installed (default: the one running Arcflow); the project root is first on `sys.path`, and the process runs in the node's workspace.
+- The function receives `args` as keyword arguments (JSON values) and, when its signature accepts `ctx` (or `**kwargs`), a read-only `ctx` with the attributes `run_id`, `node_id`, `visit`, `artifacts_dir`, `workdir`. Its prints go to the attempt's `stdout.log` and `stderr.log`. It returns a JSON-serializable value, which becomes `output`. An exception is outcome `failed` with kind `exception` and the traceback in the visit directory.
 - Arcflow never reads or edits the function body; the TUI shows `call` as a reference that opens the module in `$EDITOR` (research §8.2).
 
 ### 5.8 `subflow` (Core)
