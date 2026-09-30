@@ -563,7 +563,7 @@ def workspace_checks(flow: Flow, workdir: Path) -> list[Problem]:
 # -- harnesses and capabilities (§8.1, §8.2) -------------------------------------
 
 
-def harness_checks(flow: Flow) -> list[Problem]:
+def harness_checks(flow: Flow, prices: dict[str, Any] | None = None) -> list[Problem]:
     from arcflow import jsonschemas
     from arcflow.adapters import registry
 
@@ -625,6 +625,15 @@ def harness_checks(flow: Flow) -> list[Problem]:
             ignored.append("session (sessions cannot be resumed; each attempt starts new)")
         elif isinstance(session, dict) and "fork" in session and not caps.fork:
             ignored.append("session.fork (the session is resumed instead)")
+        usd = (config.get("budget") or {}).get("usd")
+        if usd not in (None, "none") and not caps.cost_usd and not (prices or {}).get(harness):
+            problems.append(
+                node.where("budget").problem(
+                    "W-USD-UNENFORCEABLE",
+                    f"the {harness} adapter reports no cost and no price is configured for it; "
+                    "only the tokens budget is enforced",
+                )
+            )
         for what in ignored:
             problems.append(
                 node.origin.problem(

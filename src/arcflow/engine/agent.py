@@ -7,6 +7,7 @@ import contextlib
 import uuid
 from typing import Any
 
+from arcflow import jsonschemas
 from arcflow.adapters import (
     Adapter,
     AdapterEvent,
@@ -20,9 +21,11 @@ from arcflow.adapters import (
     Text,
     ToolCall,
     ToolResult,
+    Usage,
     UsageUpdate,
 )
 from arcflow.engine.nodes import AttemptResult, VisitContext
+from arcflow.engine.structured import extract_json, fix_message, json_instruction
 from arcflow.templates import parse_template
 
 RESUME_PROMPT = (
@@ -54,7 +57,10 @@ class AgentExecutor:
         runner = ctx.runner
         config = ctx.config
         adapter = runner.adapter(config["harness"])
+        caps = adapter.capabilities()
         session: SessionSpec = ctx.scratch["session"]
+        schema = runner.flow.schema_for(ctx.node, "output_schema")
+        native = caps.structured_output
         prompt = self._text(ctx, "prompt") or ""
         if (
             ctx.resume is not None
@@ -62,6 +68,8 @@ class AgentExecutor:
             and ctx.resume.get("mode") == "resume"
         ):
             prompt = RESUME_PROMPT
+        if schema is not None and not native:
+            prompt += json_instruction(schema)
         instructions = self._text(ctx, "instructions")
         visit_dir = runner.run_dir.visit_dir(ctx.node.id, ctx.visit)
         (visit_dir / "prompt.md").write_text(prompt)
@@ -82,7 +90,7 @@ class AgentExecutor:
             permissions=config.get("permissions", "edit"),
             allow_tools=list(config.get("allow_tools") or []),
             deny_tools=list(config.get("deny_tools") or []),
-            output_schema=runner.flow.schema_for(ctx.node, "output_schema"),
+            output_schema=schema if native else None,
             session=session,
             max_turns=config.get("max_turns"),
             budget_usd=None,
@@ -92,8 +100,54 @@ class AgentExecutor:
             options=dict(config.get("harness_options") or {}),
             attempt_dir=str(ctx.attempt_dir),
         )
-        result = await self._drive(ctx, adapter, request)
-        return self._attempt_result(ctx, adapter.name, result)
+        fixes_left = int(config.get("schema_retries", 2))
+        usage = Usage()
+        cost: float | None = 0.0
+        schema_errors: list[str] = []
+        while True:
+            request.budget_usd, request.budget_tokens = runner.allowance(ctx)
+            result = await self._drive(ctx, adapter, request)
+            spent = runner.record_spend(ctx, adapter.name, request.model, result)
+            usage = _add_usage(usage, result.usage)
+            cost = None if cost is None or spent is None else cost + spent
+            if result.outcome != "succeeded" or schema is None:
+                break
+            output = result.output if native else extract_json(result.text)
+            validator = jsonschemas.compile_schema(schema)
+            problem = jsonschemas.validation_error(validator, output)
+            if problem is None:
+                result.output = output
+                break
+            schema_errors = [problem]
+            if fixes_left <= 0:
+                result.outcome = "schema_invalid"
+                result.error = ErrorInfo(
+                    "schema", f"output does not match output_schema: {problem}"
+                )
+                break
+            fixes_left -= 1
+            runner.emit(
+                "schema_retry",
+                {"errors": schema_errors},
+                node=ctx.node.id,
+                visit=ctx.visit,
+                attempt=ctx.attempt,
+            )
+            if caps.resume and result.session_id:
+                request.session = SessionSpec("resume", result.session_id, None)
+                request.prompt = fix_message(schema_errors)
+            else:
+                request.session = SessionSpec("new", None, _new_id(caps))
+                request.prompt = prompt + "\n\n" + fix_message(schema_errors)
+        if schema is None:
+            result.output = None
+        result.usage = usage
+        result.cost_usd = cost
+        attempt = self._attempt_result(ctx, adapter.name, result)
+        attempt.fields["schema_errors"] = (
+            schema_errors if result.outcome == "schema_invalid" else []
+        )
+        return attempt
 
     def _text(self, ctx: VisitContext, key: str) -> str | None:
         """The rendered `prompt`/`instructions`, or the rendered contents of the `_file`."""
@@ -183,6 +237,19 @@ class AgentExecutor:
             "stopped_by": result.stopped_by,
         }
         return AttemptResult(outcome, fields, error, extra=extra)
+
+
+def _new_id(capabilities: Any) -> str | None:
+    return str(uuid.uuid4()) if capabilities.session_id == "caller" else None
+
+
+def _add_usage(total: Usage, more: Usage) -> Usage:
+    return Usage(
+        total.input_tokens + more.input_tokens,
+        total.cached_input_tokens + more.cached_input_tokens,
+        total.output_tokens + more.output_tokens,
+        total.reasoning_tokens + more.reasoning_tokens,
+    )
 
 
 def _session(ctx: VisitContext, capabilities: Any) -> SessionSpec:

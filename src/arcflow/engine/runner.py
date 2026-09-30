@@ -20,11 +20,11 @@ from pathlib import Path
 from typing import Any
 
 from arcflow import __version__
-from arcflow.adapters import Adapter, UsageUpdate
+from arcflow.adapters import Adapter, AgentResult, Usage, UsageUpdate
 from arcflow.adapters import registry as adapter_registry
 from arcflow.clock import Clock, iso, parse_iso
 from arcflow.config import Config
-from arcflow.engine import environment, workspaces
+from arcflow.engine import budget, environment, workspaces
 from arcflow.engine.inputs import resolve_inputs
 from arcflow.engine.nodes import AttemptResult, Executor, SleepError, VisitContext
 from arcflow.engine.process import Stop
@@ -379,6 +379,10 @@ class Runner:
         left = self.remaining_active_seconds()
         if left is not None and left <= 0:
             return "max_duration_exceeded", "the run reached limits.max_duration"
+        if node.type == "agent":
+            spent = self._run_budget_spent()
+            if spent is not None:
+                return "budget_exceeded", spent
         return None
 
     def max_duration(self) -> float | None:
@@ -513,6 +517,9 @@ class Runner:
         )
         ctx = VisitContext(self, node, visit, {}, dict(progress.get("data") or {}))
         ctx.workspace = progress.get("workspace")
+        for earlier in attempts:  # spend of this visit before the interruption
+            if isinstance(earlier.get("usage"), dict):
+                ctx.spend.add(earlier.get("cost_usd"), int(earlier["usage"].get("total_tokens", 0)))
         ctx.namespace = self.namespace(node, visit, (last or {}).get("attempt", 0) + 1)
         if self.options.rerun:
             ctx.config = render_config(node.type, node.config, ctx.namespace, self.clock.now)
@@ -745,9 +752,92 @@ class Runner:
             self._adapters[name] = adapter_registry.load(name)
         return self._adapters[name]
 
+    # -- budgets (§6.8) ----------------------------------------------------------------
+
+    def _cost(
+        self, harness: str, model: str | None, usage: Usage, cost: float | None
+    ) -> float | None:
+        if cost is not None:
+            return cost
+        return budget.price_cost(self.config["prices"], harness, model, usage)
+
+    def allowance(self, ctx: VisitContext) -> tuple[float | None, int | None]:
+        """What the next adapter call may spend: the tighter of the node's and the
+        run's remaining budget. Passed to the harness as a backstop."""
+        node_usd, node_tokens = budget.node_limits(ctx.config)
+        run_usd, run_tokens = budget.run_limits(self.flow.limits)
+        totals = self.state["totals"]
+        usd = [
+            v
+            for v in (
+                None if node_usd is None else node_usd - ctx.spend.usd,
+                None if run_usd is None else run_usd - totals["usd_spent"],
+            )
+            if v is not None
+        ]
+        tokens = [
+            v
+            for v in (
+                None if node_tokens is None else node_tokens - ctx.spend.tokens,
+                None if run_tokens is None else run_tokens - totals["tokens_spent"],
+            )
+            if v is not None
+        ]
+        return (
+            max(min(usd), 0.0) if usd else None,
+            int(max(min(tokens), 0)) if tokens else None,
+        )
+
+    def record_spend(
+        self, ctx: VisitContext, harness: str, model: str | None, result: AgentResult
+    ) -> float | None:
+        """Add one adapter call's spend to the visit and the run (`budget_updated`)."""
+        cost = self._cost(harness, model or result.model, result.usage, result.cost_usd)
+        tokens = result.usage.total_tokens
+        ctx.spend.add(cost, tokens)
+        totals = self.state["totals"]
+        usd_spent = round(totals["usd_spent"] + (cost or 0.0), 6)
+        tokens_spent = totals["tokens_spent"] + tokens
+        run_usd, run_tokens = budget.run_limits(self.flow.limits)
+        self.emit(
+            "budget_updated",
+            {
+                "usd_spent": usd_spent,
+                "tokens_spent": tokens_spent,
+                "usd_left": None if run_usd is None else round(run_usd - usd_spent, 6),
+                "tokens_left": None if run_tokens is None else int(run_tokens - tokens_spent),
+            },
+            node=ctx.node.id,
+            visit=ctx.visit,
+            attempt=ctx.attempt,
+        )
+        return cost
+
     def on_usage(self, ctx: VisitContext, event: UsageUpdate) -> None:
-        """Usage reported while an agent attempt runs."""
-        ctx.scratch["usage"] = event
+        """Stop an agent attempt once its streamed usage crosses a budget."""
+        harness = str(ctx.config.get("harness"))
+        cost = self._cost(harness, ctx.config.get("model"), event.usage, event.cost_usd) or 0.0
+        tokens = event.usage.total_tokens
+        node_usd, node_tokens = budget.node_limits(ctx.config)
+        run_usd, run_tokens = budget.run_limits(self.flow.limits)
+        totals = self.state["totals"]
+        crossed = (
+            (node_usd is not None and ctx.spend.usd + cost > node_usd)
+            or (node_tokens is not None and ctx.spend.tokens + tokens > node_tokens)
+            or (run_usd is not None and totals["usd_spent"] + cost > run_usd)
+            or (run_tokens is not None and totals["tokens_spent"] + tokens > run_tokens)
+        )
+        if crossed:
+            ctx.stop.request("budget")
+
+    def _run_budget_spent(self) -> str | None:
+        run_usd, run_tokens = budget.run_limits(self.flow.limits)
+        totals = self.state["totals"]
+        if run_usd is not None and totals["usd_spent"] >= run_usd:
+            return f"the run spent ~${totals['usd_spent']:.2f} of its ${run_usd:g} budget"
+        if run_tokens is not None and totals["tokens_spent"] >= run_tokens:
+            return f"the run used {totals['tokens_spent']} of its {int(run_tokens)} tokens"
+        return None
 
     @property
     def workdir(self) -> Path:

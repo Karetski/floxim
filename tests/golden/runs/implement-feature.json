@@ -1,0 +1,711 @@
+[
+  {
+    "branch": "main",
+    "data": {
+      "arcflow_version": "0.1.0.dev0",
+      "flow": "implement-feature",
+      "flow_sha256": "e2b39f6d73c29e091bbf27de7187017c0f2ce127656622f6a1a3d783ee2b5bef",
+      "inputs": {
+        "feature": "login"
+      },
+      "parent": null,
+      "workdir": "<tmp>"
+    },
+    "seq": 1,
+    "ts": "<time>",
+    "type": "run_created",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "host": "<host>",
+      "pid": 0
+    },
+    "seq": 2,
+    "ts": "<time>",
+    "type": "run_started",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "config_ref": "nodes/plan/1/visit.json",
+      "config_sha256": "15574c23571d998c0cac123227e7e4781fe0301f9643d69116cbae3c723c93e8",
+      "type": "agent",
+      "workspace": null
+    },
+    "node": "plan",
+    "seq": 3,
+    "ts": "<time>",
+    "type": "visit_started",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "adapter": "fake",
+      "attempt": 1,
+      "resume_session_id": null,
+      "session_mode": "new"
+    },
+    "node": "plan",
+    "seq": 4,
+    "ts": "<time>",
+    "type": "attempt_started",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "session_id": "<session-1>"
+    },
+    "node": "plan",
+    "seq": 5,
+    "ts": "<time>",
+    "type": "session_started",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "kind": "usage",
+      "summary": "0 tokens"
+    },
+    "node": "plan",
+    "seq": 6,
+    "ts": "<time>",
+    "type": "progress",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "tokens_left": 10000000,
+      "tokens_spent": 0,
+      "usd_left": 9.95,
+      "usd_spent": 0.05
+    },
+    "node": "plan",
+    "seq": 7,
+    "ts": "<time>",
+    "type": "budget_updated",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "cost_usd": 0.05,
+      "error": null,
+      "outcome": "succeeded",
+      "stopped_by": null,
+      "usage": {
+        "cached_input_tokens": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    "node": "plan",
+    "seq": 8,
+    "ts": "<time>",
+    "type": "attempt_finished",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "outcome": "succeeded",
+      "result": {
+        "artifacts_dir": "<tmp>/.arcflow/runs/<run>/nodes/plan/1/artifacts",
+        "attempts": 1,
+        "cost_estimated": true,
+        "cost_usd": 0.05,
+        "duration_s": 0,
+        "error": null,
+        "finished_at": "<time>",
+        "harness": "fake",
+        "harness_version": "fake",
+        "model": null,
+        "num_turns": 1,
+        "outcome": "succeeded",
+        "output": {
+          "status": "ready",
+          "steps": [
+            "form",
+            "tests"
+          ],
+          "summary": "Add a login form"
+        },
+        "permission_denials": [],
+        "schema_errors": [],
+        "session_id": "<session-1>",
+        "started_at": "<time>",
+        "text": "",
+        "usage": {
+          "cached_input_tokens": 0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "reasoning_tokens": 0,
+          "total_tokens": 0
+        },
+        "visit": 1,
+        "workspace": {
+          "branch": null,
+          "path": "<tmp>"
+        }
+      }
+    },
+    "node": "plan",
+    "seq": 9,
+    "ts": "<time>",
+    "type": "visit_finished",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "case_index": 0,
+      "from": "plan",
+      "reason": null,
+      "to": "implement",
+      "via": "next"
+    },
+    "seq": 10,
+    "ts": "<time>",
+    "type": "route_taken",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "config_ref": "nodes/implement/1/visit.json",
+      "config_sha256": "aef7bcf2d2f381e10ec63301671f0a3ecf81b5a1693387bf9fd56250797d808e",
+      "type": "agent",
+      "workspace": null
+    },
+    "node": "implement",
+    "seq": 11,
+    "ts": "<time>",
+    "type": "visit_started",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "adapter": "fake",
+      "attempt": 1,
+      "resume_session_id": null,
+      "session_mode": "new"
+    },
+    "node": "implement",
+    "seq": 12,
+    "ts": "<time>",
+    "type": "attempt_started",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "session_id": "<session-2>"
+    },
+    "node": "implement",
+    "seq": 13,
+    "ts": "<time>",
+    "type": "session_started",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "kind": "text",
+      "summary": "first try"
+    },
+    "node": "implement",
+    "seq": 14,
+    "ts": "<time>",
+    "type": "progress",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "tokens_left": 10000000,
+      "tokens_spent": 0,
+      "usd_left": 9.85,
+      "usd_spent": 0.15
+    },
+    "node": "implement",
+    "seq": 15,
+    "ts": "<time>",
+    "type": "budget_updated",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "cost_usd": 0.1,
+      "error": null,
+      "outcome": "succeeded",
+      "stopped_by": null,
+      "usage": {
+        "cached_input_tokens": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    "node": "implement",
+    "seq": 16,
+    "ts": "<time>",
+    "type": "attempt_finished",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "outcome": "succeeded",
+      "result": {
+        "artifacts_dir": "<tmp>/.arcflow/runs/<run>/nodes/implement/1/artifacts",
+        "attempts": 1,
+        "cost_estimated": true,
+        "cost_usd": 0.1,
+        "duration_s": 0,
+        "error": null,
+        "finished_at": "<time>",
+        "harness": "fake",
+        "harness_version": "fake",
+        "model": null,
+        "num_turns": 1,
+        "outcome": "succeeded",
+        "output": null,
+        "permission_denials": [],
+        "schema_errors": [],
+        "session_id": "<session-2>",
+        "started_at": "<time>",
+        "text": "first try",
+        "usage": {
+          "cached_input_tokens": 0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "reasoning_tokens": 0,
+          "total_tokens": 0
+        },
+        "visit": 1,
+        "workspace": {
+          "branch": null,
+          "path": "<tmp>"
+        }
+      }
+    },
+    "node": "implement",
+    "seq": 17,
+    "ts": "<time>",
+    "type": "visit_finished",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "case_index": null,
+      "from": "implement",
+      "reason": null,
+      "to": "test",
+      "via": "next"
+    },
+    "seq": 18,
+    "ts": "<time>",
+    "type": "route_taken",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "config_ref": "nodes/test/1/visit.json",
+      "config_sha256": "50bb65e40fcf607eb842f24622a1937297e022c4f5ab18e28597aeea1613c395",
+      "type": "shell",
+      "workspace": null
+    },
+    "node": "test",
+    "seq": 19,
+    "ts": "<time>",
+    "type": "visit_started",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "attempt": 1
+    },
+    "node": "test",
+    "seq": 20,
+    "ts": "<time>",
+    "type": "attempt_started",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "error": {
+        "kind": "exit_code",
+        "message": "exit code 1"
+      },
+      "outcome": "failed"
+    },
+    "node": "test",
+    "seq": 21,
+    "ts": "<time>",
+    "type": "attempt_finished",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "outcome": "failed",
+      "result": {
+        "artifacts_dir": "<tmp>/.arcflow/runs/<run>/nodes/test/1/artifacts",
+        "attempts": 1,
+        "duration_s": 0,
+        "error": {
+          "kind": "exit_code",
+          "message": "exit code 1"
+        },
+        "exit_code": 1,
+        "finished_at": "<time>",
+        "outcome": "failed",
+        "output": null,
+        "signal": null,
+        "started_at": "<time>",
+        "stderr": "",
+        "stderr_file": "<tmp>/.arcflow/runs/<run>/nodes/test/1/attempt-1/stderr.log",
+        "stderr_truncated": false,
+        "stdout": "",
+        "stdout_file": "<tmp>/.arcflow/runs/<run>/nodes/test/1/attempt-1/stdout.log",
+        "stdout_truncated": false,
+        "visit": 1,
+        "workspace": {
+          "branch": null,
+          "path": "<tmp>"
+        }
+      }
+    },
+    "node": "test",
+    "seq": 22,
+    "ts": "<time>",
+    "type": "visit_finished",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "case_index": 1,
+      "from": "test",
+      "reason": null,
+      "to": "implement",
+      "via": "next"
+    },
+    "seq": 23,
+    "ts": "<time>",
+    "type": "route_taken",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "config_ref": "nodes/implement/2/visit.json",
+      "config_sha256": "9d7fb3699133d1a92dffdff48bc6f150eff37cb02c1600924bc9636c669a407e",
+      "type": "agent",
+      "workspace": null
+    },
+    "node": "implement",
+    "seq": 24,
+    "ts": "<time>",
+    "type": "visit_started",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "adapter": "fake",
+      "attempt": 1,
+      "resume_session_id": "<session-2>",
+      "session_mode": "resume"
+    },
+    "node": "implement",
+    "seq": 25,
+    "ts": "<time>",
+    "type": "attempt_started",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "session_id": "<session-2>"
+    },
+    "node": "implement",
+    "seq": 26,
+    "ts": "<time>",
+    "type": "session_started",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "kind": "text",
+      "summary": "fixed it"
+    },
+    "node": "implement",
+    "seq": 27,
+    "ts": "<time>",
+    "type": "progress",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "tokens_left": 10000000,
+      "tokens_spent": 0,
+      "usd_left": 9.75,
+      "usd_spent": 0.25
+    },
+    "node": "implement",
+    "seq": 28,
+    "ts": "<time>",
+    "type": "budget_updated",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "cost_usd": 0.1,
+      "error": null,
+      "outcome": "succeeded",
+      "stopped_by": null,
+      "usage": {
+        "cached_input_tokens": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    "node": "implement",
+    "seq": 29,
+    "ts": "<time>",
+    "type": "attempt_finished",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "branch": "main",
+    "data": {
+      "outcome": "succeeded",
+      "result": {
+        "artifacts_dir": "<tmp>/.arcflow/runs/<run>/nodes/implement/2/artifacts",
+        "attempts": 1,
+        "cost_estimated": true,
+        "cost_usd": 0.1,
+        "duration_s": 0,
+        "error": null,
+        "finished_at": "<time>",
+        "harness": "fake",
+        "harness_version": "fake",
+        "model": null,
+        "num_turns": 1,
+        "outcome": "succeeded",
+        "output": null,
+        "permission_denials": [],
+        "schema_errors": [],
+        "session_id": "<session-2>",
+        "started_at": "<time>",
+        "text": "fixed it",
+        "usage": {
+          "cached_input_tokens": 0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "reasoning_tokens": 0,
+          "total_tokens": 0
+        },
+        "visit": 2,
+        "workspace": {
+          "branch": null,
+          "path": "<tmp>"
+        }
+      }
+    },
+    "node": "implement",
+    "seq": 30,
+    "ts": "<time>",
+    "type": "visit_finished",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "branch": "main",
+    "data": {
+      "case_index": null,
+      "from": "implement",
+      "reason": null,
+      "to": "test",
+      "via": "next"
+    },
+    "seq": 31,
+    "ts": "<time>",
+    "type": "route_taken",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "config_ref": "nodes/test/2/visit.json",
+      "config_sha256": "50bb65e40fcf607eb842f24622a1937297e022c4f5ab18e28597aeea1613c395",
+      "type": "shell",
+      "workspace": null
+    },
+    "node": "test",
+    "seq": 32,
+    "ts": "<time>",
+    "type": "visit_started",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "attempt": 1
+    },
+    "node": "test",
+    "seq": 33,
+    "ts": "<time>",
+    "type": "attempt_started",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "error": null,
+      "outcome": "succeeded"
+    },
+    "node": "test",
+    "seq": 34,
+    "ts": "<time>",
+    "type": "attempt_finished",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "branch": "main",
+    "data": {
+      "outcome": "succeeded",
+      "result": {
+        "artifacts_dir": "<tmp>/.arcflow/runs/<run>/nodes/test/2/artifacts",
+        "attempts": 1,
+        "duration_s": 0,
+        "error": null,
+        "exit_code": 0,
+        "finished_at": "<time>",
+        "outcome": "succeeded",
+        "output": null,
+        "signal": null,
+        "started_at": "<time>",
+        "stderr": "",
+        "stderr_file": "<tmp>/.arcflow/runs/<run>/nodes/test/2/attempt-1/stderr.log",
+        "stderr_truncated": false,
+        "stdout": "",
+        "stdout_file": "<tmp>/.arcflow/runs/<run>/nodes/test/2/attempt-1/stdout.log",
+        "stdout_truncated": false,
+        "visit": 2,
+        "workspace": {
+          "branch": null,
+          "path": "<tmp>"
+        }
+      }
+    },
+    "node": "test",
+    "seq": 35,
+    "ts": "<time>",
+    "type": "visit_finished",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "branch": "main",
+    "data": {
+      "case_index": 0,
+      "from": "test",
+      "reason": null,
+      "to": "end",
+      "via": "next"
+    },
+    "seq": 36,
+    "ts": "<time>",
+    "type": "route_taken",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "outputs": {
+        "spent": 0.25,
+        "summary": "Add a login form"
+      },
+      "totals": {
+        "active_s": 0,
+        "steps": 5,
+        "tokens_left": 10000000,
+        "tokens_spent": 0,
+        "usd_left": 9.75,
+        "usd_spent": 0.25
+      }
+    },
+    "seq": 37,
+    "ts": "<time>",
+    "type": "run_succeeded",
+    "v": 1
+  }
+]

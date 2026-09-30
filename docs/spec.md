@@ -496,7 +496,8 @@ Flows that care whether the agent really did the work should require a `status` 
 - The schema file is loaded and checked as a valid JSON Schema at validate time.
 - If the adapter declares native structured output, the schema is passed to the harness (Claude `--json-schema`, Codex `--output-schema`). Arcflow validates the result again with `fastjsonschema` in all cases.
 - Without native support, Arcflow appends an instruction to reply with only a JSON object matching the schema, extracts the last fenced or bare JSON object from the final text, and validates it.
-- On failure, if `schema_retries` remain: the adapter resumes the same session (when it can) with a message listing the validation errors and asking for corrected JSON only; otherwise it re-runs the prompt with the errors appended. Each fix counts toward the visit's budget but not toward `retry.max_attempts`.
+- On failure, if `schema_retries` remain: the adapter resumes the same session (when it can) with a message listing the validation errors and asking for corrected JSON only; otherwise it re-runs the prompt with the errors appended. Each fix is recorded as `schema_retry`, counts toward the visit's budget but not toward `retry.max_attempts`, and happens within the same attempt, whose `usage` and `cost_usd` are the sums over all its calls.
+- Without an `output_schema`, `output` is `None` whatever the harness returned. Extraction takes the last fenced JSON block, else the last top-level JSON object in the final text.
 - For `harness: codex`, `validate` warns (`W-CODEX-STRICT-SCHEMA`) when the schema lacks `additionalProperties: false` on objects or does not list every property in `required`, pending the M3 contract test (research §7.3).
 
 #### 5.1.3 Sessions
@@ -754,7 +755,7 @@ retry:
 
 Budgets exist at two levels: the run (`limits.budget`) and the agent visit (`budget` on the node). Each accepts `usd`, `tokens`, or both (ADR 0011).
 
-- **Accounting.** After every agent attempt, its `usage` and `cost_usd` are added to the run's totals (`budget_updated` event). USD comes from the harness where it reports it (Claude `total_cost_usd`, delta on resume), otherwise from `prices` in config (§2.2), otherwise it is unknown.
+- **Accounting.** After every call to the harness (each attempt, and each schema fix within it), its `usage` and `cost_usd` are added to the run's totals (`budget_updated` event). USD comes from the harness where it reports it (Claude `total_cost_usd`, delta on resume), otherwise from `prices` in config (§2.2), otherwise it is unknown. Prices apply per million tokens, with `cached_input_tokens` counted as part of `input_tokens` (adapters normalize to this) and billed at `cached_input_per_mtok` when given; when the model has no entry and the harness has exactly one, that one is used. `tokens` budgets count `input_tokens + output_tokens`. A node's budget covers its whole visit, across attempts, schema fixes and a resume.
 - **Before a visit starts:** if either run total has reached its limit, the run fails with `budget_exceeded` (not routed; the run budget is a hard stop).
 - **During a visit:** the adapter receives the remaining allowance, `min(node budget, run budget − spent)`, and passes it to the harness when it has a budget cap (Claude `--max-budget-usd`) as a backstop. Arcflow also watches streamed usage and stops the attempt (§6.7) when the node or run budget is crossed. Overshoot of one model response is expected (research §1.4) and reported.
 - **Unknown USD.** When a node has a `usd` budget but its adapter reports no cost and no price is configured, `validate` warns (`W-USD-UNENFORCEABLE`) and only the `tokens` budget is enforced for that node.
@@ -1046,7 +1047,7 @@ responses:
   - replay: fixtures/claude-2.1.285/success-schema.jsonl   # parse a recorded real stream
 ```
 
-The fake adapter declares every capability, can simulate slow runs (for cancel/timeout tests) and can replay recorded streams through the real adapters' parsers. An entry with `match` answers every call it matches; the other entries answer calls in order, counted per runner process, so tests that resume a run should use `match`.
+The fake adapter declares every capability, can simulate slow runs (for cancel/timeout tests) and can replay recorded streams through the real adapters' parsers. An entry with `match` answers every call it matches; the other entries answer each node's calls in order, counted per runner process, so tests that resume a run should use `match`.
 
 ### 8.4 Permission profiles
 

@@ -60,7 +60,7 @@ def validate(
             lambda: graph_checks(flow, graph),
             lambda: expression_checks(flow, graph),
             lambda: limit_checks(flow),
-            lambda: harness_checks(flow),
+            lambda: harness_checks(flow, config["prices"] if config else None),
             lambda: workspace_checks(flow, workdir or path.parent),
             lambda: lint_checks(flow, graph, risky),
         ]

@@ -2,8 +2,8 @@
 
 Every engine test drives agent nodes through it. A script is a list of
 responses. An entry with `match` answers every call whose node, visit and
-attempt match; the others answer calls in order. A `delay` makes a call slow,
-for timeout, cancel and budget tests.
+attempt match; the others answer each node's calls in order. A `delay` makes a
+call slow, for timeout, cancel and budget tests.
 """
 
 from __future__ import annotations
@@ -73,7 +73,7 @@ class FakeAdapter:
     auth_env: ClassVar[tuple[str, ...]] = ()
 
     def __init__(self) -> None:
-        self._next = 0  # index of the next unmatched response
+        self._next: dict[str, int] = {}  # per node: index of its next unmatched response
 
     def capabilities(self) -> Capabilities:
         return Capabilities(
@@ -120,9 +120,10 @@ class FakeAdapter:
             ):
                 return response
         unmatched = [r for r in responses if not r.get("match")]
-        if self._next < len(unmatched):
-            self._next += 1
-            return unmatched[self._next - 1]
+        index = self._next.get(req.node_id, 0)
+        if index < len(unmatched):
+            self._next[req.node_id] = index + 1
+            return unmatched[index]
         return {"text": "ok"}
 
     async def run(self, req: AgentRequest, emit: Callable[[AdapterEvent], None]) -> AgentResult:

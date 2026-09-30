@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from arcflow.clock import iso, parse_iso
+from arcflow.engine.budget import Spend
 from arcflow.engine.process import Stop
 from arcflow.engine.routing import Decision, decide
 from arcflow.units import parse_duration
@@ -37,6 +38,7 @@ class VisitContext:
     stop: Stop = field(default_factory=Stop)  # set to stop the attempt (cancel, shutdown)
     workspace: dict[str, Any] | None = None  # {name, path, branch} of the node's worktree
     scratch: dict[str, Any] = field(default_factory=dict)  # executor-private, per attempt
+    spend: Spend = field(default_factory=Spend)  # this visit's agent spend so far
 
 
 @dataclass
