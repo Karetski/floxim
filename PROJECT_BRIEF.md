@@ -8,11 +8,12 @@
 
 | Item | State |
 |---|---|
-| Current stage | **Stage 2: Spec**. Stage 1 (Research) completed 2026-09-30: see `docs/research.md` and `docs/adr/` |
+| Current stage | **Stage 3: Build phases**. Stage 1 (Research) completed 2026-09-30 (`docs/research.md`, `docs/adr/`); Stage 2 (Spec) completed 2026-09-29 |
 | Spec | `docs/spec.md`, accepted 2026-09-29; review decisions in its §15 |
+| Build plan | Draft 1 in `docs/milestones.md` (2026-09-29), awaiting review |
 | Code | None |
 | Name | Arcflow (ADR 0013); CLI `arcflow`, short alias `arcf` |
-| Last updated | 2026-09-30 |
+| Last updated | 2026-09-29 |
 
 ---
 
@@ -327,7 +328,7 @@ Produce `docs/research.md` with findings, recommendations, and decisions for §1
 Produce `docs/spec.md`, the authoritative definition. Sections: concepts, file format with 3–4 complete example flows, node catalog (inputs, outputs, failure behavior), execution semantics (data passing, retries, loop limits, timeouts, budgets), persistence and resume, adapter interface, CLI and TUI, security, testing strategy, non-goals.
 
 ### Stage 3: Build phases
-Produce `docs/milestones.md`. Each milestone is sized for roughly one agent session, with acceptance criteria and required tests.
+Produce `docs/milestones.md`. Each milestone is sized for roughly one agent session, with acceptance criteria and required tests. The table below is the original outline; `docs/milestones.md` is authoritative. It keeps these numbers, splits large milestones into lettered parts, and adds the features ADR 0014 brings into v1 (structured editing, the remaining node types, command adapters).
 
 | # | Milestone | Done when |
 |---|---|---|
