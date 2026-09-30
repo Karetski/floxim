@@ -38,7 +38,7 @@ from ruamel.yaml.util import load_yaml_guess_indent
 
 from arcflow.expr import ExprError
 from arcflow.expr import parse as parse_expression
-from arcflow.flowspec import NODE_TYPES, node_fields
+from arcflow.flowspec import EXACTLY_ONE, NODE_TYPES, node_fields
 from arcflow.problems import Problem
 from arcflow.schema import IDENTIFIER
 from arcflow.templates import OPEN, parse_template
@@ -446,9 +446,17 @@ def reorder_cases(ed: Editable, node_id: str, order: list[int], *, on_error: boo
             cases[index] = case
 
 
-def change_type(ed: Editable, node_id: str, new_type: str, *, drop: bool = False) -> list[str]:
-    """Change a node's type; keys the new type does not accept must be dropped
-    explicitly. Returns the dropped keys."""
+def change_type(
+    ed: Editable,
+    node_id: str,
+    new_type: str,
+    *,
+    drop: bool = False,
+    fields: dict[str, Any] | None = None,
+) -> list[str]:
+    """Change a node's type. Keys the new type does not accept must be dropped
+    explicitly; keys it needs come from its starter body, unless the node already
+    has them, and from `fields`. Returns the dropped keys."""
     if new_type not in NODE_TYPES:
         raise EditError(f"unknown node type {new_type!r}")
     node = ed.node(node_id)
@@ -460,7 +468,17 @@ def change_type(ed: Editable, node_id: str, new_type: str, *, drop: bool = False
         for key in extra:
             del node[key]
         node["type"] = _like(node.get("type"), new_type)
+        given = fields or {}
+        for key, value in {**starter(new_type, set(node) | set(given)), **given}.items():
+            node[key] = value
     return extra
+
+
+def starter(node_type: str, present: set[str]) -> dict[str, Any]:
+    """The starter keys a node of `node_type` still needs, given the keys it has.
+    A key is skipped when another key of its one-of group is present."""
+    taken = {k for group in EXACTLY_ONE.get(node_type, ()) if present & set(group) for k in group}
+    return {k: v for k, v in STARTERS.get(node_type, {}).items() if k not in present | taken}
 
 
 # -- rename -------------------------------------------------------------------------------

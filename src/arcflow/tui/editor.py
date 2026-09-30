@@ -26,7 +26,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, Checkbox, Input, Label, Select, Static, TextArea
 
 from arcflow import edit
-from arcflow.flowspec import COMMON, NODE_TYPES, node_fields
+from arcflow.flowspec import COMMON, NODE_TYPES, REQUIRED_KEYS, node_fields
 
 Operation = Callable[[edit.Editable], None]
 
@@ -91,6 +91,42 @@ def parse_yaml(text: str) -> Any:
     return YAML(typ="safe", pure=True).load(text)
 
 
+# What to show in an empty input for a required key no starter body can fill.
+PLACEHOLDERS = {
+    "harness": "harness, e.g. claude (leave empty if defaults set it)",
+    "call": "module:function",
+    "flow": "path/to/flow.yaml, relative to this file",
+    "items": "${{ nodes.<id>.output }}",
+    "from": "the agent node whose session to hand off",
+}
+
+
+def needed(node_type: str, present: set[str]) -> list[str]:
+    """Required keys of `node_type` that neither the node nor its starter body has."""
+    starter = edit.STARTERS.get(node_type, {})
+    return [k for k in REQUIRED_KEYS.get(node_type, ()) if k not in starter and k not in present]
+
+
+class RequiredFields(Vertical):
+    """Inputs for the keys a node type needs a value for, rebuilt when the type changes."""
+
+    DEFAULT_CSS = "RequiredFields { height: auto; }"
+
+    def show(self, node_type: str, present: set[str]) -> None:
+        self.remove_children()
+        self.mount_all(
+            Input(placeholder=f"{key}: {PLACEHOLDERS.get(key, '')}", id=f"field-{key}")
+            for key in needed(node_type, present)
+        )
+
+    def values(self) -> dict[str, str]:
+        found = {}
+        for widget in self.query(Input):
+            if widget.value.strip() and widget.id:
+                found[widget.id.removeprefix("field-")] = widget.value.strip()
+        return found
+
+
 class _Modal(ModalScreen[Operation | None]):
     DEFAULT_CSS = """
     _Modal { align: center middle; }
@@ -139,11 +175,17 @@ class AddNodeModal(_Modal):
     def body(self) -> ComposeResult:
         yield Input(placeholder="node ID", id="node-id")
         yield Select([(t, t) for t in NODE_TYPES], value="shell", allow_blank=False, id="node-type")
+        yield RequiredFields(id="required")
+
+    @on(Select.Changed, "#node-type")
+    def _type(self, event: Select.Changed) -> None:
+        self.query_one(RequiredFields).show(str(event.value), set())
 
     def operation(self) -> Operation:
         node_id = self.query_one("#node-id", Input).value.strip()
         node_type = str(self.query_one("#node-type", Select).value)
-        return lambda ed: edit.add_node(ed, node_id, node_type, after=self.after)
+        fields = self.query_one(RequiredFields).values()
+        return lambda ed: edit.add_node(ed, node_id, node_type, after=self.after, fields=fields)
 
 
 class RemoveNodeModal(_Modal):
@@ -222,24 +264,31 @@ class ReorderModal(_Modal):
 
 
 class ChangeTypeModal(_Modal):
-    def __init__(self, node: str, current: str) -> None:
+    def __init__(self, node: str, current: str, present: set[str]) -> None:
         super().__init__()
         self.node = node
         self.current = current
+        self.present = present
         self.heading = f"Change {node}'s type"
 
     def body(self) -> ComposeResult:
         yield Select(
             [(t, t) for t in NODE_TYPES], value=self.current, allow_blank=False, id="node-type"
         )
+        yield RequiredFields(id="required")
         yield Checkbox("drop keys the new type does not accept", id="drop")
+
+    @on(Select.Changed, "#node-type")
+    def _type(self, event: Select.Changed) -> None:
+        self.query_one(RequiredFields).show(str(event.value), self.present)
 
     def operation(self) -> Operation:
         new_type = str(self.query_one("#node-type", Select).value)
         drop = self.query_one("#drop", Checkbox).value
+        fields = self.query_one(RequiredFields).values()
 
         def operation(ed: edit.Editable) -> None:
-            edit.change_type(ed, self.node, new_type, drop=drop)
+            edit.change_type(ed, self.node, new_type, drop=drop, fields=fields)
 
         return operation
 

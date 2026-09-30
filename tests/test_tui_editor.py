@@ -44,9 +44,10 @@ nodes:
 
 
 async def submit(pilot: Any, fields: dict[str, Any], key: str) -> None:
-    """Open a form with `key`, fill it, and press OK."""
-    await pilot.press(key)
-    await pilot.pause()
+    """Open a form with `key` (or use the open one), fill it, and press OK."""
+    if key:
+        await pilot.press(key)
+        await pilot.pause()
     for selector, value in fields.items():
         widget = pilot.app.screen.query_one(selector)
         if isinstance(widget, TextArea):
@@ -281,3 +282,38 @@ def test_given_add_node_form_with_a_taken_id_then_the_error_is_shown_and_the_fil
 
     drive(ArcflowApp(config, target=str(path)), scenario)
     assert path.read_text() == FLOW
+
+
+def test_given_type_that_needs_a_value_when_chosen_in_the_tui_then_the_form_asks_for_it(
+    tmp_path: Path,
+) -> None:
+    # Given
+    root = project(tmp_path, FLOW)
+    twin = tmp_path / "twin.yaml"
+    twin.write_text(FLOW)
+    config, _ = load_config(root)
+
+    async def scenario(pilot: Any) -> None:
+        select(pilot, "done")
+        await pilot.pause()
+        # When: `done` becomes an agent, which needs a harness
+        await pilot.press("t")
+        await pilot.pause()
+        pilot.app.screen.query_one("#node-type", Select).value = "agent"
+        await pilot.pause()
+        await submit(pilot, {"#field-harness": "fake", "#drop": True}, "")
+        # and a new agent node gets one too
+        await pilot.press("n")
+        await pilot.pause()
+        pilot.app.screen.query_one("#node-type", Select).value = "agent"
+        await pilot.pause()
+        await submit(pilot, {"#node-id": "review", "#field-harness": "fake"}, "")
+
+    drive(ArcflowApp(config, target=str(root / "flow.yaml")), scenario)
+    editable = edit.open_flow(twin)
+    edit.change_type(editable, "done", "agent", drop=True, fields={"harness": "fake"})
+    edit.add_node(editable, "review", "agent", after="done", fields={"harness": "fake"})
+    edit.save(editable)
+
+    # Then
+    assert (root / "flow.yaml").read_bytes() == twin.read_bytes()

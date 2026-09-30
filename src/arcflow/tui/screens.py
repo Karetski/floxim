@@ -818,7 +818,7 @@ class FlowGraphScreen(Screen[None]):
 
         node = self._current()
         if node is not None:
-            self._edit(ChangeTypeModal(node.id, node.type))
+            self._edit(ChangeTypeModal(node.id, node.type, set(node.config)))
 
 
 class NodeItem(ListItem):

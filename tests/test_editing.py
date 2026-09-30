@@ -172,3 +172,84 @@ def test_given_cli_when_editing_then_exit_codes_follow_the_outcome(
     assert cli.main(["flow", "unset", str(hand), "ghost", "run"]) == 2
     assert cli.main(["flow", "add-node", str(hand), "x", "--type", "shell", "--set", "run=ls"]) == 0
     assert "  x:\n    type: shell\n    run: ls\n" in hand.read_text()
+
+
+def test_given_type_change_to_a_type_with_required_keys_then_its_starter_fills_them(
+    hand: Path,
+) -> None:
+    # When: a condition becomes a sleep, which needs a duration
+    ed = edit.open_flow(hand)
+    edit.change_type(ed, "check", "sleep")
+    edit.save(ed)
+
+    # Then: the flow stays valid, and only the changed keys move
+    assert changes(HAND, hand.read_text()) == [
+        "-    type: condition",
+        "+    type: sleep",
+        "+    duration: 1m",
+    ]
+
+
+STEPS = """name: steps
+nodes:
+  ask:
+    type: human
+    message_file: ask.md
+    choices: [go]
+    next: say
+  say:
+    type: shell
+    args: [echo, hi]
+"""
+
+
+def test_given_type_change_when_a_one_of_group_is_already_met_then_no_starter_is_added(
+    tmp_path: Path,
+) -> None:
+    # Given
+    path = tmp_path / "steps.yaml"
+    path.write_text(STEPS)
+    (tmp_path / "ask.md").write_text("Go?")
+
+    # When: `message_file` given for a human answers its `message` starter
+    ed = edit.open_flow(path)
+    edit.change_type(ed, "ask", "notify", drop=True)
+    edit.change_type(ed, "say", "human", drop=True, fields={"message_file": "ask.md"})
+    edit.save(ed)
+
+    # Then
+    assert path.read_text() == (
+        "name: steps\n"
+        "nodes:\n"
+        "  ask:\n"
+        "    type: notify\n"
+        "    next: say\n"
+        "    message: Done.\n"
+        "    command: 'true'\n"
+        "  say:\n"
+        "    type: human\n"
+        "    ack: true\n"
+        "    message_file: ask.md\n"
+    )
+
+
+def test_given_type_change_with_values_for_required_keys_then_they_are_set(
+    tmp_path: Path,
+) -> None:
+    # Given: a subflow needs a flow file, which no starter can provide
+    path = tmp_path / "steps.yaml"
+    path.write_text(STEPS)
+    (tmp_path / "ask.md").write_text("Go?")
+    (tmp_path / "child.yaml").write_text("name: child\nnodes:\n  a: {type: set, vars: {x: 1}}\n")
+    ed = edit.open_flow(path)
+    edit.change_type(ed, "say", "subflow", drop=True)
+    with pytest.raises(edit.EditError):
+        edit.save(ed)
+
+    # When
+    ed = edit.open_flow(path)
+    edit.change_type(ed, "say", "subflow", drop=True, fields={"flow": "child.yaml"})
+    edit.save(ed)
+
+    # Then
+    assert path.read_text().endswith("  say:\n    type: subflow\n    flow: child.yaml\n")
