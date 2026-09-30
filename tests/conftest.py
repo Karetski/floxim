@@ -43,3 +43,11 @@ def write_flow(tmp_path: Path) -> Any:
         return paths[0]
 
     return write
+
+
+@pytest.fixture(autouse=True)
+def isolated_user_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Never read the developer's own ~/.config/arcflow in tests."""
+    home = tmp_path / "xdg"
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(home))
+    return home / "arcflow" / "config.yaml"

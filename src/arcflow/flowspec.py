@@ -450,3 +450,8 @@ SCHEMA_OUTPUT_TYPES = frozenset({"agent", "shell", "python"})
 RUN_FIELDS = frozenset({"id", "flow", "flow_file", "started_at", "workdir", "budget"})
 BUDGET_FIELDS = frozenset({"usd_spent", "tokens_spent", "usd_left", "tokens_left"})
 NODE_CONTEXT_FIELDS = frozenset({"id", "visit", "attempt", "artifacts_dir", "workdir", "message"})
+
+# Built-in attempt timeouts by node type (spec §3.4); other types have none.
+DEFAULT_TIMEOUTS: dict[str, str] = {"agent": "30m", "shell": "10m", "human": "7d"}
+# The longest sleep, unless limits.max_duration is longer (spec §3.4).
+MAX_SLEEP = "7d"

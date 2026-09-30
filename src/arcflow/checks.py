@@ -16,6 +16,7 @@ from arcflow.flow import Flow, Node, Origin
 from arcflow.flowspec import (
     BUDGET_FIELDS,
     COMMON_RESULT_FIELDS,
+    MAX_SLEEP,
     NODE_CONTEXT_FIELDS,
     RESULT_FIELDS,
     RUN_FIELDS,
@@ -25,8 +26,10 @@ from arcflow.flowspec import (
 )
 from arcflow.graph import END, Graph
 from arcflow.problems import Problem, join_pointer
-from arcflow.schema import AnyValue, ListOf, MapOf, OneOf, Struct, Type, closest
-from arcflow.templates import jinja_like_offsets, parse_template
+from arcflow.rendering import templated_strings
+from arcflow.schema import AnyValue, closest
+from arcflow.templates import has_template, jinja_like_offsets, parse_template
+from arcflow.units import parse_duration
 
 STATE_ROOTS = frozenset(
     {"inputs", "nodes", "visits", "vars", "run", "env", "node", "self", "item", "index"}
@@ -224,42 +227,6 @@ class _Site:
     in_map_inputs: bool = False
 
 
-def _templated_strings(value: Any, type_: Type, origin: Origin) -> Iterator[tuple[str, Origin]]:
-    """Every string inside `value` that the declaration marks as a template."""
-    if isinstance(value, str):
-        if getattr(type_, "templated", False):
-            yield value, origin
-        return
-    if isinstance(type_, OneOf):
-        for alt in type_.alternatives:
-            if (isinstance(value, dict) and isinstance(alt, (Struct, MapOf))) or (
-                isinstance(value, list) and isinstance(alt, ListOf)
-            ):
-                yield from _templated_strings(value, alt, origin)
-                return
-        return
-    if isinstance(value, list):
-        item: Type | None = (
-            type_.item
-            if isinstance(type_, ListOf)
-            else (type_ if isinstance(type_, AnyValue) else None)
-        )
-        if item is not None:
-            for index, element in enumerate(value):
-                yield from _templated_strings(
-                    element, item, Origin(origin.doc, join_pointer(origin.pointer, index))
-                )
-    elif isinstance(value, dict):
-        for key, element in value.items():
-            child = Origin(origin.doc, join_pointer(origin.pointer, key))
-            if isinstance(type_, Struct) and key in type_.fields:
-                yield from _templated_strings(element, type_.fields[key].type, child)
-            elif isinstance(type_, MapOf):
-                yield from _templated_strings(element, type_.value, child)
-            elif isinstance(type_, AnyValue):
-                yield from _templated_strings(element, type_, child)
-
-
 def expression_checks(flow: Flow, graph: Graph) -> list[Problem]:
     checker = _ReferenceChecker(flow, graph)
     for node in flow.nodes.values():
@@ -268,7 +235,7 @@ def expression_checks(flow: Flow, graph: Graph) -> list[Problem]:
             if key in ("next", "on_error") or key not in fields:
                 continue
             site = _Site(node, routing=False, in_map_inputs=node.type == "map" and key == "inputs")
-            for text, origin in _templated_strings(value, fields[key].type, node.where(key)):
+            for text, origin in templated_strings(value, fields[key].type, node.where(key)):
                 checker.template(text, origin, site)
         for text, origin in _routing_expressions(node):
             checker.expression(text, origin, _Site(node, routing=True))
@@ -284,7 +251,7 @@ def expression_checks(flow: Flow, graph: Graph) -> list[Problem]:
                         )
     for name, value in flow.outputs.items():
         origin = Origin(flow.doc, join_pointer("/outputs", name))
-        for text, where in _templated_strings(value, AnyValue(templated=True), origin):
+        for text, where in templated_strings(value, AnyValue(templated=True), origin):
             checker.template(text, where, _Site(None, routing=False))
     return checker.problems
 
@@ -551,6 +518,30 @@ def _reachable_without_human(flow: Flow, graph: Graph) -> set[str]:
             continue
         stack.extend(graph.successors(current))
     return {n for n in seen if flow.nodes[n].type != "human"}
+
+
+def limit_checks(flow: Flow) -> list[Problem]:
+    """A sleep with a fixed duration longer than the run may last (spec §3.4, §5.5)."""
+    max_duration = flow.limits.get("max_duration", "8h")
+    limit = parse_duration(max_duration)
+    ceiling = max(parse_duration(MAX_SLEEP) or 0, limit or 0) if limit is not None else None
+    problems = []
+    for node in flow.nodes.values():
+        duration = node.config.get("duration")
+        if node.type != "sleep" or duration is None or has_template(duration):
+            continue
+        seconds = parse_duration(duration) or 0
+        if limit is not None and seconds > limit:
+            problems.append(
+                node.where("duration").problem(
+                    "E-SCHEMA", f"sleeps longer than limits.max_duration ({max_duration})"
+                )
+            )
+        elif ceiling is not None and seconds > ceiling:
+            problems.append(
+                node.where("duration").problem("E-SCHEMA", f"sleeps are limited to {MAX_SLEEP}")
+            )
+    return problems
 
 
 def workspace_checks(flow: Flow, workdir: Path) -> list[Problem]:

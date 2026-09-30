@@ -46,7 +46,7 @@ path = "src/arcflow/__init__.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["tools"]
+pythonpath = ["tools", "tests"]
 addopts = ["--strict-markers"]
 
 [tool.ruff]

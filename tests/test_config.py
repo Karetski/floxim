@@ -2,17 +2,8 @@
 
 from pathlib import Path
 
-import pytest
-
 from arcflow.config import find_project_root, load_config
 from arcflow.validate import validate
-
-
-@pytest.fixture(autouse=True)
-def isolated_user_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    home = tmp_path / "xdg"
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(home))
-    return home / "arcflow" / "config.yaml"
 
 
 def test_given_arcflow_dir_above_when_root_searched_then_it_wins_over_git(tmp_path: Path) -> None:

@@ -693,7 +693,7 @@ A run always executes the **snapshot**, never the live flow file, so editing a f
 For the current node `N`:
 
 1. **Limits.** If `visits.N` is already `max_visits`, the run fails with `max_visits_exceeded`. If the run has made `limits.max_steps` visits, it fails with `max_steps_exceeded`. If active time exceeds `limits.max_duration`, it fails with `max_duration_exceeded`. If `N` is an agent node and the run budget is exhausted, it fails with `budget_exceeded` (§6.8).
-2. **Start the visit.** Increment `visits.N`; render templated fields; append `visit_started` with the effective, rendered configuration (large values such as prompts are written to the visit directory and referenced by path and SHA-256).
+2. **Start the visit.** Increment `visits.N`; render templated fields; append `visit_started` with the effective, rendered configuration (large values such as prompts are written to the visit directory and referenced by path and SHA-256). If rendering fails, the visit is still recorded: it finishes at once with outcome `failed`, error kind `expression_error` and zero attempts, and is routed by `on_error` like any failure.
 3. **Attempts.** Run attempt 1; on an error outcome, apply `retry` (§6.6) until an attempt succeeds or attempts run out.
 4. **Finish the visit.** Append `visit_finished` with the visit's result fields. The node's entry in `nodes.N` is replaced; the previous one moves into `nodes.N.visits`.
 5. **Route.** If the outcome is `succeeded`, evaluate `next`; otherwise evaluate `on_error` (§6.5). Append `route_taken {from, to, case_index, reason}`.
@@ -1138,7 +1138,7 @@ Stable and documented (ADR 0008):
 | `arcflow init` | Core | Create `.arcflow/` with config, `.gitignore`, and an example flow. |
 | `arcflow validate <flow>… [--strict]` | Core | Check files (§9.4). `--strict` turns warnings into errors. |
 | `arcflow graph <flow> [--format ascii\|mermaid\|dot\|json]` | Core | Render the graph; `json` gives nodes and edges with conditions, for tools. |
-| `arcflow run <flow> [--input k=v]… [--inputs-file f] [--workdir d] [--detach] [--on-wait prompt\|wait\|exit] [--events]` | Core | Create and start a run. Foreground by default. `--input k=@file` reads a value from a file. Prints the run ID first on stderr (and in `--json`). |
+| `arcflow run <flow> [--input k=v]… [--inputs-file f] [--workdir d] [--detach] [--on-wait prompt\|wait\|exit] [--events]` | Core | Create and start a run. Foreground by default. `--input k=@file` reads a value from a file. Prints the run ID first on stderr (and in `--json`). With `--json`, a succeeded run gives `{"ok": true, "data": {run_id, status, outputs, failure, totals}}`; any other end gives `ok: false` with error code `E-RUN-FAILED`, `E-RUN-CANCELLED`, `E-RUN-WAITING` or `E-RUN-DETACHED` and the same object as `details`. Invalid inputs are `E-INVALID-INPUT` and an invalid flow `E-INVALID-FLOW`, both exit 3. |
 | `arcflow resume <run> [options of §7.6]` | Core | Continue a run. |
 | `arcflow wait <run> [--timeout d]` | Core | Block until the run is terminal or waiting; exit code by status. For scripts that used `--detach`. |
 | `arcflow status [<run>]` | Core | One run in detail (current node, visits, pending human prompt, totals); without an argument, active runs. |

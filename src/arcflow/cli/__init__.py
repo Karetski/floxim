@@ -84,6 +84,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     schema.add_argument("which", choices=["flow", "config"], help="which schema")
     schema.set_defaults(handler=_cmd_schema)
+
+    from arcflow.cli import runs
+
+    runs.add_parsers(commands, common)
     return parser
 
 

@@ -1,0 +1,675 @@
+[
+  {
+    "branch": "main",
+    "data": {
+      "arcflow_version": "0.1.0.dev0",
+      "flow": "counter",
+      "flow_sha256": "071ff790738101b7b957a8514614c5525f3522ec4da9765c410d99b3bb3359da",
+      "inputs": {
+        "rounds": 3
+      },
+      "parent": null,
+      "workdir": "<tmp>"
+    },
+    "seq": 1,
+    "ts": "2026-09-30T12:00:00.000Z",
+    "type": "run_created",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "host": "<host>",
+      "pid": 0
+    },
+    "seq": 2,
+    "ts": "2026-09-30T12:00:00.000Z",
+    "type": "run_started",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "config_ref": "nodes/count/1/visit.json",
+      "config_sha256": "2f4613f7579dd98e7efa0b9228ff7ebf3715569861f078a70d0bb53cae56d7b1",
+      "type": "set"
+    },
+    "node": "count",
+    "seq": 3,
+    "ts": "2026-09-30T12:00:00.000Z",
+    "type": "visit_started",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "attempt": 1
+    },
+    "node": "count",
+    "seq": 4,
+    "ts": "2026-09-30T12:00:00.000Z",
+    "type": "attempt_started",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "error": null,
+      "outcome": "succeeded"
+    },
+    "node": "count",
+    "seq": 5,
+    "ts": "2026-09-30T12:00:00.000Z",
+    "type": "attempt_finished",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "outcome": "succeeded",
+      "result": {
+        "attempts": 1,
+        "duration_s": 0.0,
+        "error": null,
+        "finished_at": "2026-09-30T12:00:00.000Z",
+        "outcome": "succeeded",
+        "started_at": "2026-09-30T12:00:00.000Z",
+        "values": {
+          "n": 1
+        },
+        "visit": 1
+      }
+    },
+    "node": "count",
+    "seq": 6,
+    "ts": "2026-09-30T12:00:00.000Z",
+    "type": "visit_finished",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "case_index": null,
+      "from": "count",
+      "reason": null,
+      "to": "check",
+      "via": "next"
+    },
+    "seq": 7,
+    "ts": "2026-09-30T12:00:00.000Z",
+    "type": "route_taken",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "config_ref": "nodes/check/1/visit.json",
+      "config_sha256": "820a98d8195b39b821471f3be054b1908395c51c07021a24928690b5d2319b23",
+      "type": "condition"
+    },
+    "node": "check",
+    "seq": 8,
+    "ts": "2026-09-30T12:00:00.000Z",
+    "type": "visit_started",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "attempt": 1
+    },
+    "node": "check",
+    "seq": 9,
+    "ts": "2026-09-30T12:00:00.000Z",
+    "type": "attempt_started",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "error": null,
+      "outcome": "succeeded"
+    },
+    "node": "check",
+    "seq": 10,
+    "ts": "2026-09-30T12:00:00.000Z",
+    "type": "attempt_finished",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "outcome": "succeeded",
+      "result": {
+        "attempts": 1,
+        "branch": "nap",
+        "duration_s": 0.0,
+        "error": null,
+        "finished_at": "2026-09-30T12:00:00.000Z",
+        "outcome": "succeeded",
+        "started_at": "2026-09-30T12:00:00.000Z",
+        "visit": 1
+      }
+    },
+    "node": "check",
+    "seq": 11,
+    "ts": "2026-09-30T12:00:00.000Z",
+    "type": "visit_finished",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "case_index": 0,
+      "from": "check",
+      "reason": null,
+      "to": "nap",
+      "via": "next"
+    },
+    "seq": 12,
+    "ts": "2026-09-30T12:00:00.000Z",
+    "type": "route_taken",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "config_ref": "nodes/nap/1/visit.json",
+      "config_sha256": "c86b87b5198c6f1c544ab1a402a665c877f8df22d168c5ea2f8fffadd33e9ed1",
+      "type": "sleep",
+      "wake_at": "2026-09-30T12:10:00.000Z"
+    },
+    "node": "nap",
+    "seq": 13,
+    "ts": "2026-09-30T12:00:00.000Z",
+    "type": "visit_started",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "attempt": 1
+    },
+    "node": "nap",
+    "seq": 14,
+    "ts": "2026-09-30T12:00:00.000Z",
+    "type": "attempt_started",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "error": null,
+      "outcome": "succeeded"
+    },
+    "node": "nap",
+    "seq": 15,
+    "ts": "2026-09-30T12:10:00.000Z",
+    "type": "attempt_finished",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "outcome": "succeeded",
+      "result": {
+        "attempts": 1,
+        "duration_s": 600.0,
+        "error": null,
+        "finished_at": "2026-09-30T12:10:00.000Z",
+        "outcome": "succeeded",
+        "started_at": "2026-09-30T12:00:00.000Z",
+        "visit": 1,
+        "woke_at": "2026-09-30T12:10:00.000Z"
+      }
+    },
+    "node": "nap",
+    "seq": 16,
+    "ts": "2026-09-30T12:10:00.000Z",
+    "type": "visit_finished",
+    "v": 1,
+    "visit": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "case_index": null,
+      "from": "nap",
+      "reason": null,
+      "to": "count",
+      "via": "next"
+    },
+    "seq": 17,
+    "ts": "2026-09-30T12:10:00.000Z",
+    "type": "route_taken",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "config_ref": "nodes/count/2/visit.json",
+      "config_sha256": "d17fdc66353498ef61910138dab350fdbd8e1c7c0fd9d337230f81c5ee497945",
+      "type": "set"
+    },
+    "node": "count",
+    "seq": 18,
+    "ts": "2026-09-30T12:10:00.000Z",
+    "type": "visit_started",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "attempt": 1
+    },
+    "node": "count",
+    "seq": 19,
+    "ts": "2026-09-30T12:10:00.000Z",
+    "type": "attempt_started",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "error": null,
+      "outcome": "succeeded"
+    },
+    "node": "count",
+    "seq": 20,
+    "ts": "2026-09-30T12:10:00.000Z",
+    "type": "attempt_finished",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "branch": "main",
+    "data": {
+      "outcome": "succeeded",
+      "result": {
+        "attempts": 1,
+        "duration_s": 0.0,
+        "error": null,
+        "finished_at": "2026-09-30T12:10:00.000Z",
+        "outcome": "succeeded",
+        "started_at": "2026-09-30T12:10:00.000Z",
+        "values": {
+          "n": 2
+        },
+        "visit": 2
+      }
+    },
+    "node": "count",
+    "seq": 21,
+    "ts": "2026-09-30T12:10:00.000Z",
+    "type": "visit_finished",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "branch": "main",
+    "data": {
+      "case_index": null,
+      "from": "count",
+      "reason": null,
+      "to": "check",
+      "via": "next"
+    },
+    "seq": 22,
+    "ts": "2026-09-30T12:10:00.000Z",
+    "type": "route_taken",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "config_ref": "nodes/check/2/visit.json",
+      "config_sha256": "820a98d8195b39b821471f3be054b1908395c51c07021a24928690b5d2319b23",
+      "type": "condition"
+    },
+    "node": "check",
+    "seq": 23,
+    "ts": "2026-09-30T12:10:00.000Z",
+    "type": "visit_started",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "attempt": 1
+    },
+    "node": "check",
+    "seq": 24,
+    "ts": "2026-09-30T12:10:00.000Z",
+    "type": "attempt_started",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "error": null,
+      "outcome": "succeeded"
+    },
+    "node": "check",
+    "seq": 25,
+    "ts": "2026-09-30T12:10:00.000Z",
+    "type": "attempt_finished",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "branch": "main",
+    "data": {
+      "outcome": "succeeded",
+      "result": {
+        "attempts": 1,
+        "branch": "nap",
+        "duration_s": 0.0,
+        "error": null,
+        "finished_at": "2026-09-30T12:10:00.000Z",
+        "outcome": "succeeded",
+        "started_at": "2026-09-30T12:10:00.000Z",
+        "visit": 2
+      }
+    },
+    "node": "check",
+    "seq": 26,
+    "ts": "2026-09-30T12:10:00.000Z",
+    "type": "visit_finished",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "branch": "main",
+    "data": {
+      "case_index": 0,
+      "from": "check",
+      "reason": null,
+      "to": "nap",
+      "via": "next"
+    },
+    "seq": 27,
+    "ts": "2026-09-30T12:10:00.000Z",
+    "type": "route_taken",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "config_ref": "nodes/nap/2/visit.json",
+      "config_sha256": "c86b87b5198c6f1c544ab1a402a665c877f8df22d168c5ea2f8fffadd33e9ed1",
+      "type": "sleep",
+      "wake_at": "2026-09-30T12:20:00.000Z"
+    },
+    "node": "nap",
+    "seq": 28,
+    "ts": "2026-09-30T12:10:00.000Z",
+    "type": "visit_started",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "attempt": 1
+    },
+    "node": "nap",
+    "seq": 29,
+    "ts": "2026-09-30T12:10:00.000Z",
+    "type": "attempt_started",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "error": null,
+      "outcome": "succeeded"
+    },
+    "node": "nap",
+    "seq": 30,
+    "ts": "2026-09-30T12:20:00.000Z",
+    "type": "attempt_finished",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "branch": "main",
+    "data": {
+      "outcome": "succeeded",
+      "result": {
+        "attempts": 1,
+        "duration_s": 600.0,
+        "error": null,
+        "finished_at": "2026-09-30T12:20:00.000Z",
+        "outcome": "succeeded",
+        "started_at": "2026-09-30T12:10:00.000Z",
+        "visit": 2,
+        "woke_at": "2026-09-30T12:20:00.000Z"
+      }
+    },
+    "node": "nap",
+    "seq": 31,
+    "ts": "2026-09-30T12:20:00.000Z",
+    "type": "visit_finished",
+    "v": 1,
+    "visit": 2
+  },
+  {
+    "branch": "main",
+    "data": {
+      "case_index": null,
+      "from": "nap",
+      "reason": null,
+      "to": "count",
+      "via": "next"
+    },
+    "seq": 32,
+    "ts": "2026-09-30T12:20:00.000Z",
+    "type": "route_taken",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "config_ref": "nodes/count/3/visit.json",
+      "config_sha256": "27971d39b9be123002c18d8b74f663b55fe13f61804748215b2da2ef13297798",
+      "type": "set"
+    },
+    "node": "count",
+    "seq": 33,
+    "ts": "2026-09-30T12:20:00.000Z",
+    "type": "visit_started",
+    "v": 1,
+    "visit": 3
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "attempt": 1
+    },
+    "node": "count",
+    "seq": 34,
+    "ts": "2026-09-30T12:20:00.000Z",
+    "type": "attempt_started",
+    "v": 1,
+    "visit": 3
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "error": null,
+      "outcome": "succeeded"
+    },
+    "node": "count",
+    "seq": 35,
+    "ts": "2026-09-30T12:20:00.000Z",
+    "type": "attempt_finished",
+    "v": 1,
+    "visit": 3
+  },
+  {
+    "branch": "main",
+    "data": {
+      "outcome": "succeeded",
+      "result": {
+        "attempts": 1,
+        "duration_s": 0.0,
+        "error": null,
+        "finished_at": "2026-09-30T12:20:00.000Z",
+        "outcome": "succeeded",
+        "started_at": "2026-09-30T12:20:00.000Z",
+        "values": {
+          "n": 3
+        },
+        "visit": 3
+      }
+    },
+    "node": "count",
+    "seq": 36,
+    "ts": "2026-09-30T12:20:00.000Z",
+    "type": "visit_finished",
+    "v": 1,
+    "visit": 3
+  },
+  {
+    "branch": "main",
+    "data": {
+      "case_index": null,
+      "from": "count",
+      "reason": null,
+      "to": "check",
+      "via": "next"
+    },
+    "seq": 37,
+    "ts": "2026-09-30T12:20:00.000Z",
+    "type": "route_taken",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "config_ref": "nodes/check/3/visit.json",
+      "config_sha256": "820a98d8195b39b821471f3be054b1908395c51c07021a24928690b5d2319b23",
+      "type": "condition"
+    },
+    "node": "check",
+    "seq": 38,
+    "ts": "2026-09-30T12:20:00.000Z",
+    "type": "visit_started",
+    "v": 1,
+    "visit": 3
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "attempt": 1
+    },
+    "node": "check",
+    "seq": 39,
+    "ts": "2026-09-30T12:20:00.000Z",
+    "type": "attempt_started",
+    "v": 1,
+    "visit": 3
+  },
+  {
+    "attempt": 1,
+    "branch": "main",
+    "data": {
+      "error": null,
+      "outcome": "succeeded"
+    },
+    "node": "check",
+    "seq": 40,
+    "ts": "2026-09-30T12:20:00.000Z",
+    "type": "attempt_finished",
+    "v": 1,
+    "visit": 3
+  },
+  {
+    "branch": "main",
+    "data": {
+      "outcome": "succeeded",
+      "result": {
+        "attempts": 1,
+        "branch": "end",
+        "duration_s": 0.0,
+        "error": null,
+        "finished_at": "2026-09-30T12:20:00.000Z",
+        "outcome": "succeeded",
+        "started_at": "2026-09-30T12:20:00.000Z",
+        "visit": 3
+      }
+    },
+    "node": "check",
+    "seq": 41,
+    "ts": "2026-09-30T12:20:00.000Z",
+    "type": "visit_finished",
+    "v": 1,
+    "visit": 3
+  },
+  {
+    "branch": "main",
+    "data": {
+      "case_index": 1,
+      "from": "check",
+      "reason": "done after 3",
+      "to": "end",
+      "via": "next"
+    },
+    "seq": 42,
+    "ts": "2026-09-30T12:20:00.000Z",
+    "type": "route_taken",
+    "v": 1
+  },
+  {
+    "branch": "main",
+    "data": {
+      "outputs": {
+        "last_branch": "end",
+        "total": 3
+      },
+      "totals": {
+        "active_s": 1200.0,
+        "steps": 8,
+        "tokens_left": null,
+        "tokens_spent": 0,
+        "usd_left": null,
+        "usd_spent": 0.0
+      }
+    },
+    "seq": 43,
+    "ts": "2026-09-30T12:20:00.000Z",
+    "type": "run_succeeded",
+    "v": 1
+  }
+]

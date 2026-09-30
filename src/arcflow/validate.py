@@ -6,7 +6,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from arcflow.checks import expression_checks, graph_checks, lint_checks, workspace_checks
+from arcflow.checks import (
+    expression_checks,
+    graph_checks,
+    limit_checks,
+    lint_checks,
+    workspace_checks,
+)
 from arcflow.config import DEFAULT_RISKY_COMMANDS, Config
 from arcflow.flow import Flow, load_flow
 from arcflow.graph import build_graph
@@ -15,7 +21,7 @@ from arcflow.problems import Problem
 # Node types the runner can execute in this version. Validation reports
 # E-NOT-IMPLEMENTED for the others as its last stage; each milestone that makes a
 # node type runnable adds it here (docs/milestones.md).
-IMPLEMENTED_NODE_TYPES: frozenset[str] = frozenset()
+IMPLEMENTED_NODE_TYPES: frozenset[str] = frozenset({"condition", "sleep", "set"})
 
 
 @dataclass
@@ -49,6 +55,7 @@ def validate(
         stages: list[Callable[[], list[Problem]]] = [
             lambda: graph_checks(flow, graph),
             lambda: expression_checks(flow, graph),
+            lambda: limit_checks(flow),
             lambda: workspace_checks(flow, workdir or path.parent),
             lambda: lint_checks(flow, graph, risky),
         ]
