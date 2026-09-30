@@ -334,6 +334,8 @@ Rejected at parse time (`E-EXPR-FORBIDDEN`): any name beginning with `_`, attrib
 
 **Attribute access on a mapping** reads the key. Reading a **missing key or any attribute of `None` yields `None`** (null-safe navigation), so `nodes.test.stderr` is `None` before `test` has run. Typos are caught statically by the validator (§4.5) rather than at run time.
 
+**Operand rules.** `and`, `or`, `not` and `a if c else b` use Python truthiness; only a routing `when:` must produce a boolean (§3.9). Arithmetic applies to numbers; `+` also joins two strings or two lists, and `*` repeats a string or list by an integer (results are capped at 1,000,000 items). `<`, `<=`, `>`, `>=` compare numbers, or two strings, or two lists. `in` looks into a string, list or object (object keys); any other container is a run-time error, including `None`. Tuples evaluate to lists, and object literal keys must be strings. Reading a list or string index that is out of range yields `None`, like a missing key.
+
 **Errors at run time** (wrong operand types, division by zero, calling a function with bad arguments) make the node that evaluated the expression fail with outcome `failed` and error kind `expression_error`; routing expressions fail the run with `E-EXPR-RUNTIME`, since a routing error means the graph is wrong.
 
 ### 4.2 Functions
@@ -341,7 +343,7 @@ Rejected at parse time (`E-EXPR-FORBIDDEN`): any name beginning with `_`, attrib
 | Function | Result |
 |---|---|
 | `len(x)` | length of string, list or object |
-| `str(x)`, `int(x)`, `float(x)`, `bool(x)` | conversions (`bool` of a non-boolean is explicit truthiness) |
+| `str(x)`, `int(x)`, `float(x)`, `bool(x)` | conversions (`bool` of a non-boolean is explicit truthiness; `str` renders like interpolation (§4.4), so `str(True)` is `true` and `str(None)` is empty) |
 | `abs`, `min`, `max`, `round`, `sum`, `sorted`, `any`, `all` | as in Python, on lists |
 | `default(x, fallback)` | `fallback` if `x` is `None` (or an empty string, when `empty=True`) |
 | `json(x, indent=2)` | JSON text |
@@ -349,13 +351,13 @@ Rejected at parse time (`E-EXPR-FORBIDDEN`): any name beginning with `_`, attrib
 | `lower(s)`, `upper(s)`, `strip(s)` | string helpers |
 | `startswith(s, p)`, `endswith(s, p)` | booleans |
 | `matches(s, regex)` | `True` if `re.search` finds a match (regex length ≤ 500) |
-| `replace(s, old, new)`, `split(s, sep)`, `join(xs, sep)` | string helpers |
+| `replace(s, old, new)`, `split(s, sep)`, `join(xs, sep)` | string helpers; `split` without `sep` splits on whitespace, `join` renders non-string items like interpolation |
 | `truncate(s, n)` | at most `n` characters, with `…` when cut |
 | `head(s, n)`, `tail(s, n)` | first or last `n` lines |
 | `keys(o)`, `values(o)` | lists |
 | `pluck(xs, key)` | the value of `key` in each object of list `xs` (e.g. `"fail" in pluck(nodes.checks.output, "bucket")`); stands in for comprehensions, which are forbidden |
 | `shq(s)` | POSIX shell-quoted string (§12.5) |
-| `now()` | current UTC time, ISO 8601 |
+| `now()` | current UTC time, ISO 8601 to the second (`2026-09-30T14:15:03Z`) |
 | `duration(s)` | seconds from a duration string |
 
 New functions are added only through this list (and the plugin registry for custom nodes is not allowed to add functions in v1), so that flows stay portable.
