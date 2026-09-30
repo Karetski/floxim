@@ -749,7 +749,11 @@ class Runner:
     def adapter(self, name: str) -> Adapter:
         """The run's adapter instance for a harness (one per runner process)."""
         if name not in self._adapters:
-            self._adapters[name] = adapter_registry.load(name)
+            adapter = adapter_registry.load(name)
+            configure = getattr(adapter, "configure", None)
+            if configure is not None:
+                configure(self.config["harnesses"].get(name) or {})
+            self._adapters[name] = adapter
         return self._adapters[name]
 
     # -- budgets (§6.8) ----------------------------------------------------------------

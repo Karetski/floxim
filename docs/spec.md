@@ -912,6 +912,8 @@ class Adapter(Protocol):
     def interactive_command(self, session_id: str, cwd: str) -> list[str] | None: ...
 ```
 
+- **Resume cost.** `SessionSpec.previous_cost_usd` carries the running total the harness last reported for the session being resumed or forked, and `AgentResult.session_total_usd` returns the new total; the engine records totals per session (`attempt_finished`), so an adapter whose harness reports session totals (Claude) can report the call's own delta.
+- Process adapters take `command` (the binary), `grace` and `tested_versions` from `harnesses.<name>` in config (§2.2).
 - **`run`** starts the harness, emits normalized events while it runs, and returns the result. The brief's `start`/`stream`/`result` are this one coroutine; **cancellation** is `asyncio` task cancellation, on which the adapter must perform the stop sequence of §6.7 and then return (not raise) an `AgentResult` with outcome `cancelled` or `timed_out` as the engine instructs through `req.stop_reason`. Adapters built on `arcflow.adapters.ProcessAdapter` get the process-group handling for free.
 - Adapters also declare `auth_env`, the environment variables their harness needs for authentication (§12.3). The engine keeps one adapter instance per runner process.
 - **`emit`** must be called with `SessionStarted` **as soon as** the session ID is known (Claude: before spawning, since Arcflow chose it; Codex: on `thread.started`). The engine writes it to the event log and `fsync`s before anything else, so a crash after that point can resume the session.
@@ -1055,11 +1057,11 @@ ADR 0005. Unattended default is `edit`, and anything that would prompt is denied
 
 | Profile | Claude Code | Codex |
 |---|---|---|
-| `read-only` | `--permission-mode dontAsk --permission-prompts none`, `--disallowedTools Edit,Write,NotebookEdit`, and `--allowedTools` limited to read tools plus read-only Bash rules | `--sandbox read-only`, `approval_policy="never"` |
+| `read-only` | `--permission-mode dontAsk --permission-prompts none` (reads and pre-approved tools only; anything that would prompt is denied), plus `Edit`, `Write`, `NotebookEdit` in `--disallowedTools`; `allow_tools` adds pre-approved rules | `--sandbox read-only`, `approval_policy="never"` |
 | `edit` | `--permission-mode acceptEdits --permission-prompts none`; Bash denied except rules in `allow_tools` | `--sandbox workspace-write`, `approval_policy="never"` |
 | `full` | `--permission-mode bypassPermissions` | `--sandbox danger-full-access`, `approval_policy="never"` |
 
-The exact flag sets are fixed in M3 by contract tests against the pinned versions (§15 Q6); this table fixes the intent: `read-only` cannot change files, `edit` can change files in the workspace (and `add_dirs`) and run only explicitly allowed commands, `full` can do anything the user can. Every denial the harness reports appears in `permission_denials`.
+The Claude flags above follow the Claude Code 2.1.285 CLI reference and permission-mode docs (checked 2026-09-29); the live contract tests (`tests/live`) confirm them against a real install and are run by hand (§15 Q6); this table fixes the intent: `read-only` cannot change files, `edit` can change files in the workspace (and `add_dirs`) and run only explicitly allowed commands, `full` can do anything the user can. Every denial the harness reports appears in `permission_denials`.
 
 ### 8.5 Tier 2: command adapters
 
@@ -1294,7 +1296,7 @@ Templates see `env.X` only for variables allowed by 1–3.
 
 - Arcflow never writes environment values to events, `visit.json` or logs; `env` entries are recorded by name only.
 - Rendered prompts and harness streams are stored as is, because they are the audit trail. They can contain secrets that agents printed; run directories are `0700`, and `.arcflow/.gitignore` excludes `runs/` and `worktrees/`.
-- `redact` patterns from config are applied to everything Arcflow writes itself (events, `stdout.log`, `stderr.log`, TUI display). Raw `stream.jsonl` is redacted too unless `redact_streams: false` (keeping byte-exact fixtures for adapter debugging).
+- `redact` patterns from config are applied to everything Arcflow writes itself (events, `stdout.log`, `stderr.log`, TUI display). Raw `stream.jsonl` is redacted too, once its attempt ends, unless `redact_streams: false` (keeping byte-exact fixtures for adapter debugging).
 
 ### 12.5 Injection-safe interpolation
 
@@ -1796,7 +1798,7 @@ All events carry `v`, `seq`, `ts`, `type`, and where relevant `branch`, `node`, 
 | `session_started` | `session_id` (fsynced immediately, §8.1) |
 | `progress` | `kind` (`text`, `tool_call`, `tool_result`, `usage`, `log`), `summary` (sampled, at most 5 per second; full detail is in `stream.jsonl`) |
 | `permission_denied` | `tool`, `reason` |
-| `attempt_finished` | normalized result without large fields: `outcome`, `error`, `usage`, `cost_usd`, `stopped_by`, `result_ref` |
+| `attempt_finished` | normalized result without large fields: `outcome`, `error`, `usage`, `cost_usd`, `stopped_by`, `session_id`, `session_total_usd` (agents) |
 | `schema_retry` | `errors` |
 | `visit_finished` | `outcome`, `result` (state fields, large values by reference) |
 | `route_taken` | `from`, `to`, `via` (`next` / `on_error` / `resume`), `case_index`, `reason` |

@@ -42,6 +42,7 @@ def initial_state() -> State:
         "cancel_requested": None,
         "runner": None,
         "awaiting_route": None,  # a node whose visit finished but whose route is not recorded
+        "sessions": {},  # harness session ID → running total cost the harness last reported
         "active_since": None,
         "last_ts": None,
     }
@@ -157,6 +158,8 @@ def _attempt_finished(state: State, event: Event, data: dict[str, Any], ts: str,
     progress = state["in_progress"]
     if progress is not None and progress["attempts"]:
         progress["attempts"][-1].update({"finished_at": ts, **data})
+    if data.get("session_id") and data.get("session_total_usd") is not None:
+        state["sessions"][data["session_id"]] = data["session_total_usd"]
 
 
 def _permission_denied(

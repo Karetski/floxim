@@ -134,13 +134,16 @@ class AgentExecutor:
                 attempt=ctx.attempt,
             )
             if caps.resume and result.session_id:
-                request.session = SessionSpec("resume", result.session_id, None)
+                request.session = SessionSpec(
+                    "resume", result.session_id, None, result.session_total_usd
+                )
                 request.prompt = fix_message(schema_errors)
             else:
                 request.session = SessionSpec("new", None, _new_id(caps))
                 request.prompt = prompt + "\n\n" + fix_message(schema_errors)
         if schema is None:
             result.output = None
+        _redact_stream(ctx)
         result.usage = usage
         result.cost_usd = cost
         attempt = self._attempt_result(ctx, adapter.name, result)
@@ -235,6 +238,8 @@ class AgentExecutor:
             "usage": result.usage.to_json(),
             "cost_usd": result.cost_usd,
             "stopped_by": result.stopped_by,
+            "session_id": result.session_id,
+            "session_total_usd": result.session_total_usd,
         }
         return AttemptResult(outcome, fields, error, extra=extra)
 
@@ -261,7 +266,7 @@ def _session(ctx: VisitContext, capabilities: Any) -> SessionSpec:
 
     def resume(session_id: str | None) -> SessionSpec:
         if session_id and capabilities.resume:
-            return SessionSpec("resume", session_id, None)
+            return SessionSpec("resume", session_id, None, _session_total(state, session_id))
         return SessionSpec("new", None, new_id)
 
     if ctx.resume is not None and ctx.resume.get("mode") == "resume":
@@ -289,7 +294,7 @@ def _session(ctx: VisitContext, capabilities: Any) -> SessionSpec:
         return SessionSpec("new", None, new_id)
     if source_key == "fork":
         if capabilities.fork:
-            return SessionSpec("fork", session_id, new_id)
+            return SessionSpec("fork", session_id, new_id, _session_total(state, session_id))
         ctx.runner.emit(
             "warning",
             {"code": "W-FORK-AS-RESUME", "message": "the adapter cannot fork; resuming instead"},
@@ -297,6 +302,11 @@ def _session(ctx: VisitContext, capabilities: Any) -> SessionSpec:
             visit=ctx.visit,
         )
     return resume(session_id)
+
+
+def _session_total(state: dict[str, Any], session_id: str) -> float | None:
+    total = state.get("sessions", {}).get(session_id)
+    return None if total is None else float(total)
 
 
 def _previous_attempt_session(state: dict[str, Any], ctx: VisitContext) -> str | None:
@@ -347,3 +357,16 @@ def _progress(event: AdapterEvent) -> dict[str, Any]:
     if isinstance(event, Log):
         return {"kind": "log", "summary": f"{event.level}: {event.message}"[:200]}
     return {"kind": "log", "summary": repr(event)[:200]}
+
+
+def _redact_stream(ctx: VisitContext) -> None:
+    """Apply `redact` patterns to the raw harness stream unless redact_streams is
+    off (spec §12.4)."""
+    runner = ctx.runner
+    if not runner.redactor or not runner.config["redact_streams"] or ctx.attempt_dir is None:
+        return
+    stream = ctx.attempt_dir / "stream.jsonl"
+    if stream.exists():
+        stream.write_text(
+            runner.redactor.text(stream.read_text(encoding="utf-8", errors="replace"))
+        )

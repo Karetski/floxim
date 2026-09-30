@@ -47,7 +47,8 @@ path = "src/arcflow/__init__.py"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["tools", "tests"]
-addopts = ["--strict-markers"]
+addopts = ["--strict-markers", "-m", "not live"]
+markers = ["live: runs a real harness and spends money; opt in with ARCFLOW_LIVE=1 -m live"]
 
 [tool.ruff]
 target-version = "py310"

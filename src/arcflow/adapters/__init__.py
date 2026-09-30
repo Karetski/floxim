@@ -48,6 +48,9 @@ class SessionSpec:
     mode: Literal["new", "resume", "fork"] = "new"
     resume_id: str | None = None  # the session to resume or fork
     new_id: str | None = None  # a caller-chosen ID, for adapters with session_id="caller"
+    # What the harness last reported as the resumed session's running total, so an
+    # adapter whose harness reports session totals can report this call's delta.
+    previous_cost_usd: float | None = None
 
 
 @dataclass
@@ -182,6 +185,8 @@ class AgentResult:
     permission_denials: list[Denial] = field(default_factory=list)
     error: ErrorInfo | None = None
     stopped_by: Literal["sigint", "sigterm", "sigkill"] | None = None
+    # The session's running total as the harness reported it, when it reports one.
+    session_total_usd: float | None = None
 
 
 @dataclass(frozen=True)

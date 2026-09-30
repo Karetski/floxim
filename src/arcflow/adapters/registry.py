@@ -14,7 +14,7 @@ from arcflow.adapters import Adapter, Capabilities
 
 BUILT_IN = ("claude", "codex", "fake")
 # Built-in adapters whose milestone has not landed (docs/milestones.md).
-PENDING: frozenset[str] = frozenset({"claude", "codex"})
+PENDING: frozenset[str] = frozenset({"codex"})
 ENTRY_POINT_GROUP = "arcflow.adapters"
 
 
@@ -40,6 +40,10 @@ def load(name: str) -> Adapter:
         from arcflow.adapters.fake import FakeAdapter
 
         return FakeAdapter()
+    if name == "claude":
+        from arcflow.adapters.claude import ClaudeAdapter
+
+        return ClaudeAdapter()
     if name in PENDING:
         raise UnknownAdapter(f"the {name} adapter is not available in this version of Arcflow")
     entry = _entry_points().get(name)

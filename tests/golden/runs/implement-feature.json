@@ -108,6 +108,8 @@
       "cost_usd": 0.05,
       "error": null,
       "outcome": "succeeded",
+      "session_id": "<session-1>",
+      "session_total_usd": null,
       "stopped_by": null,
       "usage": {
         "cached_input_tokens": 0,
@@ -270,6 +272,8 @@
       "cost_usd": 0.1,
       "error": null,
       "outcome": "succeeded",
+      "session_id": "<session-2>",
+      "session_total_usd": null,
       "stopped_by": null,
       "usage": {
         "cached_input_tokens": 0,
@@ -522,6 +526,8 @@
       "cost_usd": 0.1,
       "error": null,
       "outcome": "succeeded",
+      "session_id": "<session-2>",
+      "session_total_usd": null,
       "stopped_by": null,
       "usage": {
         "cached_input_tokens": 0,

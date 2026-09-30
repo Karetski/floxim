@@ -323,7 +323,7 @@ def test_given_pending_built_in_harness_when_validated_then_it_is_not_implemente
 ) -> None:
     # Given
     (tmp_path / "flow.yaml").write_text(
-        "name: c\nnodes:\n  a: {type: agent, harness: claude, prompt: Hi.}\n"
+        "name: c\nnodes:\n  a: {type: agent, harness: codex, prompt: Hi.}\n"
     )
 
     # When
@@ -331,4 +331,4 @@ def test_given_pending_built_in_harness_when_validated_then_it_is_not_implemente
 
     # Then
     assert [p.code for p in report.errors] == ["E-NOT-IMPLEMENTED"]
-    assert "claude adapter" in report.errors[0].message
+    assert "codex adapter" in report.errors[0].message
