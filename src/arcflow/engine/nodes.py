@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from arcflow.clock import iso, parse_iso
+from arcflow.engine.process import Stop
 from arcflow.engine.routing import Decision, decide
 from arcflow.units import parse_duration
 
@@ -33,6 +34,7 @@ class VisitContext:
     attempt_dir: Path | None = None
     namespace: dict[str, Any] = field(default_factory=dict)
     resume: dict[str, Any] | None = None  # set when continuing an interrupted visit
+    stop: Stop = field(default_factory=Stop)  # set to stop the attempt (cancel, shutdown)
 
 
 @dataclass
@@ -115,14 +117,3 @@ class SetExecutor(_Base):
 
     async def run(self, ctx: VisitContext) -> AttemptResult:
         return AttemptResult("succeeded", {"values": dict(ctx.config.get("vars") or {})})
-
-
-EXECUTORS: dict[str, Executor] = {
-    "condition": ConditionExecutor(),
-    "sleep": SleepExecutor(),
-    "set": SetExecutor(),
-}
-
-
-def register(node_type: str, executor: Executor) -> None:
-    EXECUTORS[node_type] = executor

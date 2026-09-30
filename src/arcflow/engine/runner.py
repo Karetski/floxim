@@ -24,11 +24,13 @@ from arcflow.clock import Clock, iso
 from arcflow.config import Config
 from arcflow.engine import environment
 from arcflow.engine.inputs import resolve_inputs
-from arcflow.engine.nodes import EXECUTORS, AttemptResult, Executor, SleepError, VisitContext
+from arcflow.engine.nodes import AttemptResult, Executor, SleepError, VisitContext
+from arcflow.engine.registry import EXECUTORS
 from arcflow.engine.routing import Decision, RoutingError, decide
 from arcflow.expr import EvalError, ExprError
 from arcflow.flow import Flow, Node, load_flow
 from arcflow.flowspec import DEFAULT_TIMEOUTS
+from arcflow.redact import Redactor
 from arcflow.rendering import render_config
 from arcflow.store.events import Event, EventWriter
 from arcflow.store.ids import new_run_id
@@ -39,6 +41,7 @@ from arcflow.templates import render_value
 from arcflow.units import parse_duration
 from arcflow.validate import Report, validate
 
+DEFAULT_GRACE_S = 10.0
 DEFAULT_MAX_VISITS = 10
 DEFAULT_MAX_STEPS = 200
 DEFAULT_MAX_DURATION = "8h"
@@ -133,6 +136,7 @@ class Runner:
         environ: Mapping[str, str] | None = None,
         heartbeat: bool = True,
         crash_hook: Callable[[Event], None] | None = None,
+        grace: float = DEFAULT_GRACE_S,
     ) -> None:
         self.run_dir = run
         self.config = config
@@ -141,6 +145,8 @@ class Runner:
         self.environ = dict(os.environ if environ is None else environ)
         self.heartbeat_enabled = heartbeat
         self.crash_hook = crash_hook
+        self.grace = grace
+        self.redactor = Redactor(config["redact"])
         self.meta = run.meta()
         flow, problems = load_flow(run.path / self.meta["snapshot_flow"])
         if flow is None:
@@ -157,7 +163,11 @@ class Runner:
         heartbeat: asyncio.Task[None] | None = None
         try:
             self.writer = EventWriter(
-                self.run_dir.events, self.clock, on_event=self._on_event, crash_hook=self.crash_hook
+                self.run_dir.events,
+                self.clock,
+                on_event=self._on_event,
+                crash_hook=self.crash_hook,
+                redact=self.redactor.value if self.redactor else None,
             )
             self.state = reduce(self.writer.events)
             if self.state["status"] == "pending":
@@ -365,7 +375,7 @@ class Runner:
     async def _attempt(self, executor: Executor, ctx: VisitContext) -> AttemptResult:
         timeout = self.timeout_for(ctx.node, ctx.config)
         try:
-            if timeout is None:
+            if timeout is None or getattr(executor, "handles_timeout", False):
                 return await executor.run(ctx)
             return await asyncio.wait_for(executor.run(ctx), timeout)
         except asyncio.TimeoutError:
@@ -424,6 +434,29 @@ class Runner:
         return totals
 
     # -- the expression namespace (§4.3) ----------------------------------------------------
+
+    def node_workdir(self, ctx: VisitContext) -> Path:
+        """Where a node's process runs: the run workdir (worktrees come with workspaces)."""
+        return Path(self.meta["workdir"])
+
+    def process_env(self, ctx: VisitContext, adapter_vars: tuple[str, ...] = ()) -> dict[str, str]:
+        """The environment of a node's child process (spec §12.3)."""
+        extra = {str(k): str(v) for k, v in (ctx.config.get("env") or {}).items()}
+        artifacts = self.run_dir.artifacts_dir(ctx.node.id, ctx.visit)
+        return environment.process_environment(
+            self.environ,
+            passthrough=self.config["env_passthrough"],
+            adapter_vars=adapter_vars,
+            extra=extra,
+            arcflow={
+                "ARCFLOW_RUN_ID": self.meta["id"],
+                "ARCFLOW_RUN_DIR": str(self.run_dir.path),
+                "ARCFLOW_NODE_ID": ctx.node.id,
+                "ARCFLOW_VISIT": str(ctx.visit),
+                "ARCFLOW_ATTEMPT": str(ctx.attempt),
+                "ARCFLOW_ARTIFACTS_DIR": str(artifacts),
+            },
+        )
 
     def allowed_env(self) -> dict[str, str]:
         return environment.allowed(self.environ, passthrough=self.config["env_passthrough"])

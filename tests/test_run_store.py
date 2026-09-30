@@ -311,12 +311,13 @@ def test_given_dead_pid_on_this_host_when_acquiring_then_the_lock_is_taken_over(
     assert lock.took_over is not None
 
 
-def _race(path: str, queue: Any) -> None:
+def _race(path: str, queue: Any, done: Any) -> None:
     try:
         RunLock(Path(path), FakeClock(T0 + datetime.timedelta(seconds=STALE_AFTER_S + 5))).acquire()
         queue.put("won")
     except LockHeld:
         queue.put("lost")
+    done.wait(30)  # a winner must stay alive, or its lock is stale for the next racer
 
 
 def test_given_stale_lock_when_processes_race_to_take_it_then_exactly_one_wins(
@@ -328,16 +329,18 @@ def test_given_stale_lock_when_processes_race_to_take_it_then_exactly_one_wins(
     )
     context = multiprocessing.get_context("spawn")
     queue = context.Queue()
+    done = context.Event()
     processes = [
-        context.Process(target=_race, args=(str(tmp_path / "lock"), queue)) for _ in range(6)
+        context.Process(target=_race, args=(str(tmp_path / "lock"), queue, done)) for _ in range(6)
     ]
 
     # When
     for p in processes:
         p.start()
+    results = sorted(queue.get(timeout=30) for _ in processes)
+    done.set()
     for p in processes:
         p.join(30)
-    results = sorted(queue.get(timeout=5) for _ in processes)
 
     # Then
     assert results.count("won") == 1

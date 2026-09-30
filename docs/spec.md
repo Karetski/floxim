@@ -537,7 +537,7 @@ test:
 
 Result fields: `exit_code` (integer, or `None` if killed), `signal` (name or `None`), `stdout`, `stderr` (tails), `stdout_file`, `stderr_file` (absolute paths), `stdout_truncated`, `stderr_truncated`, `output`, `workspace`, `artifacts_dir`.
 
-Behaviour: the command runs in its own process group with the node environment (§12.3) plus `ARCFLOW_RUN_ID`, `ARCFLOW_RUN_DIR`, `ARCFLOW_NODE_ID`, `ARCFLOW_VISIT`, `ARCFLOW_ATTEMPT`, `ARCFLOW_ARTIFACTS_DIR`. An exit code outside `ok_codes` is outcome `failed` with error kind `exit_code`. Timeouts and cancellation stop the whole process group (§6.7).
+Behaviour: `bash`, `zsh` and `ksh` given as `shell` run with `-eo pipefail`, any other interpreter with `-e`. Output is written to `stdout.log`/`stderr.log` as it arrives, as UTF-8 text with `redact` patterns applied line by line (§12.4). The command runs in its own process group with the node environment (§12.3) plus `ARCFLOW_RUN_ID`, `ARCFLOW_RUN_DIR`, `ARCFLOW_NODE_ID`, `ARCFLOW_VISIT`, `ARCFLOW_ATTEMPT`, `ARCFLOW_ARTIFACTS_DIR`. An exit code outside `ok_codes` is outcome `failed` with error kind `exit_code`. Timeouts and cancellation stop the whole process group (§6.7).
 
 ### 5.3 `condition` (Core)
 

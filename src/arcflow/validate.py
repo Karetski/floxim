@@ -21,7 +21,7 @@ from arcflow.problems import Problem
 # Node types the runner can execute in this version. Validation reports
 # E-NOT-IMPLEMENTED for the others as its last stage; each milestone that makes a
 # node type runnable adds it here (docs/milestones.md).
-IMPLEMENTED_NODE_TYPES: frozenset[str] = frozenset({"condition", "sleep", "set"})
+IMPLEMENTED_NODE_TYPES: frozenset[str] = frozenset({"condition", "sleep", "set", "shell"})
 
 
 @dataclass

@@ -84,9 +84,11 @@ class EventWriter:
         clock: Clock,
         on_event: Callable[[Event], None] | None = None,
         crash_hook: Callable[[Event], None] | None = None,
+        redact: Callable[[Any], Any] | None = None,
     ) -> None:
         self.path = path
         self.clock = clock
+        self.redact = redact
         self.on_event = on_event
         self.crash_hook = crash_hook
         read = read_log(path)
@@ -128,7 +130,7 @@ class EventWriter:
             event["visit"] = visit
         if attempt is not None:
             event["attempt"] = attempt
-        event["data"] = data or {}
+        event["data"] = self.redact(data or {}) if self.redact else (data or {})
         line = json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n"
         self._handle.write(line.encode("utf-8"))
         self._handle.flush()

@@ -3,8 +3,10 @@
 `lock` is created with O_CREAT|O_EXCL and holds `{pid, host, started_at,
 heartbeat_at}`. The holder refreshes `heartbeat_at` every few seconds. A lock is
 stale when its host is this host and the PID is gone, or when its heartbeat is
-older than 30 seconds. Taking over a stale lock renames it aside first, so two
-processes racing to take it over cannot both win.
+older than 30 seconds. A takeover happens inside a short critical section
+guarded by an exclusive `lock.takeover` marker, and replaces the lock only if
+it is still the stale lock that was judged, so two processes racing to take it
+over cannot both win.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ import datetime
 import json
 import os
 import socket
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -103,31 +106,52 @@ class RunLock:
         now = self.clock.now()
         stamp = iso(now)
         info = LockInfo(os.getpid(), hostname(), stamp, stamp)
-        for _ in range(3):
-            try:
-                fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-            except FileExistsError:
-                current = read_lock(self.path)
-                if current is None:
-                    continue  # released meanwhile
-                if not is_stale(current, now):
-                    raise LockHeld(current) from None
-                aside = self.path.with_name(f"lock.stale.{os.getpid()}")
-                try:
-                    os.rename(self.path, aside)
-                except FileNotFoundError:
-                    continue  # someone else took it over first; try again
-                aside.unlink(missing_ok=True)
-                self.took_over = current
-                continue
+        for _ in range(50):
+            if self._create(info):
+                return
+            current = read_lock(self.path)
+            if current is None:
+                continue  # released meanwhile
+            if not is_stale(current, now):
+                raise LockHeld(current)
+            if self._take_over(current, info):
+                return
+            time.sleep(0.01)
+        raise LockHeld(read_lock(self.path) or {})
+
+    def _create(self, info: LockInfo) -> bool:
+        try:
+            fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            return False
+        with os.fdopen(fd, "w") as handle:
+            json.dump(info.to_json(), handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        self.info = info
+        return True
+
+    def _take_over(self, stale: dict[str, Any], info: LockInfo) -> bool:
+        marker = self.path.with_name("lock.takeover")
+        try:
+            fd = os.open(marker, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            holder = read_lock(marker)
+            if holder is not None and is_stale(holder, self.clock.now()):
+                marker.unlink(missing_ok=True)  # left behind by a process that died
+            return False
+        try:
             with os.fdopen(fd, "w") as handle:
                 json.dump(info.to_json(), handle)
-                handle.flush()
-                os.fsync(handle.fileno())
-            self.info = info
-            return
-        current = read_lock(self.path) or {}
-        raise LockHeld(current)
+            if read_lock(self.path) != stale:
+                return False  # changed since it was judged stale: judge again
+            self.path.unlink(missing_ok=True)
+            if not self._create(info):
+                return False
+            self.took_over = stale
+            return True
+        finally:
+            marker.unlink(missing_ok=True)
 
     def heartbeat(self) -> None:
         if self.info is None:
