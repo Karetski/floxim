@@ -676,7 +676,7 @@ tell_me:
   # webhook: { url: "${{ env.SLACK_WEBHOOK }}", body: { text: "${{ node.message }}" } }
 ```
 
-Keys: `message` (T, required; passed to `command` as `ARCFLOW_MESSAGE` and available as `node.message`), exactly one of `command` (run like `on_wait`, 30 s timeout) or `webhook` (`{url, method: POST, headers, body}`, JSON body, 10 s timeout), and `required` (default `false`). Fire-and-forget: a failure is logged and the node still succeeds unless `required: true`.
+Keys: `message` (T, required; passed to `command` as `ARCFLOW_MESSAGE` and available as `node.message` in the node's other fields), exactly one of `command` (run like `on_wait`, 30 s timeout) or `webhook` (`{url, method: POST, headers, body}`, JSON body, 10 s timeout; any 2xx status is success), and `required` (default `false`). Fire-and-forget: a failure is recorded as a `W-NOTIFY-FAILED` warning event and the node still succeeds unless `required: true`. The node has no type-specific result fields.
 
 ---
 
@@ -749,7 +749,7 @@ retry:
 
 - `timeout` limits one attempt's wall-clock time. The runner enforces it; harness timeouts are never relied on (ADR 0011).
 - **Stopping a process** (timeout, cancel, runner shutdown): send `SIGINT` to the process group; wait up to 10 s (configurable per adapter as `grace`) for the adapter to report a final result; then `SIGTERM`; after 5 more seconds `SIGKILL`. The visit records which step ended it (`stopped_by`). A result that arrives during the grace period is kept (partial usage and cost still count toward the budget).
-- **Cancel** (`arcflow cancel`, TUI) stops the current attempt as above, records outcome `cancelled`, skips routing and ends the run `cancelled`. A waiting run is cancelled immediately.
+- **Cancel** (`arcflow cancel`, TUI) stops the current attempt as above, records outcome `cancelled`, skips routing and ends the run `cancelled`. A waiting run, or any run without a live runner, is cancelled immediately by the cancelling process. With a live runner the request goes through the inbox, and `arcflow cancel` waits up to 30 s for the run to end cancelled. It prints `{run_id, status, delivered: "requested" | "cancelled"}` with `--json` and exits 0; a run that already finished is exit 2 (`E-ALREADY-FINISHED`).
 - **Runner signals.** `SIGINT`/`SIGTERM` to a foreground `arcflow run` stops the current attempt and leaves the run **resumable** (`runner_detached` event, status stays `running`, displayed as `interrupted`), rather than cancelling it. A second `SIGINT` within 3 s skips the grace period. Use `arcflow cancel` to end a run for good.
 - On Windows (unsupported in v1, §15 Q10) process groups are replaced by job objects.
 
@@ -812,7 +812,7 @@ A human node's `timeout` is enforced by whichever runner holds the run; if none 
 
 ### 7.1 Run IDs
 
-`<UTC timestamp>-<flow name>-<4 random base32 chars>`, e.g. `20260930T141503-implement-feature-7k2q`. Sortable by start time. CLI arguments accept any unique prefix or suffix, and `@last` / `@last:<flow>` for the most recent run.
+`<UTC timestamp>-<flow name>-<4 random base32 chars>`, e.g. `20260930T141503-implement-feature-7k2q`. Sortable by start time to the second; runs created in the same second are ordered by `created_at` in `run.json`. CLI arguments accept any unique prefix or suffix, and `@last` / `@last:<flow>` for the most recent run.
 
 ### 7.2 Run directory
 
@@ -872,7 +872,7 @@ Each line is a JSON object with at least:
 |---|---|---|
 | `resume` | Agent: if a session ID was recorded and the adapter can resume, start a new attempt that resumes that session with the prompt "Your previous run was interrupted. Continue the task and finish with the required output." Otherwise behaves as `restart`. Other types: same as `restart`. | `agent` |
 | `restart` | Start a new attempt of the same visit from scratch, with the templates rendered at visit start. | `shell`, `python`, `set`, `condition`, `notify`, `subflow` (resumes the child run instead), `map` (continues with the next unfinished item) |
-| `ask` | Turn the interruption into a human prompt: *"`<node>` was interrupted. Rerun, skip, or fail?"* with choices `rerun`, `skip` (record `succeeded` with empty results and route via `next`), `fail`. | — |
+| `ask` | Turn the interruption into a human prompt: *"`<node>` was interrupted. Rerun, skip, or fail?"* with choices `rerun` (a new attempt, as `restart`), `skip` (record `succeeded` with empty results and route via `next`), `fail` (route to `fail`). The prompt is a `human_waiting` event with `kind: "resume"`, answered with `arcflow respond` like any other. | — |
 
   `human` and `sleep` nodes simply continue waiting (sleep for the remaining time).
 
@@ -891,7 +891,7 @@ Each line is a JSON object with at least:
 | `--from <node>` | Continue at `<node>` (as if routed there), leaving earlier visits recorded. Implies nothing is rerun automatically. |
 | `--rerun` | Rerun the interrupted visit from scratch regardless of `on_resume`: a new attempt with freshly rendered templates. |
 | `--force` | Allow resuming a `failed` or `cancelled` run (recorded as `run_reopened`); it continues from the node that failed (a new visit) or with `--from`. A run that failed outside a node (a limit reached before a visit, an `outputs` error) needs `--from`. |
-| `--due` | Resume only runs whose waiting human timeout or sleep has passed. Takes no run ID; meant for cron. |
+| `--due` | Resume only runs whose waiting human timeout or sleep has passed and that no runner holds: timed-out prompts are answered with their `default` (or time out), then a detached runner continues each run. Takes no run ID; meant for cron. `--json` gives `{resumed: [run IDs]}`. An `arcflow respond` that arrives after a deadline finds the timeout applied first and exits 6. |
 
 ### 7.7 Retention
 
@@ -1811,7 +1811,7 @@ All events carry `v`, `seq`, `ts`, `type`, and where relevant `branch`, `node`, 
 | `visit_finished` | `outcome`, `result` (state fields, large values by reference) |
 | `route_taken` | `from`, `to`, `via` (`next` / `on_error` / `resume`), `case_index`, `reason` |
 | `budget_updated` | `usd_spent`, `tokens_spent`, `usd_left`, `tokens_left` |
-| `human_waiting` | `message`, `choices`, `input`, `ack`, `deadline` |
+| `human_waiting` | `message`, `choices`, `input`, `ack`, `show`, `default`, `deadline`, and `kind: "resume"` for an `on_resume: ask` prompt |
 | `hook_ran` | `hook` (`on_wait`), `exit_code`, `duration_s` |
 | `human_responded` | `choice`, `text`, `acknowledged`, `responder`, `via` |
 | `cancel_requested` | `by`, `reason` |

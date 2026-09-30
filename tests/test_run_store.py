@@ -405,3 +405,21 @@ def test_given_stale_state_json_when_state_read_then_it_is_rebuilt_from_events(
     # Then
     assert state["status"] == "running"
     assert state["last_seq"] == 2
+
+
+def test_given_runs_created_in_the_same_second_when_last_resolved_then_the_newest_wins(
+    tmp_path: Path,
+) -> None:
+    # Given: the random suffixes sort the other way round
+    for run_id, created in [
+        ("20260930T100000-a-zzzz", "10:00:00.100"),
+        ("20260930T100000-a-aaaa", "10:00:00.900"),
+    ]:
+        (tmp_path / run_id).mkdir()
+        (tmp_path / run_id / "events.jsonl").touch()
+        (tmp_path / run_id / "run.json").write_text(
+            json.dumps({"created_at": f"2026-09-30T{created}Z"})
+        )
+
+    # When / Then
+    assert resolve_run(tmp_path, "@last") == "20260930T100000-a-aaaa"

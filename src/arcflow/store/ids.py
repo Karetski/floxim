@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import json
 import secrets
 from pathlib import Path
 
@@ -30,10 +31,20 @@ def flow_of(run_id: str) -> str:
 
 
 def list_run_ids(runs_dir: Path) -> list[str]:
-    """Run IDs, oldest first (IDs sort by start time)."""
+    """Run IDs, oldest first. IDs sort by the second they were created in; runs
+    created in the same second are ordered by `created_at` in run.json."""
     if not runs_dir.is_dir():
         return []
-    return sorted(p.name for p in runs_dir.iterdir() if (p / "events.jsonl").exists())
+    runs = [p for p in runs_dir.iterdir() if (p / "events.jsonl").exists()]
+    return [p.name for p in sorted(runs, key=_created_key)]
+
+
+def _created_key(path: Path) -> tuple[str, str]:
+    try:
+        created = str(json.loads((path / "run.json").read_text()).get("created_at") or "")
+    except (OSError, ValueError):
+        created = ""
+    return (path.name.split("-", 1)[0], created or path.name)
 
 
 def resolve_run(runs_dir: Path, arg: str) -> str:

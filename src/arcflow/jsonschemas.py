@@ -7,6 +7,7 @@ flow files use for `output_schema` and input schemas (spec §5.1.2). Remote
 
 from __future__ import annotations
 
+import copy
 import json
 from collections.abc import Callable
 from functools import lru_cache
@@ -43,7 +44,9 @@ def schema_error(schema: Any) -> str | None:
     if isinstance(schema, dict) and schema.get("$schema") not in _ACCEPTED_DIALECTS:
         return f"unsupported $schema {schema['$schema']!r}; Arcflow uses JSON Schema draft-07"
     try:
-        _meta_validator()(schema)
+        # fastjsonschema fills in `default` values from the schema it validates
+        # against, so validate a copy and leave the user's schema untouched.
+        _meta_validator()(copy.deepcopy(schema))
     except fastjsonschema.JsonSchemaValueException as exc:
         return f"not a valid JSON Schema: {exc.message}"
     try:
@@ -58,9 +61,10 @@ def compile_schema(schema: Any) -> Validator:
 
 
 def validation_error(validator: Validator, value: Any) -> str | None:
-    """The first validation error for `value`, or None when it is valid."""
+    """The first validation error for `value`, or None when it is valid. The value
+    itself is never changed (defaults are filled into a copy)."""
     try:
-        validator(value)
+        validator(copy.deepcopy(value))
     except fastjsonschema.JsonSchemaValueException as exc:
         return str(exc.message)
     return None

@@ -1,8 +1,8 @@
-"""Answering a waiting run from another process (spec §6.11, §7.4).
+"""Acting on a run from another process: answers, cancels, timeouts (spec §6.11, §7.4).
 
-With a live runner, the answer goes into the run's inbox and the runner records
-it. Without one, the answering process takes the lock, records the answer
-itself, and starts a detached runner to continue the run, unless told not to.
+With a live runner, a request goes into the run's inbox and the runner records
+it. Without one, the acting process takes the lock, records the events itself,
+and (for answers and timeouts) starts a detached runner to continue the run.
 """
 
 from __future__ import annotations
@@ -13,13 +13,14 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from arcflow.clock import Clock
+from arcflow.clock import Clock, parse_iso
 from arcflow.engine.human import Answer, InvalidAnswer, check_answer
 from arcflow.store import inbox
 from arcflow.store.events import EventWriter
-from arcflow.store.lock import RunLock, lock_state
+from arcflow.store.ids import list_run_ids
+from arcflow.store.lock import LockHeld, RunLock, lock_state
 from arcflow.store.rundir import RunDir
-from arcflow.store.state import reduce
+from arcflow.store.state import TERMINAL, reduce
 
 
 class NotWaiting(Exception):
@@ -60,6 +61,7 @@ def respond(
     continue_run: bool = True,
 ) -> Delivery:
     """Record an answer. Raises NotWaiting or InvalidAnswer; nothing changes then."""
+    enforce_timeouts(run, clock=clock, project_root=project_root, continue_run=continue_run)
     node, prompt = pending_node(run, node)
     check_answer(dict(prompt), answer)
     if lock_state(run.lock, clock.now()) == "live":
@@ -97,4 +99,103 @@ def spawn_detached(run: RunDir, project_root: Path, extra_args: list[str] | None
     return process.pid
 
 
-__all__ = ["Answer", "Delivery", "InvalidAnswer", "NotWaiting", "respond", "spawn_detached"]
+class AlreadyFinished(Exception):
+    pass
+
+
+def cancel(run: RunDir, *, by: str | None, reason: str | None, clock: Clock) -> str:
+    """Cancel a run: "requested" when a live runner will stop it, "cancelled" when
+    this process recorded it. Raises AlreadyFinished for a finished run."""
+    state = run.read_state()
+    if state["status"] in TERMINAL:
+        raise AlreadyFinished(f"run {run.id} already {state['status']}")
+    request = {"by": by, "reason": reason}
+    if lock_state(run.lock, clock.now()) == "live":
+        inbox.post(run.inbox, {"type": "cancel", **request}, clock)
+        return "requested"
+    lock = RunLock(run.lock, clock)
+    lock.acquire()
+    try:
+        writer = EventWriter(run.events, clock)
+        writer.append("cancel_requested", request)
+        totals = reduce(writer.events)["totals"]
+        writer.append("run_cancelled", {**request, "totals": totals})
+        writer.close()
+        run.write_state(reduce(writer.events))
+    finally:
+        lock.release()
+    return "cancelled"
+
+
+def enforce_timeouts(
+    run: RunDir, *, clock: Clock, project_root: Path, continue_run: bool = True
+) -> bool:
+    """Apply a passed human-node deadline when no runner holds the run (lazy
+    timeouts, spec §6.11). Returns whether anything timed out."""
+    state = run.read_state()
+    if state["status"] != "waiting" or lock_state(run.lock, clock.now()) == "live":
+        return False
+    now = clock.now()
+    due = [
+        (node, prompt)
+        for node, prompt in state["pending_human"].items()
+        if prompt.get("deadline") and parse_iso(str(prompt["deadline"])) <= now
+    ]
+    if not due:
+        return False
+    lock = RunLock(run.lock, clock)
+    try:
+        lock.acquire()
+    except LockHeld:
+        return False
+    try:
+        writer = EventWriter(run.events, clock)
+        for node, prompt in due:
+            answer = Answer(choice=prompt.get("default"), via="timeout")
+            writer.append("human_responded", answer.to_json(), node=node)
+        writer.close()
+        run.write_state(reduce(writer.events))
+    finally:
+        lock.release()
+    if continue_run:
+        spawn_detached(run, project_root)
+    return True
+
+
+def resume_due(runs_dir: Path, *, clock: Clock, project_root: Path) -> list[str]:
+    """`arcflow resume --due`: continue runs whose human timeout or sleep has passed
+    and that no runner holds. Returns the run IDs started."""
+    started: list[str] = []
+    now = clock.now()
+    for run_id in list_run_ids(runs_dir):
+        run = RunDir(runs_dir / run_id)
+        if enforce_timeouts(run, clock=clock, project_root=project_root):
+            started.append(run_id)
+            continue
+        state = run.read_state()
+        progress = state.get("in_progress") or {}
+        wake = progress.get("wake_at")
+        if (
+            state["status"] == "running"
+            and progress.get("type") == "sleep"
+            and wake
+            and parse_iso(str(wake)) <= now
+            and lock_state(run.lock, now) != "live"
+        ):
+            spawn_detached(run, project_root)
+            started.append(run_id)
+    return started
+
+
+__all__ = [
+    "AlreadyFinished",
+    "Answer",
+    "Delivery",
+    "InvalidAnswer",
+    "NotWaiting",
+    "cancel",
+    "enforce_timeouts",
+    "respond",
+    "resume_due",
+    "spawn_detached",
+]

@@ -169,6 +169,10 @@ class ResumeRefused(Exception):
     """The run cannot be resumed as asked; nothing was changed."""
 
 
+class RunCancelled(Exception):
+    """A cancel request arrived while the runner was waiting."""
+
+
 class Detached(Exception):
     """The runner was asked to stop and left the run resumable."""
 
@@ -232,6 +236,7 @@ class Runner:
         self.shutting_down = False
         self._current: tuple[VisitContext, asyncio.Future[AttemptResult], bool] | None = None
         self._adapters: dict[str, Adapter] = {}
+        self.cancel: dict[str, Any] | None = None  # the cancel request being honoured
 
     def _snapshot_path(self) -> Path:
         relative = str(self.state["run"].get("snapshot") or self.meta["snapshot_flow"])
@@ -290,14 +295,21 @@ class Runner:
                 self.emit(kind, {"pid": os.getpid(), "host": hostname(), "reason": "resume"})
             if self.heartbeat_enabled:
                 heartbeat = asyncio.ensure_future(self._heartbeat(lock))
+            watcher = asyncio.ensure_future(self._watch_inbox())
             try:
                 status = await self._main()
+            except RunCancelled:
+                status = self._cancelled()
             except Detached:
                 self.emit("runner_detached", {"pid": os.getpid(), "reason": "signal"})
                 status = "detached" if self.state["status"] != "waiting" else "waiting"
             except WaitReleased:
                 self.emit("runner_detached", {"pid": os.getpid(), "reason": "waiting"})
                 status = "waiting"
+            finally:
+                watcher.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await watcher
             self.run_dir.write_state(self.state)
             return RunOutcome(status, self.state)
         finally:
@@ -321,6 +333,38 @@ class Runner:
                 ctx.stop.urgent.set()
         else:
             task.cancel()
+
+    async def _watch_inbox(self) -> None:
+        """Take cancel requests from other processes while the run goes on (§7.4)."""
+        while True:
+            for path, request in inbox.pending(self.run_dir.inbox):
+                if request.get("type") == "cancel":
+                    inbox.consume(path)
+                    self.request_cancel(request.get("by"), request.get("reason"))
+            await self.clock.sleep(INBOX_POLL_S)
+
+    def request_cancel(self, by: Any, reason: Any) -> None:
+        """Stop the current attempt and end the run cancelled (spec §6.7)."""
+        if self.cancel is not None:
+            return
+        self.cancel = {"by": by, "reason": reason}
+        self.emit("cancel_requested", self.cancel)
+        if self._current is None:
+            return
+        ctx, task, handles_stop = self._current
+        if handles_stop:
+            ctx.stop.request("cancel")
+        else:
+            task.cancel()
+
+    def _cancelled(self) -> str:
+        cancel = self.cancel or {}
+        self.emit(
+            "run_cancelled",
+            {"by": cancel.get("by"), "reason": cancel.get("reason"), "totals": self._totals()},
+        )
+        self.run_dir.write_state(self.state)
+        return "cancelled"
 
     async def _heartbeat(self, lock: RunLock) -> None:
         while True:
@@ -351,6 +395,8 @@ class Runner:
         if status is not None:
             return status
         while True:
+            if self.cancel is not None:
+                return self._cancelled()
             if self.shutting_down:
                 raise Detached
             current = self.state["current"] or self.flow.start
@@ -367,6 +413,8 @@ class Runner:
 
     def _after_visit(self, node: Node, outcome: str, decision: Decision | None) -> str | None:
         """Route after a finished visit (§6.2 step 5). Returns a final status, or None."""
+        if self.cancel is not None or outcome == "cancelled":
+            return self._cancelled()  # cancellation is never routed (§6.5)
         try:
             if decision is None:
                 decision = self._route(node, outcome)
@@ -547,6 +595,16 @@ class Runner:
             else node.config.get("on_resume", executor.default_on_resume)
         )
         ctx = VisitContext(self, node, visit, {}, dict(progress.get("data") or {}))
+        if mode == "ask":
+            choice = await self._ask_after_interruption(ctx, progress)
+            if choice == "skip":
+                started = parse_iso(progress["started_at"])
+                count = (last or {}).get("attempt", 0)
+                return self._finish_visit(ctx, AttemptResult("succeeded", {}), count, started)
+            if choice == "fail":
+                return "failed", Decision("fail", None, f"{node.id} was interrupted; chose to fail")
+            mode = "restart"
+            ctx.visit_data = dict(progress.get("data") or {})
         ctx.workspace = progress.get("workspace")
         for earlier in attempts:  # spend of this visit before the interruption
             if isinstance(earlier.get("usage"), dict):
@@ -566,6 +624,33 @@ class Runner:
                 return self._finish_visit(ctx, finished, last["attempt"], started)
         result, count = await self._attempts(executor, ctx, first=first, used=used)
         return self._finish_visit(ctx, result, count, started)
+
+    async def _ask_after_interruption(self, ctx: VisitContext, progress: dict[str, Any]) -> str:
+        """`on_resume: ask`: turn the interruption into a prompt (spec §7.5)."""
+        node = ctx.node.id
+        response = progress.get("response")
+        if response is None:
+            if node not in self.state["pending_human"]:
+                self.emit(
+                    "human_waiting",
+                    {
+                        "kind": "resume",
+                        "message": f"{node} was interrupted. Rerun, skip, or fail?",
+                        "choices": ["rerun", "skip", "fail"],
+                        "input": "none",
+                        "ack": False,
+                        "show": [],
+                        "default": None,
+                        "deadline": None,
+                    },
+                    node=node,
+                    visit=ctx.visit,
+                )
+                self.emit("run_waiting", {"nodes": sorted(self.state["pending_human"])})
+                self.run_dir.write_state(self.state)
+            ctx.visit_data = {}
+            response = await self.wait_for_answer(ctx)
+        return str(response.get("choice"))
 
     async def _continue_waiting(
         self, executor: Executor, node: Node, progress: dict[str, Any], last: dict[str, Any]
@@ -620,6 +705,8 @@ class Runner:
                 default = prompt.get("default")
                 answer = Answer(choice=default, responder=None, via="timeout")
                 return self._record_answer(node, answer)
+            if self.cancel is not None:
+                raise RunCancelled
             if self.on_wait == "exit":
                 raise WaitReleased
             if ctx.stop.event.is_set() or self.shutting_down:
@@ -667,6 +754,12 @@ class Runner:
         failure: AttemptResult | None = None
         try:
             ctx.namespace = self.namespace(node, visit, 1)
+            if node.type in ("human", "notify") and "message" in node.config:
+                # `node.message` is available to the node's other fields (§4.3, §5.11).
+                message = render_config(
+                    node.type, {"message": node.config["message"]}, ctx.namespace, self.clock.now
+                )["message"]
+                ctx.namespace["node"]["message"] = message
             ctx.config = render_config(node.type, node.config, ctx.namespace, self.clock.now)
             ctx.workspace = self._workspace(node, visit, ctx.config)
             ctx.visit_data = executor.prepare(ctx)
@@ -805,6 +898,8 @@ class Runner:
                 "timed_out", {}, {"kind": "timeout", "message": f"timed out after {timeout:g}s"}
             )
         except asyncio.CancelledError:
+            if task.cancelled() and self.cancel is not None:
+                return AttemptResult("cancelled")
             if self.shutting_down and task.cancelled():
                 return AttemptResult("interrupted")
             raise

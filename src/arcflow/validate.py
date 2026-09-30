@@ -25,7 +25,7 @@ from arcflow.problems import Problem
 # E-NOT-IMPLEMENTED for the others as its last stage; each milestone that makes a
 # node type runnable adds it here (docs/milestones.md).
 IMPLEMENTED_NODE_TYPES: frozenset[str] = frozenset(
-    {"condition", "sleep", "set", "shell", "python", "agent", "human"}
+    {"condition", "sleep", "set", "shell", "python", "agent", "human", "notify"}
 )
 
 
@@ -78,7 +78,7 @@ def validate(
 
 
 # Features within implemented node types that the runner cannot execute yet.
-PENDING_FEATURES: dict[tuple[str, object], str] = {("on_resume", "ask"): "on_resume: ask"}
+PENDING_FEATURES: dict[tuple[str, object], str] = {}
 
 
 def _not_implemented(flow: Flow, root: Path | None = None) -> list[Problem]:

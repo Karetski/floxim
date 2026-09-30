@@ -113,42 +113,22 @@
         ],
         "output_schema": {
           "additionalProperties": false,
-          "definitions": {},
-          "items": true,
-          "patternProperties": {},
           "properties": {
             "status": {
-              "definitions": {},
               "enum": [
                 "done",
                 "blocked"
-              ],
-              "items": true,
-              "patternProperties": {},
-              "properties": {},
-              "readOnly": false,
-              "uniqueItems": false,
-              "writeOnly": false
+              ]
             },
             "summary": {
-              "definitions": {},
-              "items": true,
-              "patternProperties": {},
-              "properties": {},
-              "readOnly": false,
-              "type": "string",
-              "uniqueItems": false,
-              "writeOnly": false
+              "type": "string"
             }
           },
-          "readOnly": false,
           "required": [
             "status",
             "summary"
           ],
-          "type": "object",
-          "uniqueItems": false,
-          "writeOnly": false
+          "type": "object"
         },
         "permissions": "edit",
         "prompt": "${{ \"Upgrade these packages to their latest versions, adapting code to breaking changes:\" if visits.upgrade == 1 else \"Your last change needs more work.\" }}\n${{ nodes.outdated.output if visits.upgrade == 1 else \"\" }}\n${{ \"Test failures:\\n\" + tail(nodes.test.stderr, 80) if nodes.test and nodes.test.exit_code != 0 else \"\" }}\n${{ \"Reviewer issues:\\n\" + join(nodes.review.output.issues, \"\\n\") if nodes.review and nodes.review.output.verdict == \"changes\" else \"\" }}\nRun the tests before you finish. Report status \"done\" only if they pass.\n",

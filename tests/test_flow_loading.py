@@ -171,3 +171,22 @@ def test_given_published_schema_when_invalid_flow_checked_then_it_is_rejected(na
     # When / Then
     with pytest.raises(fastjsonschema.JsonSchemaValueException):
         validate(_plain(INVALID / f"{name}.yaml"))
+
+
+def test_given_a_schema_when_checked_and_used_then_it_is_never_modified() -> None:
+    # Given
+    import copy
+
+    from arcflow import jsonschemas
+
+    schema = {"type": "object", "properties": {"a": {"enum": [1]}, "b": {"default": 5}}}
+    output = {"a": 1}
+    original_schema, original_output = copy.deepcopy(schema), copy.deepcopy(output)
+
+    # When
+    assert jsonschemas.schema_error(schema) is None
+    assert jsonschemas.validation_error(jsonschemas.compile_schema(schema), output) is None
+
+    # Then
+    assert schema == original_schema
+    assert output == original_output

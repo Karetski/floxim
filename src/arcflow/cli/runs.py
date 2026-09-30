@@ -15,7 +15,14 @@ from arcflow.cli.common import EventPrinter, print_problems, project_context, st
 from arcflow.clock import Clock
 from arcflow.engine.human import Answer, InvalidAnswer
 from arcflow.engine.inputs import InputError, load_inputs_file, parse_assignments
-from arcflow.engine.respond import NotWaiting, respond, spawn_detached
+from arcflow.engine.respond import (
+    AlreadyFinished,
+    NotWaiting,
+    cancel,
+    respond,
+    resume_due,
+    spawn_detached,
+)
 from arcflow.engine.runner import (
     FlowInvalid,
     FullPermissionsRefused,
@@ -64,7 +71,14 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
         help="continue a run",
         description="Continue a run from its last checkpoint (spec §7.5, §7.6).",
     )
-    resume.add_argument("run", help="run ID, unique prefix or suffix, @last or @last:<flow>")
+    resume.add_argument(
+        "run", nargs="?", help="run ID, unique prefix or suffix, @last or @last:<flow>"
+    )
+    resume.add_argument(
+        "--due",
+        action="store_true",
+        help="continue every run whose human timeout or sleep has passed (for cron)",
+    )
     resume.add_argument("--reload", action="store_true", help="use the current flow file")
     resume.add_argument("--from", dest="from_node", metavar="NODE", help="continue at NODE")
     resume.add_argument(
@@ -99,6 +113,41 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
         "--no-continue", action="store_true", help="only record the answer; do not continue the run"
     )
     respond.set_defaults(handler=cmd_respond)
+
+    cancel_parser = commands.add_parser(
+        "cancel", parents=[common], help="cancel a run", description="Cancel a run (spec §6.7)."
+    )
+    cancel_parser.add_argument("run", help="run ID, unique prefix or suffix, @last or @last:<flow>")
+    cancel_parser.add_argument("--reason", help="why, recorded with the cancellation")
+    cancel_parser.add_argument("--as", dest="by", help="who is cancelling (default: $USER)")
+    cancel_parser.set_defaults(handler=cmd_cancel)
+
+
+def cmd_cancel(args: argparse.Namespace) -> int:
+    context = project_context()
+    try:
+        run = RunDir(context.config.runs_dir / resolve_run(context.config.runs_dir, args.run))
+    except (RunNotFound, AmbiguousRun) as exc:
+        return _fail(args, "E-NOT-FOUND", str(exc), ExitCode.NOT_FOUND)
+    clock = Clock()
+    try:
+        how = cancel(run, by=args.by or os.environ.get("USER"), reason=args.reason, clock=clock)
+    except AlreadyFinished as exc:
+        return _fail(args, "E-ALREADY-FINISHED", str(exc), ExitCode.USAGE)
+    except LockHeld as exc:
+        return _fail(args, "E-LOCKED", str(exc), ExitCode.CONFLICT)
+    status = run.read_state()["status"]
+    if how == "requested":
+        # The live runner stops the attempt within its grace period and records it.
+        deadline = time.monotonic() + 30
+        while status != "cancelled" and time.monotonic() < deadline:
+            time.sleep(0.2)
+            status = run.read_state()["status"]
+    if args.json:
+        emit_json(True, data={"run_id": run.id, "status": status, "delivered": how})
+    else:
+        stderr(f"run {run.id} {status}")
+    return ExitCode.OK
 
 
 def _wait_options(parser: argparse.ArgumentParser) -> None:
@@ -225,6 +274,18 @@ def _detach(
 
 def cmd_resume(args: argparse.Namespace) -> int:
     context = project_context()
+    if args.due:
+        if args.run:
+            return _fail(args, "E-USAGE", "--due takes no run", ExitCode.USAGE)
+        started = resume_due(context.config.runs_dir, clock=Clock(), project_root=context.root)
+        if args.json:
+            emit_json(True, data={"resumed": started})
+        else:
+            for run_id in started:
+                stderr(f"resumed {run_id}")
+        return ExitCode.OK
+    if not args.run:
+        return _fail(args, "E-USAGE", "name a run, or use --due", ExitCode.USAGE)
     try:
         run = RunDir(context.config.runs_dir / resolve_run(context.config.runs_dir, args.run))
     except (RunNotFound, AmbiguousRun) as exc:
