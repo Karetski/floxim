@@ -17,7 +17,8 @@ from engine_support import run_flow
 
 from arcflow.clock import Clock
 from arcflow.config import load_config
-from arcflow.engine.runner import ResumeOptions, ResumeRefused, Runner, display_status
+from arcflow.engine.runner import ResumeOptions, ResumeRefused, Runner
+from arcflow.runinfo import display_status
 from arcflow.store.events import read_log
 from arcflow.store.ids import resolve_run
 from arcflow.store.rundir import RunDir

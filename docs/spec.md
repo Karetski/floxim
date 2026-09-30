@@ -1160,7 +1160,7 @@ Stable and documented (ADR 0008):
 | `arcflow graph <flow> [--format ascii\|mermaid\|dot\|json]` | Core | Render the graph; `json` gives nodes and edges with conditions, for tools. |
 | `arcflow run <flow> [--input k=v]… [--inputs-file f] [--workdir d] [--detach] [--on-wait prompt\|wait\|exit] [--events]` | Core | Create and start a run. Foreground by default. `--input k=@file` reads a value from a file. Prints the run ID first on stderr (and in `--json`). With `--json`, a succeeded run gives `{"ok": true, "data": {run_id, status, outputs, failure, totals}}`; any other end gives `ok: false` with error code `E-RUN-FAILED`, `E-RUN-CANCELLED`, `E-RUN-WAITING` or `E-RUN-DETACHED` and the same object as `details`. Invalid inputs are `E-INVALID-INPUT` and an invalid flow `E-INVALID-FLOW`, both exit 3. |
 | `arcflow resume <run> [options of §7.6]` | Core | Continue a run. |
-| `arcflow wait <run> [--timeout d]` | Core | Block until the run is terminal or waiting; exit code by status. For scripts that used `--detach`. |
+| `arcflow wait <run> [--timeout d]` | Core | Block until the run is terminal or waiting; exit code by status. For scripts that used `--detach`. When the timeout passes first it exits 8 (`E-TIMEOUT`): the run is still in progress. |
 | `arcflow status [<run>]` | Core | One run in detail (current node, visits, pending human prompt, totals); without an argument, active runs. |
 | `arcflow list [--flow X] [--status S] [--since d] [--limit n]` | Core | Runs, newest first. |
 | `arcflow logs <run> [--node N] [--visit n] [--follow] [--raw] [--prompt]` | Core | Human-readable event log; `--raw` prints the harness stream; `--prompt` the rendered prompt. |
@@ -1178,6 +1178,8 @@ Stable and documented (ADR 0008):
 | `arcflow flow <op> <flow> …` | Core | Structured edits (§10.4): `add-node`, `rm-node`, `rename-node`, `set`, `unset`, `connect`, `disconnect`. |
 | `arcflow handoff <run> [<node>]` | Core | Open a pending handoff session interactively. |
 | `arcflow adapter test <name> [--live]` | Core | Conformance kit (§8.8). |
+
+**Inspection output.** `status` and `list` describe a run as `{run_id, flow, status, current, pending, created_at, started_at, finished_at, parent, totals: {usd_spent, tokens_spent, steps, active_s}, failure}`, with `status` the display status (§1.1). `status <run>` adds `inputs`, `workdir`, `visits`, `nodes` (`{outcome, visit, error}` per node), `in_progress`, `pending_human`, `outputs` and `vars`; `status` alone lists the active runs (`pending`, `running`, `waiting`, `interrupted`). `list --status` takes a comma-separated list and `--since` a duration. `logs --events` (or `--json`) prints events as JSON lines; `--raw` and `--prompt` need `--node`. `artifacts` gives `{node, visit, path, size}` entries and `flows` `{file, name, description, valid, errors, warnings}` for every YAML file under `flow_paths` that has a `nodes` key. `graph --format json` gives `{name, start, nodes: [{id, type, description}], edges: [{from, to, via, case_index, when, explicit}]}`, leaving out the implicit `on_error: fail` edges. Commands that read a waiting run (`status`, `logs`, `wait`, `artifacts`, `respond`) first apply any passed human deadline (§6.11).
 
 ### 9.4 `arcflow validate`
 

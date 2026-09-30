@@ -94,9 +94,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     runs.add_parsers(commands, common)
 
-    from arcflow.cli import adapters
+    from arcflow.cli import adapters, inspection
 
     adapters.add_parsers(commands, common)
+    inspection.add_parsers(commands, common)
     return parser
 
 

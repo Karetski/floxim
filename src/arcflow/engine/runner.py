@@ -47,7 +47,7 @@ from arcflow.rendering import render_config
 from arcflow.store import inbox
 from arcflow.store.events import Event, EventWriter, read_log
 from arcflow.store.ids import new_run_id
-from arcflow.store.lock import HEARTBEAT_S, RunLock, hostname, lock_state
+from arcflow.store.lock import HEARTBEAT_S, RunLock, hostname
 from arcflow.store.rundir import RunDir, write_json_atomic
 from arcflow.store.state import State, active_seconds, apply, reduce
 from arcflow.templates import render_value
@@ -1205,14 +1205,6 @@ def _read_result(attempt_dir: Path) -> AttemptResult:
     data = json.loads((attempt_dir / "result.json").read_text())
     decision = Decision(**data["decision"]) if data.get("decision") else None
     return AttemptResult(data["outcome"], data["fields"], data["error"], decision=decision)
-
-
-def display_status(run: RunDir, state: State, clock: Clock) -> str:
-    """The status to show: a `running` run with no live runner is `interrupted` (§1.1)."""
-    status = str(state.get("status"))
-    if status == "running" and lock_state(run.lock, clock.now()) != "live":
-        return "interrupted"
-    return status
 
 
 def exit_status_code(status: str) -> int:
