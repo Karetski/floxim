@@ -186,6 +186,7 @@ def cli_schema(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     root = tmp_path_factory.mktemp("schema")
     document = js(cli(root, "schema", "cli"))
     assert set(document["definitions"]) >= {"run", "status", "list", "validate", "gc", "doctor"}
+    assert isinstance(document, dict)
     return document
 
 
