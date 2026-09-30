@@ -1,0 +1,2 @@
+# expect: W-UNBOUNDED @ 10:18
+# expect: W-UNGUARDED-CYCLE @ 18:3

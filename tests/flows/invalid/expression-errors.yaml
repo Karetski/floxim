@@ -1,0 +1,17 @@
+name: expression-errors
+nodes:
+  a:
+    type: shell
+    run: echo ${{ nodes.a.stdout.lower() }}
+    next:
+      - when: visits.a <
+        to: end
+      - to: b
+  b:
+    type: human
+    message: "${{ upper_case(nodes.a.stdout) }}"
+    input: text
+
+# expect: E-EXPR-FORBIDDEN @ 5:10
+# expect: E-EXPR-SYNTAX @ 7:15
+# expect: E-EXPR-UNKNOWN-FUNCTION @ 12:14

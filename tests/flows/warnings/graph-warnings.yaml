@@ -1,0 +1,24 @@
+name: graph-warnings
+nodes:
+  test:
+    type: shell
+    run: make test
+    next:
+      - when: nodes.test.exit_code == 0
+        to: end
+      - when: nodes.fix.outcome == "succeeded"
+        to: fix
+  fix:
+    type: agent
+    harness: fake
+    prompt: "Fix: ${{ nodes.orphan.stdout }} ${{ nodes.test.output.detail }}"
+    next: test
+  orphan:
+    type: shell
+    run: echo never
+# expect: W-NO-DEFAULT-ROUTE @ 7:7
+# expect: W-ERROR-NEVER-ROUTED @ 7:15
+# expect: W-UNGUARDED-CYCLE @ 3:3
+# expect: W-NEVER-SET @ 14:13
+# expect: I-UNCHECKED-OUTPUT @ 14:13
+# expect: W-UNREACHABLE @ 16:3

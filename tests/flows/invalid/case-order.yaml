@@ -1,0 +1,18 @@
+name: case-order
+nodes:
+  a:
+    type: shell
+    run: echo
+    next:
+      - to: end
+      - when: visits.a < 2
+        to: a
+  b:
+    type: shell
+    run: echo
+    next:
+      - to: end
+      - to: fail
+
+# expect: E-DEFAULT-NOT-LAST @ 7:9
+# expect: E-MULTIPLE-DEFAULTS @ 15:9

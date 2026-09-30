@@ -1,0 +1,14 @@
+name: no-exit
+nodes:
+  ping:
+    type: sleep
+    duration: 1s
+    next: pong
+  pong:
+    type: sleep
+    duration: 1s
+    next: ping
+
+# expect: E-NO-EXIT @ 3:3
+# expect: W-UNGUARDED-CYCLE @ 3:3
+# expect: E-NO-EXIT @ 7:3

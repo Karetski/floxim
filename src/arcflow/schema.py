@@ -174,6 +174,9 @@ class Bool(Type):
 
 @dataclass
 class AnyValue(Type):
+    """Any JSON value. With `templated`, strings anywhere inside it are templates."""
+
+    templated: bool = False
     doc: str = ""
 
     def kinds(self) -> set[str]:

@@ -199,22 +199,22 @@ TYPE_FIELDS: dict[str, dict[str, Field]] = {
         "until": Field(TEMPLATE_STR),
     },
     "set": {
-        "vars": Field(MapOf(AnyValue(), identifier_keys=True)),
+        "vars": Field(MapOf(AnyValue(templated=True), identifier_keys=True)),
     },
     "python": {
         "call": Field(Str(pattern=r"^[A-Za-z_][\w.]*:[A-Za-z_]\w*$")),
-        "args": Field(MapOf(AnyValue())),
+        "args": Field(MapOf(AnyValue(templated=True))),
         "output_schema": Field(PATH_OR_SCHEMA),
         "interpreter": Field(Str()),
     },
     "subflow": {
         "flow": Field(Str()),
-        "inputs": Field(MapOf(AnyValue(), templated=True)),
+        "inputs": Field(MapOf(AnyValue(templated=True), templated=True)),
     },
     "map": {
-        "items": Field(ListOf(AnyValue(), templated=True)),
+        "items": Field(ListOf(AnyValue(templated=True), templated=True)),
         "flow": Field(Str()),
-        "inputs": Field(MapOf(AnyValue(), templated=True)),
+        "inputs": Field(MapOf(AnyValue(templated=True), templated=True)),
         "max_items": Field(Int(minimum=1)),
         "on_item_error": Field(Str(enum=("fail", "continue"))),
         "concurrency": Field(Int(minimum=1)),
@@ -232,7 +232,7 @@ TYPE_FIELDS: dict[str, dict[str, Field]] = {
                     "url": Field(TEMPLATE_STR, required=True),
                     "method": Field(Str(enum=("POST", "PUT", "PATCH", "GET"))),
                     "headers": Field(MapOf(TEMPLATE_STR)),
-                    "body": Field(AnyValue()),
+                    "body": Field(AnyValue(templated=True)),
                 }
             )
         ),
@@ -358,7 +358,7 @@ FLOW = Struct(
         "include": Field(ListOf(Str())),
         "start": Field(Str()),
         "nodes": Field(MapOf(PARTIAL_NODE, identifier_keys=True), required=True),
-        "outputs": Field(MapOf(AnyValue(), identifier_keys=True)),
+        "outputs": Field(MapOf(AnyValue(templated=True), identifier_keys=True)),
         "on_wait": Field(Str()),
     },
     doc="An Arcflow flow file (format version 1).",
@@ -393,3 +393,60 @@ def flow_json_schema() -> dict[str, Any]:
         "title": "Arcflow flow",
         **schema,
     }
+
+
+# Result fields readable as `nodes.<id>.<field>` (spec §4.3 and §5).
+COMMON_RESULT_FIELDS = frozenset(
+    {"outcome", "visit", "attempts", "started_at", "finished_at", "duration_s", "error", "visits"}
+)
+RESULT_FIELDS: dict[str, frozenset[str]] = {
+    "agent": frozenset(
+        {
+            "output",
+            "text",
+            "session_id",
+            "harness",
+            "harness_version",
+            "model",
+            "usage",
+            "cost_usd",
+            "cost_estimated",
+            "num_turns",
+            "permission_denials",
+            "schema_errors",
+            "workspace",
+            "artifacts_dir",
+        }
+    ),
+    "shell": frozenset(
+        {
+            "exit_code",
+            "signal",
+            "stdout",
+            "stderr",
+            "stdout_file",
+            "stderr_file",
+            "stdout_truncated",
+            "stderr_truncated",
+            "output",
+            "workspace",
+            "artifacts_dir",
+        }
+    ),
+    "condition": frozenset({"branch"}),
+    "human": frozenset(
+        {"choice", "text", "acknowledged", "responder", "responded_at", "via", "timed_out"}
+    ),
+    "sleep": frozenset({"woke_at"}),
+    "set": frozenset({"values"}),
+    "python": frozenset({"output", "workspace", "artifacts_dir"}),
+    "subflow": frozenset({"run_id", "status", "outputs", "output"}),
+    "map": frozenset({"results", "succeeded", "failed"}),
+    "handoff": frozenset({"session_id", "exit_code"}),
+    "notify": frozenset(),
+}
+# Node types whose `output` can be described by an `output_schema`.
+SCHEMA_OUTPUT_TYPES = frozenset({"agent", "shell", "python"})
+RUN_FIELDS = frozenset({"id", "flow", "flow_file", "started_at", "workdir", "budget"})
+BUDGET_FIELDS = frozenset({"usd_spent", "tokens_spent", "usd_left", "tokens_left"})
+NODE_CONTEXT_FIELDS = frozenset({"id", "visit", "attempt", "artifacts_dir", "workdir", "message"})

@@ -1,0 +1,39 @@
+name: lints
+limits:
+  max_steps: none
+  max_duration: none
+  budget: {usd: none, tokens: none}
+nodes:
+  plan:
+    type: agent
+    harness: fake
+    permissions: full
+    prompt: "Plan it. Previous: {{ nodes.plan.text }}"
+    next: build
+  build:
+    type: shell
+    run: make ${{ nodes.plan.text }} ${{ shq(nodes.plan.text) }}
+    next: deploy
+  deploy:
+    type: shell
+    args: [git, push, origin, HEAD]
+    next: approve
+  approve:
+    type: human
+    message: Pushed. Merge?
+    choices: [merge, stop]
+    next:
+      - when: nodes.approve.choice == "merge"
+        to: merge
+      - to: end
+  merge:
+    type: shell
+    run: gh pr merge --squash
+# expect: W-UNBOUNDED @ 3:14
+# expect: W-UNBOUNDED @ 4:17
+# expect: W-UNBOUNDED @ 5:17
+# expect: W-UNBOUNDED @ 5:31
+# expect: W-FULL-PERMISSIONS @ 10:18
+# expect: W-JINJA-LIKE @ 11:13
+# expect: W-SHELL-INTERPOLATION @ 15:10
+# expect: W-NO-HUMAN-BEFORE-RISKY @ 17:3

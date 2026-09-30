@@ -1,0 +1,13 @@
+name: condition-default
+nodes:
+  check:
+    type: condition
+    next:
+      - when: visits.check > 1
+        to: end
+  other:
+    type: condition
+    next: end
+
+# expect: E-CONDITION-NEEDS-DEFAULT @ 6:7
+# expect: E-CONDITION-NEEDS-DEFAULT @ 10:11

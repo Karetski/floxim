@@ -1,14 +1,18 @@
 """The flow corpus (spec §13): every invalid file reports exactly the errors it is
-annotated with, and every valid file reports no errors.
+annotated with, every valid file reports no errors, and every file under
+`warnings/` reports no errors and exactly its annotated warnings and infos.
 
 Annotations are comment lines, anywhere in the file:
 
     # expect: E-UNKNOWN-TARGET @ 41:13    (code at line:column)
     # expect: W-UNREACHABLE               (code, any position)
 
-For invalid files the set of errors must match the annotations exactly; for both
-kinds, every annotated warning or info must be reported. Other warnings are
-ignored, so later milestones can add lints without editing every file.
+Annotations can also live in a sidecar `<file>.expect`, for corpus files that
+must stay byte-identical to the spec's Appendix A.
+
+For invalid files the set of errors must match the annotations exactly; for all
+kinds, every annotated warning or info must be reported. Outside `warnings/`,
+other warnings are ignored, so later lints need no edits to unrelated files.
 """
 
 import re
@@ -26,7 +30,9 @@ EXPECT = re.compile(r"#\s*expect:\s*([EWI]-[A-Z0-9-]+)(?:\s*@\s*(\d+):(\d+))?")
 
 def _expectations(path: Path) -> list[tuple[str, int | None, int | None]]:
     found = []
-    for match in EXPECT.finditer(path.read_text()):
+    sidecar = path.with_name(path.name + ".expect")
+    text = path.read_text() + (sidecar.read_text() if sidecar.exists() else "")
+    for match in EXPECT.finditer(text):
         code, line, col = match.groups()
         found.append((code, int(line) if line else None, int(col) if col else None))
     return found
@@ -39,7 +45,7 @@ def _matches(
     return code == problem_key[0] and (line is None or (line, col) == problem_key[1:])
 
 
-def _check(path: Path, *, invalid: bool) -> None:
+def _check(path: Path, *, invalid: bool, exact_warnings: bool = False) -> None:
     report = validate(path, implementation_gate=False)
     actual = [(p.code, p.line or 0, p.column or 0) for p in report.problems]
     expected = _expectations(path)
@@ -54,6 +60,11 @@ def _check(path: Path, *, invalid: bool) -> None:
         )
     else:
         assert errors == [], f"{path.name}: unexpected errors {errors}"
+    if exact_warnings:
+        others = Counter(a[0] for a in actual if not a[0].startswith("E-"))
+        assert others == Counter(e[0] for e in expected if not e[0].startswith("E-")), (
+            f"{path.name}: warnings {actual} do not match expectations {expected}"
+        )
 
 
 @pytest.mark.parametrize("path", sorted((CORPUS / "invalid").glob("*.yaml")), ids=lambda p: p.name)
@@ -66,6 +77,13 @@ def test_given_invalid_corpus_file_when_validated_then_reports_its_annotated_err
 @pytest.mark.parametrize("path", sorted((CORPUS / "valid").glob("*.yaml")), ids=lambda p: p.name)
 def test_given_valid_corpus_file_when_validated_then_reports_no_errors(path: Path) -> None:
     _check(path, invalid=False)
+
+
+@pytest.mark.parametrize("path", sorted((CORPUS / "warnings").glob("*.yaml")), ids=lambda p: p.name)
+def test_given_lint_corpus_file_when_validated_then_reports_exactly_its_warnings(
+    path: Path,
+) -> None:
+    _check(path, invalid=False, exact_warnings=True)
 
 
 def test_given_spec_appendix_a_when_compared_then_corpus_copies_are_identical() -> None:

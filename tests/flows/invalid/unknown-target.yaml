@@ -1,0 +1,17 @@
+name: unknown-target
+nodes:
+  implement:
+    type: shell
+    run: make
+    next: tset
+  test:
+    type: shell
+    run: make test
+    on_error: continue
+    next:
+      - when: nodes.test.exit_code == 0
+        to: end
+      - to: implment
+
+# expect: E-UNKNOWN-TARGET @ 6:11
+# expect: E-UNKNOWN-TARGET @ 14:13

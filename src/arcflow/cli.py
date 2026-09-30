@@ -17,11 +17,14 @@ ISSUES_URL = "https://github.com/Karetski/arcflow/issues"
 
 
 def _cmd_validate(args: argparse.Namespace) -> int:
+    from arcflow.config import find_project_root, load_config
     from arcflow.validate import validate
 
-    reports = [validate(Path(p)) for p in args.flows]
-    ok = all(r.ok(args.strict) for r in reports)
-    problems = [p for r in reports for p in r.problems]
+    root = find_project_root(Path.cwd())
+    config, config_problems = load_config(root)
+    reports = [validate(Path(p), config=config, workdir=root) for p in args.flows]
+    ok = all(r.ok(args.strict) for r in reports) and not any(p.is_error for p in config_problems)
+    problems = config_problems + [p for r in reports for p in r.problems]
     if args.json:
         files = [
             {
@@ -47,9 +50,10 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
 
 def _cmd_schema(args: argparse.Namespace) -> int:
+    from arcflow.config import config_json_schema
     from arcflow.flowspec import flow_json_schema
 
-    schema = flow_json_schema()
+    schema = {"flow": flow_json_schema, "config": config_json_schema}[args.which]()
     if args.json:
         emit_json(True, data=schema)
     else:
@@ -78,7 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
     schema = commands.add_parser(
         "schema", parents=[common], help="print a JSON Schema", description="Print a JSON Schema."
     )
-    schema.add_argument("which", choices=["flow"], help="which schema")
+    schema.add_argument("which", choices=["flow", "config"], help="which schema")
     schema.set_defaults(handler=_cmd_schema)
     return parser
 

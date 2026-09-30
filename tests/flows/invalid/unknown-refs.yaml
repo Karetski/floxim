@@ -1,0 +1,38 @@
+name: unknown-refs
+inputs:
+  feature: {type: string}
+nodes:
+  plan:
+    type: agent
+    harness: fake
+    prompt: "Plan ${{ inputs.featur }} for ${{ run.flow_name }}"
+    output_schema:
+      type: object
+      additionalProperties: false
+      properties:
+        status: {enum: [ready, blocked]}
+    next:
+      - when: nodes.plan.output.state == "ready"
+        to: test
+      - when: nodes.plam.text == ""
+        to: fail
+      - to: end
+  test:
+    type: shell
+    run: make test
+    env:
+      PLAN: ${{ nodes.plan.stdout }}
+      N: ${{ vistis.plan }}
+    next:
+      - when: self.exit_code == 0 and item == 1
+        to: end
+      - to: fail
+
+# expect: E-UNKNOWN-REF @ 8:13
+# expect: E-UNKNOWN-REF @ 8:13
+# expect: E-UNKNOWN-REF @ 15:15
+# expect: E-UNKNOWN-REF @ 17:15
+# expect: E-UNKNOWN-REF @ 24:13
+# expect: E-UNKNOWN-REF @ 25:10
+# expect: E-UNKNOWN-REF @ 27:15
+# expect: W-ERROR-NEVER-ROUTED @ 27:15

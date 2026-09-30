@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from arcflow.checks import expression_checks, graph_checks, lint_checks, workspace_checks
+from arcflow.config import DEFAULT_RISKY_COMMANDS, Config
 from arcflow.flow import Flow, load_flow
+from arcflow.graph import build_graph
 from arcflow.problems import Problem
 
 # Node types the runner can execute in this version. Validation reports
@@ -30,10 +34,31 @@ class Report:
         return not self.errors
 
 
-def validate(path: Path, *, implementation_gate: bool = True) -> Report:
+def validate(
+    path: Path,
+    *,
+    config: Config | None = None,
+    workdir: Path | None = None,
+    implementation_gate: bool = True,
+) -> Report:
+    """Run the checks in the order of §9.4, stopping after the first stage with errors."""
     flow, problems = load_flow(path)
-    if flow is not None and implementation_gate:
-        problems += _not_implemented(flow)
+    if flow is not None:
+        graph = build_graph(flow)
+        risky = list(config["risky_commands"]) if config else list(DEFAULT_RISKY_COMMANDS)
+        stages: list[Callable[[], list[Problem]]] = [
+            lambda: graph_checks(flow, graph),
+            lambda: expression_checks(flow, graph),
+            lambda: workspace_checks(flow, workdir or path.parent),
+            lambda: lint_checks(flow, graph, risky),
+        ]
+        if implementation_gate:
+            stages.append(lambda: _not_implemented(flow))
+        for stage in stages:
+            found = stage()
+            problems += found
+            if any(p.is_error for p in found):
+                break
     problems.sort(key=lambda p: (p.file or "", p.line or 0, p.column or 0, p.code))
     return Report(path, flow, problems)
 

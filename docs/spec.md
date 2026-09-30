@@ -131,7 +131,12 @@ prices:                        # optional; used to estimate USD where a harness 
 on_wait: 'notify-send "Arcflow" "$ARCFLOW_MESSAGE"'   # default human-node hook (§5.4); values arrive as env vars
 retention: { keep_days: 30 }   # used by `arcflow gc`
 redact: ['sk-[A-Za-z0-9_-]{20,}']  # regexes masked in logs Arcflow writes (§12.4)
+redact_streams: true           # also redact raw harness streams (§12.4)
+allow_full: false              # allow `permissions: full` without --allow-full (§12.2)
+risky_commands: ['\bgit\s+push\b', '\bkubectl\b']   # regexes for W-NO-HUMAN-BEFORE-RISKY (§12.7); replaces the built-in list
 ```
+
+Each harness entry also accepts `grace` (a duration, default `10s`), the stop-sequence grace period of §6.7.
 
 The config file is validated against a published JSON Schema like flow files; unknown keys are errors.
 
@@ -377,7 +382,7 @@ Per ADR 0003:
 | `env.<NAME>` | Environment variables of the runner process that are allowed by §12.3. Reading any other variable yields `None`. |
 | `node` | Inside a node's own configuration only: `id`, `visit`, `attempt`, `artifacts_dir`, `workdir`, and for human nodes `message`. |
 | `item`, `index` | Inside `map` bodies only. |
-| `self` | Alias for `nodes.<current node id>`, usable in the node's own `next` and `on_error`. |
+| `self` | Alias for `nodes.<current node id>`, usable in the node's own `next` and `on_error` (anywhere else it is `E-UNKNOWN-REF`). |
 
 `visits.<id>` counts started visits so that `when: visits.implement < 3` read in a later node means "implement has run fewer than three times".
 
@@ -401,7 +406,9 @@ Strings in templated fields (marked "T" in §5) may contain `${{ expression }}`.
 - `inputs.x`: `x` is a declared input.
 - `nodes.x`: `x` is a node ID. `nodes.x.<field>`: the field exists for that node's type (§5). `nodes.x.output.<path>`: when `x` has an `output_schema`, the path exists in it (following `properties`, `items`, and `$ref` within the same file); when it has none, access to `output` is allowed but unchecked (`I-UNCHECKED-OUTPUT`).
 - `visits.x`: `x` is a node ID.
-- A reference to a node that cannot have run before the current node on any path (no path from it to here) is a warning (`W-NEVER-SET`), since it will always be `None`.
+- A reference to a node that cannot have run before the current node on any path (no path from it to here) is a warning (`W-NEVER-SET`), since it will always be `None`. For flow `outputs`, "here" is `end`.
+- `self` outside `next`/`on_error`, `node` in flow `outputs`, and `item`/`index` outside a `map` node's `inputs` are `E-UNKNOWN-REF`.
+- `E-NO-EXIT` follows every `next` edge (including the implicit `next: end`) and the `on_error` edges the author wrote; the implicit `on_error: fail` does not count as a way out, or no node could ever lack an exit.
 
 Types are not inferred beyond this in v1.
 
@@ -702,7 +709,7 @@ Nodes communicate only through state (§4.3) and the filesystem (the workspace a
 
 ### 6.4 Loops and visit limits
 
-Cycles are ordinary edges back to an earlier node. Each node allows `max_visits` visits per run (default 10); the run allows `limits.max_steps` visits in total (default 200). Exceeding either fails the run, naming the node, so an unguarded loop always terminates. Flows should guard loops with `visits.<id>` in a `when:` so they can route somewhere useful (an escalation node) before the hard limit; `arcflow validate` warns (`W-UNGUARDED-CYCLE`) for a cycle in which no `when:` references `visits` of a node in the cycle.
+Cycles are ordinary edges back to an earlier node. Each node allows `max_visits` visits per run (default 10); the run allows `limits.max_steps` visits in total (default 200). Exceeding either fails the run, naming the node, so an unguarded loop always terminates. Flows should guard loops with `visits.<id>` in a `when:` so they can route somewhere useful (an escalation node) before the hard limit; `arcflow validate` warns (`W-UNGUARDED-CYCLE`) for a cycle in which no `when:` of a node in the cycle (including cases that leave it) references `visits` of a node in the cycle.
 
 ### 6.5 Errors and `on_error`
 
