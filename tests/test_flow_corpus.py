@@ -25,6 +25,7 @@ from arcflow.validate import validate
 
 CORPUS = Path(__file__).parent / "flows"
 SPEC = Path(__file__).parent.parent / "docs" / "spec.md"
+EXAMPLES = Path(__file__).parent.parent / "examples"
 EXPECT = re.compile(r"#\s*expect:\s*([EWI]-[A-Z0-9-]+)(?:\s*@\s*(\d+):(\d+))?")
 
 
@@ -101,3 +102,17 @@ def test_given_spec_appendix_a_when_compared_then_corpus_copies_are_identical() 
         assert name is not None
         corpus_file = CORPUS / "valid" / f"{name.group(1)}.yaml"
         assert corpus_file.read_text() == block, f"{corpus_file.name} drifted from spec Appendix A"
+
+
+def test_given_examples_directory_when_compared_then_it_matches_the_corpus() -> None:
+    # Given: examples/ is the user-facing copy of the Appendix A flows and their files
+    shipped = sorted(p.relative_to(EXAMPLES) for p in EXAMPLES.rglob("*") if p.is_file())
+    shipped = [p for p in shipped if p.name != "README.md"]
+
+    # Then
+    assert shipped, "examples/ is empty"
+    for relative in shipped:
+        corpus_file = CORPUS / "valid" / relative
+        assert (EXAMPLES / relative).read_bytes() == corpus_file.read_bytes(), (
+            f"examples/{relative} drifted from the valid corpus"
+        )

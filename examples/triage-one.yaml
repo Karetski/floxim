@@ -1,0 +1,27 @@
+arcflow: 1
+name: triage-one
+include: [shared/templates.yaml]
+inputs:
+  issue: { type: object, required: true }
+nodes:
+  classify:
+    extends: triager
+    prompt: |
+      Classify this issue and draft a first response.
+      ${{ inputs.issue }}
+    output_schema: schemas/triage.json    # {label, reply, confidence}
+    next:
+      - when: nodes.classify.output.confidence >= 0.7
+        to: apply
+      - to: end
+  apply:
+    type: shell
+    env:
+      ISSUE: ${{ inputs.issue.number }}
+      LABEL: ${{ nodes.classify.output.label }}
+      REPLY: ${{ nodes.classify.output.reply }}
+    run: |
+      gh issue edit "$ISSUE" --add-label "$LABEL"
+      gh issue comment "$ISSUE" --body "$REPLY"
+outputs:
+  label: ${{ nodes.classify.output.label }}

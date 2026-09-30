@@ -1416,7 +1416,7 @@ Draft 1 left these questions open, each with a default. Alexey's review on 2026-
 
 ## Appendix A. Example flows
 
-All four are part of the valid-flow test corpus (§13). The first three use only the five basic node types; the fourth uses composition and custom logic.
+All four are part of the valid-flow test corpus (§13) and ship, with their schemas and shared templates, in the repository's `examples/` directory. The first three use only the five basic node types; the fourth uses composition and custom logic.
 
 ### A.1 `implement-feature`: plan, implement, test loop, approval
 
@@ -1709,7 +1709,7 @@ nodes:
 
 ### A.4 `triage-issues`: composition and custom logic
 
-Shows `include`, `python`, `map` over a subflow, `set` and `notify`. It is in the valid corpus from M1 and becomes runnable once those node types land (`docs/milestones.md`).
+Shows `include`, `python`, `map` over a subflow, `set` and `notify`.
 
 ```yaml
 arcflow: 1

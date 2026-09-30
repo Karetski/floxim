@@ -1,0 +1,51 @@
+arcflow: 1
+name: triage-issues
+description: Label and answer new GitHub issues, one subflow run per issue.
+
+include:
+  - shared/templates.yaml          # provides the `triager` agent template
+
+inputs:
+  since: { type: string, required: true, description: "ISO date, e.g. 2026-09-29" }
+
+nodes:
+  fetch:
+    type: shell
+    args: [gh, issue, list, --state, open, --json, "number,title,body,labels", --search, "created:>=${{ inputs.since }}"]
+    output: json
+    next: select
+
+  select:
+    type: python
+    call: tools.triage:needs_triage     # returns the issues without a triage label
+    args: { issues: "${{ nodes.fetch.output }}" }
+    next: each
+
+  each:
+    type: map
+    items: ${{ nodes.select.output }}
+    flow: triage-one.yaml
+    inputs:
+      issue: ${{ item }}
+    on_item_error: continue
+    max_items: 30
+    next: tally
+
+  tally:
+    type: set
+    vars:
+      triaged: ${{ nodes.each.succeeded }}
+      failed: ${{ nodes.each.failed }}
+    next:
+      - when: vars.failed > 0
+        to: report
+      - to: end
+
+  report:
+    type: notify
+    command: 'notify-send "Arcflow triage" "$ARCFLOW_MESSAGE"'
+    message: "${{ vars.failed }} of ${{ vars.triaged + vars.failed }} issues failed triage."
+
+outputs:
+  triaged: ${{ vars.triaged }}
+  failed: ${{ vars.failed }}
