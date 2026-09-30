@@ -1,0 +1,125 @@
+{
+  "nodes": {
+    "approve": {
+      "config": {
+        "choices": [
+          "merge",
+          "reject"
+        ],
+        "default": "reject",
+        "max_visits": 5,
+        "message": "Tests pass for \"${{ inputs.feature }}\". Merge ${{ inputs.branch }}?\n",
+        "next": [
+          {
+            "to": "merge",
+            "when": "nodes.approve.choice == \"merge\""
+          },
+          {
+            "to": "end"
+          }
+        ],
+        "show": [
+          "Plan: ${{ nodes.plan.output.summary }}",
+          "Estimated spend so far (USD): ${{ round(run.budget.usd_spent, 2) }}"
+        ],
+        "timeout": "3d",
+        "type": "human"
+      },
+      "type": "human"
+    },
+    "escalate": {
+      "config": {
+        "choices": [
+          "retry",
+          "give_up"
+        ],
+        "max_visits": 5,
+        "message": "Tests still fail after 3 attempts. Fix it by hand, then choose \"retry\" to run the tests again.",
+        "next": [
+          {
+            "to": "test",
+            "when": "nodes.escalate.choice == \"retry\""
+          },
+          {
+            "reason": "Gave up after repeated test failures.",
+            "to": "fail"
+          }
+        ],
+        "type": "human"
+      },
+      "type": "human"
+    },
+    "implement": {
+      "config": {
+        "harness": "codex",
+        "max_visits": 5,
+        "next": "test",
+        "prompt": "${{ \"Implement this plan:\" if visits.implement == 1 else \"The tests still fail. Fix the code, not the tests.\" }}\n\n${{ nodes.plan.output if visits.implement == 1 else tail(nodes.test.stdout + nodes.test.stderr, 120) }}\n",
+        "session": "continue",
+        "timeout": "30m",
+        "type": "agent"
+      },
+      "type": "agent"
+    },
+    "merge": {
+      "config": {
+        "args": [
+          "git",
+          "merge",
+          "--no-ff",
+          "${{ inputs.branch }}"
+        ],
+        "max_visits": 5,
+        "type": "shell"
+      },
+      "type": "shell"
+    },
+    "plan": {
+      "config": {
+        "harness": "claude",
+        "max_visits": 5,
+        "model": "sonnet",
+        "next": [
+          {
+            "to": "implement",
+            "when": "nodes.plan.output.status == \"ready\""
+          },
+          {
+            "reason": "Planner is blocked: ${{ nodes.plan.output.summary }}",
+            "to": "fail"
+          }
+        ],
+        "output_schema": "schemas/plan.json",
+        "permissions": "read-only",
+        "prompt": "Write an implementation plan for: ${{ inputs.feature }}\nRead the relevant code first. Do not change any files.\nSet status to \"blocked\" if the request is unclear, and explain why in summary.\n",
+        "timeout": "30m",
+        "type": "agent"
+      },
+      "type": "agent"
+    },
+    "test": {
+      "config": {
+        "max_visits": 5,
+        "next": [
+          {
+            "to": "approve",
+            "when": "nodes.test.exit_code == 0"
+          },
+          {
+            "to": "implement",
+            "when": "visits.implement < 3"
+          },
+          {
+            "to": "escalate"
+          }
+        ],
+        "on_error": "continue",
+        "run": "${{ inputs.test_command }}",
+        "timeout": "15m",
+        "type": "shell"
+      },
+      "type": "shell"
+    }
+  },
+  "start": "plan"
+}

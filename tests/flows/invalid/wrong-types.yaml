@@ -1,0 +1,15 @@
+name: wrong-types
+limits:
+  max_steps: many
+nodes:
+  a:
+    type: shell
+    run: echo
+    max_visits: 0
+    timeout: soon
+    ok_codes: 0
+
+# expect: E-SCHEMA @ 3:14
+# expect: E-SCHEMA @ 8:17
+# expect: E-SCHEMA @ 9:14
+# expect: E-SCHEMA @ 10:15

@@ -1,0 +1,10 @@
+name: template-cycle
+templates:
+  a: {extends: b, type: shell}
+  b: {extends: a}
+nodes:
+  n:
+    extends: a
+    run: echo
+
+# expect: E-TEMPLATE-CYCLE @ 4:16

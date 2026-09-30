@@ -1,0 +1,95 @@
+{
+  "nodes": {
+    "ask": {
+      "config": {
+        "input": "text",
+        "message": "The agent is stuck on PR #${{ inputs.pr }}:\n${{ nodes.fix.output.summary }}\n",
+        "next": "fix",
+        "timeout": "1d",
+        "type": "human"
+      },
+      "type": "human"
+    },
+    "checkout": {
+      "config": {
+        "args": [
+          "gh",
+          "pr",
+          "checkout",
+          "${{ inputs.pr }}"
+        ],
+        "next": "wait",
+        "type": "shell"
+      },
+      "type": "shell"
+    },
+    "checks": {
+      "config": {
+        "args": [
+          "gh",
+          "pr",
+          "checks",
+          "${{ inputs.pr }}",
+          "--json",
+          "name,bucket,link"
+        ],
+        "max_visits": 30,
+        "next": [
+          {
+            "to": "fix",
+            "when": "\"fail\" in pluck(nodes.checks.output, \"bucket\")"
+          },
+          {
+            "to": "wait",
+            "when": "\"pending\" in pluck(nodes.checks.output, \"bucket\")"
+          },
+          {
+            "to": "end"
+          }
+        ],
+        "ok_codes": [
+          0,
+          1,
+          8
+        ],
+        "output": "json",
+        "type": "shell"
+      },
+      "type": "shell"
+    },
+    "fix": {
+      "config": {
+        "harness": "codex",
+        "harness_options": {
+          "network": true
+        },
+        "max_visits": 4,
+        "next": [
+          {
+            "to": "wait",
+            "when": "nodes.fix.output.status == \"fixed\""
+          },
+          {
+            "to": "ask"
+          }
+        ],
+        "output_schema": "schemas/fix.json",
+        "permissions": "edit",
+        "prompt": "CI failed on this branch. Failed checks:\n${{ nodes.checks.output }}\n${{ \"Guidance from the maintainer: \" + nodes.ask.text if nodes.ask else \"\" }}\nUse `gh run view --log-failed` to read the logs. Fix the cause, commit and push.\nIf you cannot fix it without a decision from a person, set status to \"blocked\" and ask your question in summary.\n",
+        "session": "continue",
+        "type": "agent"
+      },
+      "type": "agent"
+    },
+    "wait": {
+      "config": {
+        "duration": "${{ \"1m\" if visits.wait == 1 else \"10m\" }}",
+        "max_visits": 30,
+        "next": "checks",
+        "type": "sleep"
+      },
+      "type": "sleep"
+    }
+  },
+  "start": "checkout"
+}

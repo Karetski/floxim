@@ -1,0 +1,8 @@
+# Template fragment included by triage-issues.yaml and triage-one.yaml (spec §3.7).
+templates:
+  triager:
+    type: agent
+    harness: claude
+    model: sonnet
+    permissions: read-only
+    timeout: 10m

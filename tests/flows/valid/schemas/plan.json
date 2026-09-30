@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "summary", "steps"],
+  "properties": {
+    "status": { "enum": ["ready", "blocked"] },
+    "summary": { "type": "string" },
+    "steps": { "type": "array", "items": { "type": "string" } }
+  }
+}

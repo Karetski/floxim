@@ -1,0 +1,91 @@
+arcflow: 1
+name: implement-feature
+description: Plan with Claude, implement with Codex, loop on tests, ask before merging.
+
+inputs:
+  feature:
+    type: string
+    required: true
+    description: What to build, in one or two sentences.
+  branch:
+    type: string
+    required: true
+  test_command:
+    type: string
+    default: npm test
+
+defaults:
+  max_visits: 5
+  agent:
+    timeout: 30m
+
+limits:
+  budget: { usd: 10 }
+
+nodes:
+  plan:
+    type: agent
+    harness: claude
+    model: sonnet
+    permissions: read-only
+    prompt: |
+      Write an implementation plan for: ${{ inputs.feature }}
+      Read the relevant code first. Do not change any files.
+      Set status to "blocked" if the request is unclear, and explain why in summary.
+    output_schema: schemas/plan.json
+    next:
+      - when: nodes.plan.output.status == "ready"
+        to: implement
+      - to: fail
+        reason: "Planner is blocked: ${{ nodes.plan.output.summary }}"
+
+  implement:
+    type: agent
+    harness: codex
+    session: continue            # later visits keep the context of earlier attempts
+    prompt: |
+      ${{ "Implement this plan:" if visits.implement == 1 else "The tests still fail. Fix the code, not the tests." }}
+
+      ${{ nodes.plan.output if visits.implement == 1 else tail(nodes.test.stdout + nodes.test.stderr, 120) }}
+    next: test
+
+  test:
+    type: shell
+    run: ${{ inputs.test_command }}
+    timeout: 15m
+    on_error: continue           # a failing test run is data, not a run failure
+    next:
+      - when: nodes.test.exit_code == 0
+        to: approve
+      - when: visits.implement < 3
+        to: implement
+      - to: escalate
+
+  approve:
+    type: human
+    message: |
+      Tests pass for "${{ inputs.feature }}". Merge ${{ inputs.branch }}?
+    show:
+      - "Plan: ${{ nodes.plan.output.summary }}"
+      - "Estimated spend so far (USD): ${{ round(run.budget.usd_spent, 2) }}"
+    choices: [merge, reject]
+    timeout: 3d
+    default: reject
+    next:
+      - when: nodes.approve.choice == "merge"
+        to: merge
+      - to: end
+
+  merge:
+    type: shell
+    args: [git, merge, --no-ff, "${{ inputs.branch }}"]
+
+  escalate:
+    type: human
+    message: Tests still fail after 3 attempts. Fix it by hand, then choose "retry" to run the tests again.
+    choices: [retry, give_up]
+    next:
+      - when: nodes.escalate.choice == "retry"
+        to: test
+      - to: fail
+        reason: Gave up after repeated test failures.

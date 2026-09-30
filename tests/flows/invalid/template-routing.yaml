@@ -1,0 +1,11 @@
+name: template-routing
+templates:
+  step:
+    type: shell
+    next: end
+nodes:
+  n:
+    extends: step
+    run: echo
+
+# expect: E-TEMPLATE-ROUTING @ 5:5

@@ -1,0 +1,76 @@
+{
+  "nodes": {
+    "each": {
+      "config": {
+        "flow": "triage-one.yaml",
+        "inputs": {
+          "issue": "${{ item }}"
+        },
+        "items": "${{ nodes.select.output }}",
+        "max_items": 30,
+        "next": "tally",
+        "on_item_error": "continue",
+        "type": "map"
+      },
+      "type": "map"
+    },
+    "fetch": {
+      "config": {
+        "args": [
+          "gh",
+          "issue",
+          "list",
+          "--state",
+          "open",
+          "--json",
+          "number,title,body,labels",
+          "--search",
+          "created:>=${{ inputs.since }}"
+        ],
+        "next": "select",
+        "output": "json",
+        "type": "shell"
+      },
+      "type": "shell"
+    },
+    "report": {
+      "config": {
+        "command": "notify-send \"Arcflow triage\" \"$ARCFLOW_MESSAGE\"",
+        "message": "${{ vars.failed }} of ${{ vars.triaged + vars.failed }} issues failed triage.",
+        "type": "notify"
+      },
+      "type": "notify"
+    },
+    "select": {
+      "config": {
+        "args": {
+          "issues": "${{ nodes.fetch.output }}"
+        },
+        "call": "tools.triage:needs_triage",
+        "next": "each",
+        "type": "python"
+      },
+      "type": "python"
+    },
+    "tally": {
+      "config": {
+        "next": [
+          {
+            "to": "report",
+            "when": "vars.failed > 0"
+          },
+          {
+            "to": "end"
+          }
+        ],
+        "type": "set",
+        "vars": {
+          "failed": "${{ nodes.each.failed }}",
+          "triaged": "${{ nodes.each.succeeded }}"
+        }
+      },
+      "type": "set"
+    }
+  },
+  "start": "fetch"
+}

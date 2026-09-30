@@ -1,0 +1,22 @@
+name: bad-json-schema
+inputs:
+  cfg:
+    type: object
+    schema: {type: 12}
+nodes:
+  a:
+    type: shell
+    run: echo
+    output: json
+    output_schema:
+      type: object
+      required: status
+  b:
+    type: shell
+    run: echo
+    output: json
+    output_schema: not-json.txt
+
+# expect: E-BAD-JSON-SCHEMA @ 5:13
+# expect: E-BAD-JSON-SCHEMA @ 12:7
+# expect: E-BAD-JSON-SCHEMA @ 18:20

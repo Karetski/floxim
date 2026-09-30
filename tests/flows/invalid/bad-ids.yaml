@@ -1,0 +1,22 @@
+name: bad-ids
+inputs:
+  Feature: {type: string}
+templates:
+  My-Template: {type: shell}
+nodes:
+  Build:
+    type: shell
+    run: echo
+  end:
+    type: shell
+    run: echo
+  bump:
+    type: set
+    vars:
+      2fast: 1
+
+# expect: E-BAD-ID @ 3:3
+# expect: E-BAD-ID @ 5:3
+# expect: E-BAD-ID @ 7:3
+# expect: E-RESERVED-ID @ 10:3
+# expect: E-BAD-ID @ 16:7

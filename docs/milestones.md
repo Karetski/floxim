@@ -95,7 +95,7 @@ M1b, M2e, M2f, M5c and M6a are off the critical path, and their order among the 
 **Scope**
 
 - `ruamel.yaml` loading in YAML 1.2 core mode with line/column positions for every value; rejection of anchors, aliases, merge keys and duplicate keys.
-- Dataclass model for flows, inputs, defaults, limits, templates and all eleven node types; `x-*` keys preserved and ignored; durations and identifiers.
+- A declarative model of flows, inputs, defaults, limits, templates and all eleven node types, from which both the validator and the published schema derive; `x-*` keys preserved and ignored; durations and identifiers.
 - Effective-node computation: built-in defaults → `defaults` → `defaults.<type>` → templates (`extends` chains) → node keys, with the merge rules of §3.6; `include` of template-only fragments.
 - Referenced files resolved relative to the flow file; JSON Schemas checked with `fastjsonschema`.
 - `arcflow validate <flow>… [--strict] [--json]`, printing problems as `file:line:col severity CODE pointer: message` and as the JSON array of §9.4. The `--json` envelope and the exit-code constants are shared code from here on.

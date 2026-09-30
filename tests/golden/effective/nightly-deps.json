@@ -1,0 +1,168 @@
+{
+  "nodes": {
+    "open_pr": {
+      "config": {
+        "env": {
+          "PR_BODY": "${{ nodes.upgrade.output.summary }}"
+        },
+        "run": "git add -A\ngit commit -m \"chore(deps): nightly upgrade\"\ngit push -u origin HEAD\ngh pr create --fill --title \"chore(deps): nightly upgrade\" --body \"$PR_BODY\"\n",
+        "type": "shell",
+        "workspace": {
+          "branch": "deps/${{ run.id }}",
+          "keep": true,
+          "worktree": "upgrade"
+        }
+      },
+      "type": "shell"
+    },
+    "outdated": {
+      "config": {
+        "next": [
+          {
+            "to": "end",
+            "when": "len(nodes.outdated.output) == 0"
+          },
+          {
+            "to": "upgrade"
+          }
+        ],
+        "ok_codes": [
+          0,
+          1
+        ],
+        "output": "json",
+        "run": "npm outdated --json",
+        "type": "shell"
+      },
+      "type": "shell"
+    },
+    "review": {
+      "config": {
+        "harness": "codex",
+        "next": [
+          {
+            "to": "open_pr",
+            "when": "nodes.review.output.verdict == \"approve\""
+          },
+          {
+            "to": "upgrade",
+            "when": "visits.upgrade < 3"
+          },
+          {
+            "reason": "Reviewer still requests changes after three rounds.",
+            "to": "fail"
+          }
+        ],
+        "output_schema": "schemas/review.json",
+        "permissions": "read-only",
+        "prompt": "Review the uncommitted dependency upgrade in this repository for risky changes,\nmissed breaking changes and unnecessary edits. Approve only if it is safe to merge.\n",
+        "type": "agent",
+        "workspace": {
+          "branch": "deps/${{ run.id }}",
+          "keep": true,
+          "worktree": "upgrade"
+        }
+      },
+      "type": "agent"
+    },
+    "test": {
+      "config": {
+        "next": [
+          {
+            "to": "review",
+            "when": "nodes.test.exit_code == 0"
+          },
+          {
+            "to": "upgrade",
+            "when": "visits.upgrade < 3"
+          },
+          {
+            "reason": "Tests fail after three upgrade attempts.",
+            "to": "fail"
+          }
+        ],
+        "on_error": "continue",
+        "run": "npm ci && npm test",
+        "timeout": "20m",
+        "type": "shell",
+        "workspace": {
+          "branch": "deps/${{ run.id }}",
+          "keep": true,
+          "worktree": "upgrade"
+        }
+      },
+      "type": "shell"
+    },
+    "upgrade": {
+      "config": {
+        "allow_tools": [
+          "Bash(npm install:*)",
+          "Bash(npm test:*)",
+          "Bash(npx tsc:*)"
+        ],
+        "harness": "claude",
+        "next": [
+          {
+            "to": "test",
+            "when": "nodes.upgrade.output.status == \"done\""
+          },
+          {
+            "reason": "Upgrade blocked: ${{ nodes.upgrade.output.summary }}",
+            "to": "fail"
+          }
+        ],
+        "output_schema": {
+          "additionalProperties": false,
+          "definitions": {},
+          "items": true,
+          "patternProperties": {},
+          "properties": {
+            "status": {
+              "definitions": {},
+              "enum": [
+                "done",
+                "blocked"
+              ],
+              "items": true,
+              "patternProperties": {},
+              "properties": {},
+              "readOnly": false,
+              "uniqueItems": false,
+              "writeOnly": false
+            },
+            "summary": {
+              "definitions": {},
+              "items": true,
+              "patternProperties": {},
+              "properties": {},
+              "readOnly": false,
+              "type": "string",
+              "uniqueItems": false,
+              "writeOnly": false
+            }
+          },
+          "readOnly": false,
+          "required": [
+            "status",
+            "summary"
+          ],
+          "type": "object",
+          "uniqueItems": false,
+          "writeOnly": false
+        },
+        "permissions": "edit",
+        "prompt": "${{ \"Upgrade these packages to their latest versions, adapting code to breaking changes:\" if visits.upgrade == 1 else \"Your last change needs more work.\" }}\n${{ nodes.outdated.output if visits.upgrade == 1 else \"\" }}\n${{ \"Test failures:\\n\" + tail(nodes.test.stderr, 80) if nodes.test and nodes.test.exit_code != 0 else \"\" }}\n${{ \"Reviewer issues:\\n\" + join(nodes.review.output.issues, \"\\n\") if nodes.review and nodes.review.output.verdict == \"changes\" else \"\" }}\nRun the tests before you finish. Report status \"done\" only if they pass.\n",
+        "session": "continue",
+        "timeout": "40m",
+        "type": "agent",
+        "workspace": {
+          "branch": "deps/${{ run.id }}",
+          "keep": true,
+          "worktree": "upgrade"
+        }
+      },
+      "type": "agent"
+    }
+  },
+  "start": "outdated"
+}

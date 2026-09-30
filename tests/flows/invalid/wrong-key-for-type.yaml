@@ -1,0 +1,8 @@
+name: wrong-key-for-type
+nodes:
+  a:
+    type: shell
+    run: echo
+    prompt: shell nodes have no prompt
+
+# expect: E-UNKNOWN-KEY @ 6:5

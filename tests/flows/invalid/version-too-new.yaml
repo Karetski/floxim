@@ -1,0 +1,6 @@
+arcflow: 2
+name: future
+nodes:
+  a: {type: shell, run: echo}
+
+# expect: E-VERSION @ 1:10

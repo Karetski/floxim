@@ -1,0 +1,9 @@
+name: unknown-template
+templates:
+  reviewer: {type: agent, harness: codex}
+nodes:
+  review:
+    extends: reviwer
+    prompt: Review.
+
+# expect: E-UNKNOWN-TEMPLATE @ 6:14

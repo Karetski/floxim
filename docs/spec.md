@@ -145,7 +145,7 @@ The config file is validated against a published JSON Schema like flow files; un
 - **Strict:** unknown keys are errors, except keys starting with `x-`, which are preserved and ignored (for tools and comments that need structure).
 - Anchors, aliases and merge keys (`<<:`) are **rejected**. They make round-trip editing ambiguous; use `templates` instead (§3.6).
 - Duplicate keys are errors.
-- A **published JSON Schema** (`arcflow schema flow`) describes the file for editors (yaml-language-server) and authoring agents. The schema and this section must stay in sync; the schema is generated from the same dataclasses the parser uses.
+- A **published JSON Schema** (`arcflow schema flow`) describes the file for editors (yaml-language-server) and authoring agents. The schema and this section must stay in sync; the schema is generated from the same declarations the validator checks against, so the two cannot disagree.
 - **Durations** are strings of one or more `<int><unit>` groups with units `s`, `m`, `h`, `d` (`90s`, `1h30m`, `3d`), or a bare integer meaning seconds. `none` is accepted where this spec says so.
 - **Identifiers** (node IDs, template names, input names, variable names) match `^[a-z][a-z0-9_]{0,63}$`. Node IDs must not be a reserved word: `end`, `fail`, `self`, `inputs`, `nodes`, `visits`, `vars`, `run`, `env`, `node`, `item`.
 
@@ -446,7 +446,7 @@ plan:
 | `effort` | `low` \| `medium` \| `high` \| `max` | harness default | Mapped by the adapter when supported, else `W-IGNORED-OPTION`. |
 | `prompt` / `prompt_file` | string T / path | exactly one required | The task. Sent on stdin (Claude, Codex) or as the adapter requires. |
 | `instructions` / `instructions_file` | string T / path | — | Extra system instructions (Claude `--append-system-prompt-file`; Codex: prepended to the prompt under a heading, since `codex exec` has no equivalent flag). |
-| `output_schema` | path or inline map | — | JSON Schema (draft 2020-12) the final output must match (§5.1.2). |
+| `output_schema` | path or inline map | — | JSON Schema (draft-07) the final output must match (§5.1.2). |
 | `schema_retries` | integer | 2 | Extra turns allowed to fix invalid output. |
 | `session` | `new` \| `continue` \| `{resume: <id>}` \| `{fork: <id>}` | `new` | §5.1.3. |
 | `permissions` | `read-only` \| `edit` \| `full` | `edit` | Profile (§8.4, ADR 0005). |
@@ -483,6 +483,7 @@ Flows that care whether the agent really did the work should require a `status` 
 
 #### 5.1.2 Structured output
 
+- Schemas use **JSON Schema draft-07**, the newest dialect `fastjsonschema` implements (ADR 0001 rules out the native-code validators that support later drafts). A `$schema` naming another dialect is `E-BAD-JSON-SCHEMA`, and so is a remote `$ref`: schemas must be self-contained. Schema files are JSON.
 - The schema file is loaded and checked as a valid JSON Schema at validate time.
 - If the adapter declares native structured output, the schema is passed to the harness (Claude `--json-schema`, Codex `--output-schema`). Arcflow validates the result again with `fastjsonschema` in all cases.
 - Without native support, Arcflow appends an instruction to reply with only a JSON object matching the schema, extracts the last fenced or bare JSON object from the final text, and validates it.
@@ -1157,7 +1158,9 @@ Checks, in order, stopping at the first stage with errors: YAML syntax; schema (
 flows/implement-feature.yaml:41:13 error E-UNKNOWN-TARGET  next[1].to: no node named "implment" (did you mean "implement"?)
 ```
 
-With `--json`, problems are an array of `{code, severity, message, file, line, column, pointer, hint}`, the format authoring agents consume (§11).
+With `--json`, problems are an array of `{code, severity, message, file, line, column, pointer, hint}`, the format authoring agents consume (§11). `pointer` is an RFC 6901 JSON pointer into the file; the text output shows it as a dotted path (`nodes.test.next[1].to`). When every file is valid the document is `{"ok": true, "data": {"files": […], "problems": […]}}` (problems then holds only warnings and infos); otherwise it is `{"ok": false, "error": {"code": "E-INVALID-FLOW", "message": …, "details": {"files": […], "problems": […]}}}` and the exit code is 3. Each `files` entry is `{file, valid, name}`.
+
+While v1 is being built, the last stage reports `E-NOT-IMPLEMENTED` for node types the runner cannot execute yet (`docs/milestones.md`).
 
 ---
 
@@ -1799,7 +1802,7 @@ Severity prefix: `E` error, `W` warning, `I` info. The list is stable; codes are
 |---|---|
 | `E-YAML` | YAML syntax error |
 | `E-YAML-ALIAS` | Anchors, aliases or merge keys used |
-| `E-DUPLICATE-KEY` | Duplicate mapping key |
+| `E-DUPLICATE-KEY` | Duplicate mapping key, or a template defined both locally and in an `include` |
 | `E-SCHEMA` | Type or structure does not match the flow schema |
 | `E-UNKNOWN-KEY` | Key not allowed here |
 | `E-VERSION` | `arcflow:` version not supported |

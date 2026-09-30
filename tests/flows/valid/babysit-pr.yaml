@@ -1,0 +1,64 @@
+arcflow: 1
+name: babysit-pr
+description: Watch a pull request's CI; when it fails, have an agent fix it; ask a person when the agent is stuck.
+
+inputs:
+  pr: { type: integer, required: true }
+
+limits:
+  max_duration: 6h
+  budget: { usd: none, tokens: 3_000_000 }   # Codex reports tokens, not USD
+
+nodes:
+  checkout:
+    type: shell
+    args: [gh, pr, checkout, "${{ inputs.pr }}"]
+    next: wait
+
+  wait:
+    type: sleep
+    duration: ${{ "1m" if visits.wait == 1 else "10m" }}
+    max_visits: 30
+    next: checks
+
+  checks:
+    type: shell
+    args: [gh, pr, checks, "${{ inputs.pr }}", --json, "name,bucket,link"]
+    ok_codes: [0, 1, 8]          # gh: 1 = some failed, 8 = some pending
+    output: json
+    max_visits: 30
+    next:
+      - when: '"fail" in pluck(nodes.checks.output, "bucket")'
+        to: fix
+      - when: '"pending" in pluck(nodes.checks.output, "bucket")'
+        to: wait
+      - to: end
+
+  fix:
+    type: agent
+    harness: codex
+    session: continue
+    max_visits: 4
+    prompt: |
+      CI failed on this branch. Failed checks:
+      ${{ nodes.checks.output }}
+      ${{ "Guidance from the maintainer: " + nodes.ask.text if nodes.ask else "" }}
+      Use `gh run view --log-failed` to read the logs. Fix the cause, commit and push.
+      If you cannot fix it without a decision from a person, set status to "blocked" and ask your question in summary.
+    permissions: edit
+    harness_options:
+      network: true                # pushing needs network (§8.3)
+    output_schema: schemas/fix.json    # {status: fixed|blocked, summary}
+    next:
+      - when: nodes.fix.output.status == "fixed"
+        to: wait
+      - to: ask
+
+  ask:
+    type: human
+    message: |
+      The agent is stuck on PR #${{ inputs.pr }}:
+      ${{ nodes.fix.output.summary }}
+    input: text
+    timeout: 1d                  # no default, so a timeout is an error and on_error (fail) ends the run
+    next: fix

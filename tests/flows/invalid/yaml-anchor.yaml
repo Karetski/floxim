@@ -1,0 +1,9 @@
+name: anchors
+nodes:
+  a: &shared
+    type: shell
+    run: echo a
+  b: *shared
+
+# expect: E-YAML-ALIAS @ 3:6
+# expect: E-YAML-ALIAS @ 6:6

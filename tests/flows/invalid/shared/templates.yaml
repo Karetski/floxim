@@ -1,0 +1,2 @@
+templates:
+  step: {type: shell, run: echo shared}

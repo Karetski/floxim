@@ -1,0 +1,8 @@
+name: broken
+nodes:
+  a:
+    type: shell
+    run: [echo
+  b: {type: shell, run: echo}
+
+# expect: E-YAML @ 6:4

@@ -1,0 +1,25 @@
+name: exclusive
+nodes:
+  a:
+    type: agent
+    harness: fake
+    prompt: Hi.
+    prompt_file: prompt.md
+  b:
+    type: shell
+    run: echo
+    args: [echo]
+  c:
+    type: sleep
+    duration: 1m
+    until: "2026-10-01T00:00:00Z"
+  d:
+    type: human
+    message: Ok?
+    ack: true
+    choices: [yes, no]
+
+# expect: E-MUTUALLY-EXCLUSIVE @ 7:5
+# expect: E-MUTUALLY-EXCLUSIVE @ 11:5
+# expect: E-MUTUALLY-EXCLUSIVE @ 15:5
+# expect: E-MUTUALLY-EXCLUSIVE @ 19:5

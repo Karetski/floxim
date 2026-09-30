@@ -1,0 +1,7 @@
+name: merge-key
+nodes:
+  a:
+    <<: {type: shell}
+    run: echo a
+
+# expect: E-YAML-ALIAS @ 4:5

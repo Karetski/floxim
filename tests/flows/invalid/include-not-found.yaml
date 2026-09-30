@@ -1,0 +1,7 @@
+name: include-not-found
+include:
+  - shared/nope.yaml
+nodes:
+  a: {type: shell, run: echo}
+
+# expect: E-FILE-NOT-FOUND @ 3:5

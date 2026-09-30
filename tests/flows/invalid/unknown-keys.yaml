@@ -1,0 +1,12 @@
+name: unknown-keys
+x-editor: {ok: true}
+nodez: {}
+nodes:
+  a:
+    type: shell
+    run: echo
+    promt: hi
+    x-note: allowed
+
+# expect: E-UNKNOWN-KEY @ 3:1
+# expect: E-UNKNOWN-KEY @ 8:5

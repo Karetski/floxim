@@ -1,0 +1,96 @@
+arcflow: 1
+name: nightly-deps
+description: Upgrade outdated npm dependencies in a worktree, test, review with a second agent, open a PR.
+
+limits:
+  max_duration: 2h
+  budget: { usd: 8, tokens: 4_000_000 }
+
+templates:
+  in_upgrade_tree:
+    workspace:
+      worktree: upgrade
+      branch: deps/${{ run.id }}
+      keep: true
+  implementer:
+    extends: in_upgrade_tree
+    type: agent
+    harness: claude
+    permissions: edit
+    allow_tools: ["Bash(npm install:*)", "Bash(npm test:*)", "Bash(npx tsc:*)"]
+    timeout: 40m
+
+nodes:
+  outdated:
+    type: shell
+    run: npm outdated --json
+    ok_codes: [0, 1]             # npm exits 1 when something is outdated
+    output: json
+    next:
+      - when: len(nodes.outdated.output) == 0
+        to: end
+      - to: upgrade
+
+  upgrade:
+    extends: implementer
+    session: continue
+    prompt: |
+      ${{ "Upgrade these packages to their latest versions, adapting code to breaking changes:" if visits.upgrade == 1 else "Your last change needs more work." }}
+      ${{ nodes.outdated.output if visits.upgrade == 1 else "" }}
+      ${{ "Test failures:\n" + tail(nodes.test.stderr, 80) if nodes.test and nodes.test.exit_code != 0 else "" }}
+      ${{ "Reviewer issues:\n" + join(nodes.review.output.issues, "\n") if nodes.review and nodes.review.output.verdict == "changes" else "" }}
+      Run the tests before you finish. Report status "done" only if they pass.
+    output_schema:
+      type: object
+      additionalProperties: false
+      required: [status, summary]
+      properties:
+        status: { enum: [done, blocked] }
+        summary: { type: string }
+    next:
+      - when: nodes.upgrade.output.status == "done"
+        to: test
+      - to: fail
+        reason: "Upgrade blocked: ${{ nodes.upgrade.output.summary }}"
+
+  test:
+    extends: in_upgrade_tree
+    type: shell
+    run: npm ci && npm test
+    timeout: 20m
+    on_error: continue
+    next:
+      - when: nodes.test.exit_code == 0
+        to: review
+      - when: visits.upgrade < 3
+        to: upgrade
+      - to: fail
+        reason: Tests fail after three upgrade attempts.
+
+  review:
+    extends: in_upgrade_tree
+    type: agent
+    harness: codex
+    permissions: read-only
+    prompt: |
+      Review the uncommitted dependency upgrade in this repository for risky changes,
+      missed breaking changes and unnecessary edits. Approve only if it is safe to merge.
+    output_schema: schemas/review.json     # {verdict: approve|changes, issues: [string]}
+    next:
+      - when: nodes.review.output.verdict == "approve"
+        to: open_pr
+      - when: visits.upgrade < 3
+        to: upgrade
+      - to: fail
+        reason: Reviewer still requests changes after three rounds.
+
+  open_pr:
+    extends: in_upgrade_tree
+    type: shell
+    env:
+      PR_BODY: ${{ nodes.upgrade.output.summary }}
+    run: |
+      git add -A
+      git commit -m "chore(deps): nightly upgrade"
+      git push -u origin HEAD
+      gh pr create --fill --title "chore(deps): nightly upgrade" --body "$PR_BODY"

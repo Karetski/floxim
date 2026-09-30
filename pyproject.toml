@@ -12,7 +12,10 @@ license-files = ["LICENSE"]
 authors = [{ name = "Alexey Karetski" }]
 requires-python = ">=3.10"
 # Runtime dependencies must be pure Python (ADR 0001); CI enforces it.
-dependencies = []
+dependencies = [
+    "fastjsonschema>=2.19",
+    "ruamel-yaml>=0.19",
+]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Environment :: Console",
@@ -54,9 +57,15 @@ extend-exclude = ["docs", ".claude"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+# Docs and messages use typographic dashes and arrows on purpose.
+ignore = ["RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]
 strict = true
 python_version = "3.10"
 files = ["src", "tests", "tools"]
 mypy_path = ["tools"]
+
+[[tool.mypy.overrides]]
+module = ["fastjsonschema", "fastjsonschema.*"]
+ignore_missing_imports = true

@@ -1,0 +1,8 @@
+name: include-collision
+include: [shared/templates.yaml]
+templates:
+  step: {type: shell, run: echo local}
+nodes:
+  a: {extends: step}
+
+# expect: E-DUPLICATE-KEY @ 4:3

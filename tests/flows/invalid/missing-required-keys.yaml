@@ -1,0 +1,19 @@
+name: missing-required
+nodes:
+  a:
+    type: agent
+    prompt: Hi.
+  b:
+    type: shell
+  c:
+    type: condition
+  d:
+    type: human
+    message: Pick one.
+    choices: [a, b]
+    default: c
+
+# expect: E-SCHEMA @ 3:3
+# expect: E-SCHEMA @ 6:3
+# expect: E-SCHEMA @ 8:3
+# expect: E-SCHEMA @ 14:14

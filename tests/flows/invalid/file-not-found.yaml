@@ -1,0 +1,14 @@
+name: file-not-found
+nodes:
+  a:
+    type: agent
+    harness: fake
+    prompt_file: prompts/missing.md
+    output_schema: schemas/missing.json
+  b:
+    type: human
+    message_file: missing.md
+
+# expect: E-FILE-NOT-FOUND @ 6:18
+# expect: E-FILE-NOT-FOUND @ 7:20
+# expect: E-FILE-NOT-FOUND @ 10:19
