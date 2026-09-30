@@ -1,0 +1,4 @@
+{"type": "thread.started", "thread_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee"}
+{"type": "turn.started"}
+{"type": "item.completed", "item": {"id": "item_3", "type": "agent_message", "text": "{\"status\": \"fixed\", \"summary\": \"Updated the import\"}"}}
+{"type": "turn.completed", "usage": {"input_tokens": 24763, "cached_input_tokens": 24448, "output_tokens": 122, "reasoning_output_tokens": 64}}

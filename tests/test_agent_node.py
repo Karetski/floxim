@@ -316,19 +316,3 @@ def test_given_full_permissions_when_run_without_allow_full_then_it_is_refused(
         workdir=tmp_path,
         allow_full=True,
     )
-
-
-def test_given_pending_built_in_harness_when_validated_then_it_is_not_implemented_yet(
-    tmp_path: Path,
-) -> None:
-    # Given
-    (tmp_path / "flow.yaml").write_text(
-        "name: c\nnodes:\n  a: {type: agent, harness: codex, prompt: Hi.}\n"
-    )
-
-    # When
-    report = validate(tmp_path / "flow.yaml")
-
-    # Then
-    assert [p.code for p in report.errors] == ["E-NOT-IMPLEMENTED"]
-    assert "codex adapter" in report.errors[0].message

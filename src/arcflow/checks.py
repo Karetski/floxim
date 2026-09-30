@@ -634,6 +634,16 @@ def harness_checks(flow: Flow, prices: dict[str, Any] | None = None) -> list[Pro
                     "only the tokens budget is enforced",
                 )
             )
+        if harness == "codex":
+            schema = flow.schema_for(node, "output_schema")
+            loose = strict_schema_problem(schema) if schema is not None else None
+            if loose is not None:
+                problems.append(
+                    node.where("output_schema").problem(
+                        "W-CODEX-STRICT-SCHEMA",
+                        f"Codex strict structured output will likely reject this schema: {loose}",
+                    )
+                )
         for what in ignored:
             problems.append(
                 node.origin.problem(
@@ -661,3 +671,33 @@ def _session_source(flow: Flow, node: Node) -> list[Problem]:
             )
         ]
     return []
+
+
+def strict_schema_problem(schema: Any, path: str = "") -> str | None:
+    """The first object in `schema` that OpenAI strict mode is reported to reject:
+    one without `additionalProperties: false`, or with a property missing from
+    `required` (spec §5.1.2, research §1.3)."""
+    if not isinstance(schema, dict):
+        return None
+    if schema.get("type") == "object" or "properties" in schema:
+        where = path or "the top level"
+        if schema.get("additionalProperties") is not False:
+            return f"{where} needs additionalProperties: false"
+        missing = sorted(set(schema.get("properties") or {}) - set(schema.get("required") or []))
+        if missing:
+            return f"{where} does not list {', '.join(missing)} in required"
+    children: list[tuple[str, Any]] = [
+        (f"{path}.{key}" if path else key, sub)
+        for key, sub in (schema.get("properties") or {}).items()
+    ]
+    if isinstance(schema.get("items"), dict):
+        children.append((f"{path}[]", schema["items"]))
+    for key in ("anyOf", "oneOf", "allOf"):
+        children += [(path, sub) for sub in schema.get(key) or []]
+    for name, definition in (schema.get("definitions") or schema.get("$defs") or {}).items():
+        children.append((f"#{name}", definition))
+    for child_path, child in children:
+        problem = strict_schema_problem(child, child_path)
+        if problem is not None:
+            return problem
+    return None

@@ -1,0 +1,3 @@
+{"type": "thread.started", "thread_id": "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee"}
+{"type": "turn.started"}
+{"type": "item.started", "item": {"id": "item_1", "type": "command_execution", "command": "bash -lc 'npm test'", "aggregated_output": "", "exit_code": null, "status": "in_progress"}}

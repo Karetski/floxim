@@ -1014,17 +1014,20 @@ claude -p [--bare] --session-id <uuid> \
 
 Capabilities: all true except `permission_hook` (Future). Maps result `subtype`/`terminal_reason` to outcomes (`error_max_budget_usd` → `budget_exceeded`, `error_during_execution` after Arcflow's SIGINT → `cancelled`/`timed_out` per `stop_reason`, other errors → `failed`). Requires `ANTHROPIC_API_KEY` for `bare: true`; otherwise uses whatever auth the Claude Code install has.
 
-**`codex`** (tier 1). Invocation (research §1.3):
+**`codex`** (tier 1). Invocation, checked against `codex exec --help` of codex-cli 0.147.0 (2026-09-29), with the prompt on stdin:
 
 ```
-codex exec --json -C <cwd> --sandbox <from profile> -c approval_policy="never" \
-  [--output-schema <file>] -o <attempt_dir>/last-message.txt [-m M] \
-  [-c model_reasoning_effort=E] --skip-git-repo-check [--add-dir D …] -
-codex exec resume <thread_id> -          # session: continue/resume
-codex exec fork <thread_id> -            # session: fork
+codex exec [resume <thread_id>] --json --skip-git-repo-check \
+  -c sandbox_mode="<from profile>" -c approval_policy="never" \
+  [-c sandbox_workspace_write.network_access=true] [-c sandbox_workspace_write.writable_roots=[…]] \
+  [--ignore-user-config] [-p profile] [-m M] [-c model_reasoning_effort="E"] \
+  [--output-schema <attempt_dir>/output-schema.json] -o <attempt_dir>/last-message.txt \
+  [-C <cwd>] -
 ```
 
-Capabilities: `session_id: harness`, `cost_usd: false` (prices from config), `budget_cap: false`, `turn_cap: false`, `tool_rules: false`. `harness_options` include `network: bool` (maps to `-c sandbox_workspace_write.network_access=true`; off by default, research §1.3), `profile`, `ignore_user_config` (default `true` for reproducibility), and `extra_args`. Sandbox and approval policy are always passed explicitly (research §1.3). Behaviours still unverified (signals, exit codes, default sandbox, schema subset; research §7) are M3 contract-test items; until then the adapter treats any exit without `turn.completed` as `no_result`.
+`exec resume` accepts no `--sandbox`, `-C` or `--add-dir`, so sandbox, approval and writable roots are always passed as `-c` overrides and the working directory is the process's (`-C` only for new threads). `codex exec` has no fork command, so the adapter declares no `fork`, and `session: {fork: …}` resumes instead (§5.1.3). Instructions are prepended to the prompt under an `# Instructions` heading. The harness version comes from `codex --version`. Codex's `input_tokens` already include `cached_input_tokens`.
+
+Capabilities: `session_id: harness`, `fork: false`, `cost_usd: false` (prices from config), `budget_cap: false`, `turn_cap: false`, `tool_rules: false`. `harness_options` include `network: bool` (off by default, research §1.3), `profile`, `ignore_user_config` (default `true` for reproducibility), and `extra_args`. Behaviours still unverified (signals, exit codes, schema subset; research §7) are settled by the live contract tests (`tests/live`); until then the adapter treats any exit without `turn.completed` as `no_result`.
 
 **`fake`** (tier 1). Deterministic, no processes, no cost; used by all engine tests (brief §16.3).
 
