@@ -288,6 +288,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     except FullPermissionsRefused as exc:
         return _fail(args, "E-FULL-PERMISSIONS", str(exc), ExitCode.INVALID)
     stderr(f"run {run.id}")
+    if _untracked(Path(args.flow)):
+        stderr(
+            f"note: {args.flow} is not tracked by git; a flow runs commands as you, "
+            "so review it before running it"
+        )
     if args.detach:
         return _detach(run, context.root, args)
     runner = Runner(
@@ -299,6 +304,19 @@ def cmd_run(args: argparse.Namespace) -> int:
         on_wait=_on_wait(args),
     )
     return _drive(runner, run, args)
+
+
+def _untracked(flow: Path) -> bool:
+    """True when the flow file is in a git work tree but not tracked (§12.1)."""
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", "--", flow.name],
+            cwd=flow.resolve().parent,
+            capture_output=True,
+        )
+    except OSError:
+        return False
+    return result.returncode == 1  # 128: not a repository
 
 
 def _detach(

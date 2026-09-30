@@ -107,3 +107,38 @@ def test_given_events_flag_when_run_then_stdout_is_one_event_per_line(
     events = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     assert events[0]["type"] == "run_started"
     assert events[-1]["type"] == "run_succeeded"
+
+
+def _git(root: Path, *args: str) -> None:
+    import subprocess
+
+    subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+        cwd=root, check=True, capture_output=True,
+    )  # fmt: skip
+
+
+def test_given_flow_not_tracked_by_git_when_run_then_a_notice_says_to_review_it(
+    project: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # Given: ok.yaml is committed, nope.yaml is not
+    _git(project, "init", "-q")
+    _git(project, "add", "ok.yaml")
+    _git(project, "commit", "-qm", "ok")
+
+    # When
+    cli.main(["run", "nope.yaml"])
+    untracked = capsys.readouterr().err
+    cli.main(["run", "ok.yaml", "--input", "n=1"])
+    tracked = capsys.readouterr().err
+
+    # Then
+    assert "nope.yaml is not tracked by git" in untracked
+    assert "not tracked" not in tracked
+
+
+def test_given_project_outside_git_when_run_then_no_notice(
+    project: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    cli.main(["run", "ok.yaml", "--input", "n=1"])
+    assert "not tracked" not in capsys.readouterr().err
