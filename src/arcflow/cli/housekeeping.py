@@ -106,6 +106,28 @@ def add_parsers(commands: Any, common: argparse.ArgumentParser) -> None:
     )
     doctor.set_defaults(handler=cmd_doctor)
 
+    tui = commands.add_parser(
+        "tui", parents=[common], help="open the terminal UI",
+        description="Open the terminal UI, at a flow's graph or a run's detail when given.",
+    )  # fmt: skip
+    tui.add_argument("target", nargs="?", help="a flow file, or a run (ID, prefix, @last)")
+    tui.set_defaults(handler=cmd_tui)
+
+
+def cmd_tui(args: argparse.Namespace) -> int:
+    from arcflow.tui.app import ArcflowApp
+
+    context = project_context()
+    target = args.target
+    if target and not Path(target).is_file():
+        try:
+            target = resolve_run(context.config.runs_dir, target)
+        except (RunNotFound, AmbiguousRun) as exc:
+            stderr(f"arcflow: {exc}")
+            return ExitCode.NOT_FOUND
+    ArcflowApp(context.config, target).run()
+    return ExitCode.OK
+
 
 # -- init ---------------------------------------------------------------------------------
 

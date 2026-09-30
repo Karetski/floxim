@@ -1210,6 +1210,8 @@ The TUI is a Textual application in the same package. It is a client: it reads f
 
 Human prompts: a pending prompt shows as a banner in every screen and as a modal in run detail with the message, `show` lines, choices, and a text field when allowed. Answering writes through `respond`.
 
+`arcflow tui` opens on Runs; given a flow file it opens that flow's graph, given a run (ID, prefix, `@last`) that run's detail. Keys: `r` runs, `f` flows, `enter` open, `s` cycle the runs' status filter, `escape` back, `q` quit, `ctrl+p` the command palette. Screens refresh from disk (runs every second, run detail every half second, a shown flow file every 300 ms), so a run driven by another process updates live. Node status in the graph is a marker (`✓` succeeded, `✗` failed, `▶` running, `…` waiting, `‖` interrupted, `⊘` cancelled, `⌛` timed out) plus colour, with `×n` for repeated visits.
+
 ### 10.2 Graph rendering
 
 - Layered (Sugiyama) layout with `grandalf` (pure Python), drawn with box-drawing characters: nodes as boxes labelled `id` and type icon, forward edges downward, back edges (loops) routed on the side in a distinct style, edge labels showing a shortened `when`.
