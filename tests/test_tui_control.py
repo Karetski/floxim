@@ -180,12 +180,12 @@ def test_given_a_run_stopped_mid_step_when_opened_then_the_step_shows_how_the_ru
     if cancelled:
         assert cli(interrupted, "cancel", run.id).returncode == 0
     config, _ = load_config(interrupted)
-    expected = "⊘ cancelled" if cancelled else "‖ interrupted"
+    expected = "⊘" if cancelled else "‖"
 
     async def scenario(pilot: Any) -> None:
         screen = pilot.app.screen
         labels = [str(item.query_one(Label).render()) for item in screen.query(VisitItem)]
-        assert len(labels) == 1 and labels[0].startswith(f"{expected}  greet #1")
+        assert len(labels) == 1 and labels[0].startswith(f"{expected} greet #1")
         graph = text_of(screen.query_one("#graph", Static))
         assert "▶" not in graph
         if not cancelled:  # a cancelled run's unfinished step has no result to mark
