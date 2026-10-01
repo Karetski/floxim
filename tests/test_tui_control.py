@@ -194,6 +194,37 @@ def test_given_a_run_stopped_mid_step_when_opened_then_the_step_shows_how_the_ru
     drive(WhisperwindApp(config, target=run.id), scenario)
 
 
+def test_given_a_step_stopped_mid_visit_when_its_logs_grow_then_the_logs_tab_follows(
+    tmp_path: Path,
+) -> None:
+    root = project(tmp_path, "name: sh\nnodes:\n  build: {type: shell, run: echo hi}\n")
+    env = {
+        **os.environ,
+        "WHISPERWIND_TEST_CRASH_AT": "visit_started:1",
+        "XDG_CONFIG_HOME": str(root / "x"),
+    }
+    subprocess.run(
+        [sys.executable, "-m", "whisperwind", "run", "flow.yaml"],
+        cwd=root, env=env, capture_output=True,
+    )  # fmt: skip
+    run = run_dir(root)
+    log = run.path / "nodes" / "build" / "1" / "attempt-1" / "stdout.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    config, _ = load_config(root)
+
+    async def scenario(pilot: Any) -> None:
+        logs = pilot.app.screen.query_one("#inspect-logs", Static)
+        log.write_text("compiling\n")
+        await pilot.pause(1.0)
+        assert "compiling" in text_of(logs)
+        with log.open("a") as out:
+            out.write("linking\n")
+        await pilot.pause(1.0)
+        assert "compiling\nlinking" in text_of(logs)
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
+
+
 def test_given_flow_when_run_from_the_flows_screen_then_the_form_supplies_inputs(
     tmp_path: Path,
 ) -> None:
