@@ -279,6 +279,7 @@ nodes:
     async def scenario(pilot: Any) -> None:
         await pilot.press("h")
         await pilot.pause()
+        await pilot.click(list(pilot.app.screen.query(VisitItem))[0])  # work #1
         await pilot.press("y")  # copy the selected visit's session ID
         await pilot.pause()
         assert pilot.app.clipboard == run.read_state()["nodes"]["work"]["session_id"]
