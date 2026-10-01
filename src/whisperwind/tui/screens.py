@@ -48,6 +48,7 @@ from whisperwind.tui.common import (
     RUN_STATUS_ORDER,
     STATUS,
     FileWatcher,
+    GraphPane,
     GraphView,
     NavFooter,
     local_time,
@@ -584,7 +585,7 @@ class RunDetailScreen(RunControl):
             yield Static("", id="inputs-list")
         yield Static("", id="limits")
         with Horizontal(id="body"):
-            with VerticalScroll(id="graph-pane", can_focus=False):
+            with GraphPane(id="graph-pane"):
                 yield GraphView(id="graph")
             with Vertical(id="side"):
                 yield Timeline(id="timeline")
@@ -1040,7 +1041,7 @@ class FlowGraphScreen(Screen[None]):
         yield Header()
         yield Static(str(self.path), id="flow-title")
         with Horizontal(id="body"):
-            with VerticalScroll(id="graph-pane", can_focus=False):
+            with GraphPane(id="graph-pane"):
                 yield GraphView(id="graph")
             with Vertical(id="side"):
                 yield ListView(id="node-list")

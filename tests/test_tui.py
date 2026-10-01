@@ -543,13 +543,28 @@ def test_given_the_graph_focused_when_a_node_is_picked_then_its_latest_visit_is_
 
     async def scenario(pilot: Any) -> None:
         screen = pilot.app.screen
-        screen.query_one("#graph", GraphView).focus()
+        screen.query_one("#graph-pane").focus()
         await pilot.press(*["up"] * 8)  # s8 → s0
         await pilot.pause()
         assert screen.selected == ("s0", 1) and not screen.follow_latest
         timeline = screen.query_one("#timeline", ListView)
         assert timeline.highlighted_child.visit == ("s0", 1)
         assert node_in_view(screen, "s0")
+
+    drive(WhisperwindApp(config, target=run.id), scenario, size=(80, 24))
+
+
+def test_given_a_tall_graph_when_it_gains_focus_then_the_view_stays_on_the_selection(
+    tmp_path: Path,
+) -> None:
+    run = run_flow(tmp_path, CHAIN).run  # waiting at s8, the bottom of the graph
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        screen.query_one("#graph-pane").focus()
+        await pilot.pause(0.5)
+        assert node_in_view(screen, "s8")
 
     drive(WhisperwindApp(config, target=run.id), scenario, size=(80, 24))
 

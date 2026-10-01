@@ -244,7 +244,7 @@ def test_given_the_graph_focused_when_arrows_are_pressed_then_the_selection_move
     async def scenario(pilot: Any) -> None:
         screen = pilot.app.screen
         graph = screen.query_one("#graph", GraphView)
-        graph.focus()
+        screen.query_one("#graph-pane").focus()
         await pilot.pause()
         regions = graph.picture.regions
         left, right = sorted(("b", "c"), key=lambda node: regions[node].col)
@@ -320,7 +320,7 @@ def test_given_a_node_in_the_graph_when_enter_is_pressed_then_its_fields_open_un
 
     async def scenario(pilot: Any) -> None:
         screen = pilot.app.screen
-        screen.query_one("#graph", GraphView).focus()
+        screen.query_one("#graph-pane").focus()
         await pilot.press("down", "down")  # build → done → end
         await pilot.pause()
         assert screen.node == "end" and listed(screen) is None
@@ -346,7 +346,7 @@ def test_given_a_flow_too_big_to_lay_out_then_the_listed_graph_selects_line_by_l
         screen = pilot.app.screen
         graph = screen.query_one("#graph", GraphView)
         assert graph.picture.fallback
-        graph.focus()
+        screen.query_one("#graph-pane").focus()
         await pilot.press("down", "down")
         await pilot.pause()
         assert screen.node == "n2" and listed(screen) == "n2"

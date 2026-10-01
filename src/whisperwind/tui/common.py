@@ -12,7 +12,7 @@ from rich.text import Text
 from textual import geometry
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
+from textual.containers import Horizontal, VerticalScroll
 from textual.content import Content
 from textual.events import Click
 from textual.message import Message
@@ -105,18 +105,15 @@ def neighbour(regions: dict[str, Region], node: str | None, direction: str) -> s
     )
 
 
-class GraphView(Static, can_focus=True):
+class GraphView(Static):
     """A flow's graph from the shared renderer, coloured by node status.
 
-    The screen owns the selection: the arrow keys and clicks ask it to move by posting
-    `Picked`, and `enter` posts `Chosen`; the screen redraws with the node it settles on."""
+    The screen owns the selection: arrow keys in the `GraphPane` and clicks ask it to move
+    by posting `Picked`, and `enter` posts `Chosen`; the screen redraws with the node it
+    settles on."""
 
     # A press picks a node, so it must not also start selecting text.
     ALLOW_SELECT = False
-    BINDINGS = [
-        *(Binding(key, f"move('{key}')", show=False) for key in ("up", "down", "left", "right")),
-        Binding("enter", "choose", show=False),
-    ]
 
     class Picked(Message):
         """A node was picked in the graph, with an arrow key or a click."""
@@ -137,12 +134,12 @@ class GraphView(Static, can_focus=True):
         self.picture: Picture | None = None
         self.selected: str | None = None
 
-    def action_move(self, direction: str) -> None:
+    def move(self, direction: str) -> None:
         node = neighbour(self.picture.regions, self.selected, direction) if self.picture else None
         if node is not None:
             self.post_message(self.Picked(node))
 
-    def action_choose(self) -> None:
+    def choose(self) -> None:
         if self.selected is not None:
             self.post_message(self.Chosen(self.selected))
 
@@ -202,6 +199,23 @@ class GraphView(Static, can_focus=True):
                     start = offsets[row] + region.col
                     text.stylize(style, start, start + region.width)
         self.update(text)
+
+
+class GraphPane(VerticalScroll):
+    """The scrolling pane around a `GraphView`, which takes focus and keys for it. The
+    graph itself must not take focus: Textual scrolls a focused widget taller than its
+    view to the widget's top, away from the selected node."""
+
+    BINDINGS = [
+        *(Binding(key, f"move('{key}')", show=False) for key in ("up", "down", "left", "right")),
+        Binding("enter", "choose", show=False),
+    ]
+
+    def action_move(self, direction: str) -> None:
+        self.query_one(GraphView).move(direction)
+
+    def action_choose(self) -> None:
+        self.query_one(GraphView).choose()
 
 
 class NavKey(Static):
