@@ -204,6 +204,8 @@ All commands accept `--json`, `--project`, `--config`, `--quiet`, `--verbose`, `
 - **Flows**: validate a flow, or start it with a form built from its inputs.
 - **Graph editor**: stays in sync with the YAML file as you or an agent edit it.
 
+Times show in your machine's local timezone; run IDs and stored timestamps stay in UTC. The runs list shows when each run started and finished: the time alone for today's runs, the date and minute for older ones. An active run has no finish time. In a narrow terminal, the list scrolls sideways while the status and run columns stay put. Run detail shows the full start time with the timezone's abbreviation and, once the run has finished, its finish time and how long it took. The timeline shows when each step started and, once it has finished, how long it took.
+
 Runs and Flows are the two top-level views. Their keys, `r` and `f`, are pinned at the left of the footer on every screen, and the current view's key is highlighted. Each view keeps its place while you're in the other one: the selected row, the status filter, and any run or flow you opened from it. Pressing the key of the view you're already in goes back to its list.
 
 From the TUI you can answer questions, cancel, resume, open handoffs, and open a step's session in its harness. Every action is a key, and `ctrl+p` opens the command palette.

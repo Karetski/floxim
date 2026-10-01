@@ -48,6 +48,8 @@ from floxim.tui.common import (
     FileWatcher,
     GraphView,
     NavFooter,
+    local_time,
+    local_timestamp,
     node_status,
     status_text,
 )
@@ -78,6 +80,22 @@ def _duration(item: dict[str, Any]) -> str:
         f"{seconds // 3600}h{seconds % 3600 // 60:02d}m"
         if seconds >= 3600
         else f"{seconds // 60}m{seconds % 60:02d}s"
+    )
+
+
+def _times(info: dict[str, Any]) -> str:
+    """When a run started and finished, in local time, and how long it took.
+
+    Only new events redraw the run's screen, so an active run shows no duration that
+    would stall; the runs list has its live one."""
+    started = info["started_at"] or info["created_at"]
+    if not started:
+        return ""
+    if not info["finished_at"]:
+        return f"started {local_timestamp(started)}"
+    return (
+        f"started {local_timestamp(started)}  ·  "
+        f"finished {local_timestamp(info['finished_at'])}  ·  took {_duration(info)}"
     )
 
 
@@ -168,12 +186,23 @@ class RunsScreen(RunControl):
         yield Header()
         yield Static("", id="banner")
         yield Label("", id="runs-filter")
-        yield DataTable(id="runs", cursor_type="row", zebra_stripes=True)
+        # Status and run stay put when a narrow terminal scrolls the other columns.
+        yield DataTable(id="runs", cursor_type="row", zebra_stripes=True, fixed_columns=2)
         yield NavFooter()
 
     def on_mount(self) -> None:
         table = self.query_one("#runs", DataTable)
-        table.add_columns("status", "run", "flow", "current", "duration", "spend", "waiting on")
+        table.add_columns(
+            "status",
+            "run",
+            "flow",
+            "current",
+            "started",
+            "finished",
+            "duration",
+            "spend",
+            "waiting on",
+        )
         self.refresh_runs()
         self.set_interval(REFRESH_S, self.refresh_runs)
 
@@ -186,11 +215,14 @@ class RunsScreen(RunControl):
         cursor = table.cursor_row
         table.clear()
         for item in runs:
+            started = item["started_at"] or item["created_at"]
             table.add_row(
                 status_text(item["status"]),
                 item["run_id"],
                 item["flow"] or "",
                 item["current"] or "",
+                local_time(started) if started else "",
+                local_time(item["finished_at"]) if item["finished_at"] else "",
                 _duration(item),
                 _money(item["totals"]["usd_spent"]),
                 ", ".join(item["pending"]),
@@ -478,7 +510,8 @@ class RunDetailScreen(RunControl):
             Text.assemble(
                 status_text(info["status"]),
                 f"  {info['run_id']}  ·  {info['flow']}  ·  {_money(info['totals']['usd_spent'])}",
-                f"  ·  {info['totals']['tokens_spent']} tokens",
+                f"  ·  {info['totals']['tokens_spent']} tokens\n",
+                _times(info),
             )
         )
         banner = self.query_one("#banner", Static)
@@ -546,7 +579,15 @@ class RunDetailScreen(RunControl):
             key = (event["node"], event["visit"])
             done = finished.get(key)
             outcome = done["data"]["outcome"] if done else "running"
-            label = Text.assemble(status_text(outcome), f"  {event['node']} #{event['visit']}")
+            label = Text.assemble(
+                status_text(outcome),
+                f"  {event['node']} #{event['visit']}",
+                (f"  {local_time(event['ts'])}", "dim"),
+                # Only new events redraw the timeline, so a running visit's duration would stall.
+                (f"  {_duration({'started_at': event['ts'], 'finished_at': done['ts']})}", "dim")
+                if done
+                else "",
+            )
             timeline.append(VisitItem(key, Label(label)))
         if self.selected is None and finished:
             self.selected = list(finished)[-1]

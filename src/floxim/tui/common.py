@@ -1,7 +1,8 @@
-"""Pieces shared by the TUI's screens: status styles, graph, footer, file watching."""
+"""Pieces shared by the TUI's screens: status styles, local times, graph, footer, file watching."""
 
 from __future__ import annotations
 
+import datetime
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +16,7 @@ from textual.content import Content
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
+from floxim.clock import parse_iso
 from floxim.flow import Flow
 from floxim.render import Picture, render
 
@@ -35,6 +37,19 @@ RUN_STATUS_ORDER = {"waiting": 0, "running": 1, "interrupted": 2, "pending": 3}
 def status_text(status: str) -> Text:
     marker, style = STATUS.get(status, ("?", ""))
     return Text(f"{marker} {status}", style=style)
+
+
+def local_time(stamp: str, now: datetime.datetime | None = None) -> str:
+    """A stored UTC timestamp, compact, in the local timezone: the time alone for today,
+    the date and the minute for an earlier day."""
+    moment = parse_iso(stamp).astimezone()
+    today = (now or datetime.datetime.now(datetime.timezone.utc)).astimezone().date()
+    return moment.strftime("%H:%M:%S" if moment.date() == today else "%b %d %H:%M")
+
+
+def local_timestamp(stamp: str) -> str:
+    """A stored UTC timestamp in full, in the local timezone, named by its abbreviation."""
+    return parse_iso(stamp).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
 def node_status(state: dict[str, Any]) -> dict[str, str]:
