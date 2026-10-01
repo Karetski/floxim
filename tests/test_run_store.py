@@ -15,7 +15,7 @@ from whisperwind.clock import FakeClock, iso
 from whisperwind.store import inbox
 from whisperwind.store.events import CorruptLog, EventWriter, read_log
 from whisperwind.store.ids import AmbiguousRun, RunNotFound, new_run_id, resolve_run
-from whisperwind.store.lock import STALE_AFTER_S, LockHeld, RunLock, hostname
+from whisperwind.store.lock import STALE_AFTER_S, LockHeld, RunLock, hostname, read_lock
 from whisperwind.store.rundir import RunDir
 from whisperwind.store.state import active_seconds, apply, initial_state, reduce
 
@@ -309,6 +309,37 @@ def test_given_dead_pid_on_this_host_when_acquiring_then_the_lock_is_taken_over(
 
     # Then
     assert lock.took_over is not None
+
+
+@pytest.mark.parametrize("stale", [False, True])
+def test_given_a_lock_being_written_then_a_racer_never_sees_it_half_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stale: bool
+) -> None:
+    # Given: what a racing process would read from the lock and the takeover marker
+    # at the moment either is being written. A half-written file reads as `{}`, which
+    # counts as stale, so a racer seeing one could take over a lock just won.
+    if stale:
+        (tmp_path / "lock").write_text(
+            json.dumps(
+                {"pid": 1, "host": "elsewhere", "started_at": iso(T0), "heartbeat_at": iso(T0)}
+            )
+        )
+    seen: list[dict[str, Any] | None] = []
+    real_dump = json.dump
+
+    def watched_dump(data: Any, handle: Any, *args: Any, **kwargs: Any) -> None:
+        seen.extend(read_lock(tmp_path / name) for name in ("lock", "lock.takeover"))
+        real_dump(data, handle, *args, **kwargs)
+
+    monkeypatch.setattr(json, "dump", watched_dump)
+
+    # When
+    RunLock(
+        tmp_path / "lock", FakeClock(T0 + datetime.timedelta(seconds=STALE_AFTER_S + 5))
+    ).acquire()
+
+    # Then
+    assert seen and {} not in seen
 
 
 def _race(path: str, queue: Any, done: Any) -> None:
