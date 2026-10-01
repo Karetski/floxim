@@ -1,0 +1,11 @@
+# Whisperwind project configuration. It describes the environment flows
+# run in; what a flow does lives in the flow file.
+flow_paths: [flows]
+# env_passthrough: [NPM_TOKEN]      # extra variables allowed into nodes
+# harnesses:
+#   claude: {tested_versions: ">=2.1.285,<2.2"}
+# prices:                           # USD estimates for harnesses that report tokens only
+#   codex:
+#     gpt-5-codex: {input_per_mtok: 1.25, cached_input_per_mtok: 0.125, output_per_mtok: 10.0}
+# on_wait: 'notify-send "Whisperwind" "$WHISPERWIND_MESSAGE"'
+# redact: ['sk-[A-Za-z0-9_-]{20,}']

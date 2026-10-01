@@ -244,13 +244,12 @@ From the TUI you can answer questions, cancel, resume, open handoffs, and open a
 
 ## Examples
 
-`examples/` has five complete flows:
+`examples/` has four complete flows:
 
 - [`implement-feature.yaml`](examples/implement-feature.yaml): plan, implement, loop on tests, approve.
 - [`babysit-pr.yaml`](examples/babysit-pr.yaml): watch a PR's CI and have an agent fix failures.
 - [`nightly-deps.yaml`](examples/nightly-deps.yaml): upgrade npm dependencies in a worktree, test, review, open a PR.
 - [`triage-issues.yaml`](examples/triage-issues.yaml): label and answer new GitHub issues, running [`triage-one.yaml`](examples/triage-one.yaml) once per issue.
-- [`tui-tour.yaml`](examples/tui-tour.yaml): a tour of run detail in the terminal UI that costs nothing: scripted agent steps, a retry, a handled failure, live logs, child runs and a question. Start it with `whisperwind run examples/tui-tour.yaml --detach`, then open `whisperwind tui`.
 
 ## Development
 
@@ -262,6 +261,13 @@ uv run pytest           # tests (never call a real harness or spend money)
 uv run ruff check .     # lint
 uv run ruff format .    # format
 uv run mypy             # type check
+```
+
+The repository is itself a Whisperwind project: `.whisperwind/config.yaml` configures it, and `flows/` holds flows for working on Whisperwind. `flows/tui-tour.yaml` runs through every part of the run detail screen at no cost, using the scripted `fake` harness. To get `whisperwind` and `whw` commands that run this checkout, with your edits live, install it in editable mode:
+
+```sh
+uv tool install -e .
+whw tui                 # from the repository root: this project's flows and runs
 ```
 
 TUI screens are checked against SVG snapshots in `tests/__snapshots__/`. After an intended screen change, run `uv run pytest --snapshot-update` and commit the updated snapshots. On every pull request, CI posts a comment showing each added, changed or removed screen as text, with a diff for the changed ones.

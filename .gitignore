@@ -11,6 +11,3 @@ build/
 .pytest_cache/
 .ruff_cache/
 .hypothesis/
-
-# Runs and settings from trying flows in this checkout
-.whisperwind/
