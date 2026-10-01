@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 from engine_support import run_flow
-from textual.widgets import DataTable, Label, ListView, Static
+from textual.widgets import Collapsible, DataTable, Label, ListView, Static
 
 from whisperwind import runinfo
 from whisperwind.clock import Clock, parse_iso
@@ -222,7 +222,7 @@ def test_given_waiting_run_when_opened_then_graph_banner_and_inspector_show_it(
         assert "✓ ◆ plan" in graph and "… ☺ approve" in graph
         assert len(screen.query_one("#timeline", ListView)) == 2
         assert "Plan the demo." in text_of(screen.query_one("#inspect-prompt", Static))
-        assert "~$0.10" in text_of(screen.query_one("#summary", Static))
+        assert text_of(screen.query_one("#limits", Static)).startswith("$0.10 / $25")
 
     drive(WhisperwindApp(config), scenario)
 
@@ -283,6 +283,130 @@ def test_given_a_run_when_opened_then_its_summary_and_timeline_show_local_times(
             assert any(shown in label for shown in compact_in_zone(start))
 
     drive(WhisperwindApp(config, target=run.id), scenario)
+
+
+def run_of(project: Path, flow: str) -> str:
+    config, _ = load_config(project)
+    return next(p.name for p in config.runs_dir.iterdir() if f"-{flow}-" in p.name)
+
+
+def test_given_a_waiting_run_when_opened_then_its_current_step_and_visit_show_waiting(
+    project: Path,
+) -> None:
+    config, _ = load_config(project)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        assert "  ·  at approve" in text_of(screen.query_one("#summary", Static))
+        labels = [str(item.query_one(Label).render()) for item in screen.query(VisitItem)]
+        assert labels[-1].startswith("… waiting  approve #1")
+
+    drive(WhisperwindApp(config, target=run_of(project, "demo")), scenario)
+
+
+def test_given_a_finished_run_when_opened_then_no_current_step_or_failure_shows(
+    project: Path,
+) -> None:
+    config, _ = load_config(project)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        assert " at " not in text_of(screen.query_one("#summary", Static))
+        assert not screen.query_one("#failure", Static).display
+
+    drive(WhisperwindApp(config, target=run_of(project, "quick")), scenario)
+
+
+def test_given_a_run_far_from_its_limits_when_opened_then_they_show_in_one_line_without_bars(
+    project: Path,
+) -> None:
+    config, _ = load_config(project)
+
+    async def scenario(pilot: Any) -> None:
+        limits = text_of(pilot.app.screen.query_one("#limits", Static))
+        assert limits == "$0.10 / $25  ·  0 / 10M tokens  ·  1 / 200 steps  ·  0s / 8h"
+
+    drive(WhisperwindApp(config, target=run_of(project, "demo")), scenario)
+
+
+def test_given_a_run_past_half_a_limit_when_opened_then_that_limit_has_a_bar(
+    tmp_path: Path,
+) -> None:
+    tight = FLOW.replace(
+        "name: demo\n", "name: demo\nlimits: {budget: {usd: 0.15, tokens: none}, max_steps: 3}\n"
+    )
+    run = run_flow(tmp_path, tight).run
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        segments = text_of(pilot.app.screen.query_one("#limits", Static)).split("  ·  ")
+        assert segments == [
+            "$0.10 / $0.15 ━━━━━━━━ 67%",
+            "0 tokens",
+            "1 / 3 steps",
+            "0s / 8h",
+        ]
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
+
+
+def test_given_a_failed_run_when_opened_then_a_callout_names_the_node_and_why(
+    tmp_path: Path,
+) -> None:
+    run = run_flow(tmp_path, "name: doomed\nnodes:\n  a: {type: set, vars: {x: 1}, next: fail}\n")
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        failure = pilot.app.screen.query_one("#failure", Static)
+        assert failure.display
+        assert text_of(failure) == "✗ failed at a  route_fail: a routed to fail"
+
+    assert run.status == "failed"
+    drive(WhisperwindApp(config, target=run.run.id), scenario)
+
+
+def test_given_a_run_with_inputs_when_opened_then_they_are_listed_collapsed(
+    tmp_path: Path,
+) -> None:
+    flow = (
+        "name: greet\ninputs:\n  who: {type: string, required: true}\n"
+        "  times: {type: integer}\nnodes:\n  a: {type: set, vars: {x: 1}}\n"
+    )
+    run = run_flow(tmp_path, flow, inputs={"who": "world", "times": 2}).run
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        inputs = pilot.app.screen.query_one("#inputs", Collapsible)
+        assert inputs.display and inputs.collapsed and inputs.title == "inputs (2)"
+        await pilot.click("#inputs CollapsibleTitle")
+        assert not inputs.collapsed
+        assert text_of(inputs.query_one("#inputs-list", Static)) == 'who = "world"\ntimes = 2'
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
+
+
+def test_given_a_run_without_inputs_when_opened_then_no_inputs_row_shows(project: Path) -> None:
+    config, _ = load_config(project)
+
+    async def scenario(pilot: Any) -> None:
+        assert not pilot.app.screen.query_one("#inputs", Collapsible).display
+
+    drive(WhisperwindApp(config, target=run_of(project, "demo")), scenario)
+
+
+def test_given_a_waiting_run_at_80x24_then_summary_prompt_and_limits_are_all_visible(
+    project: Path,
+) -> None:
+    config, _ = load_config(project)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        assert "at approve" in text_of(screen.query_one("#summary", Static))
+        for widget in ("#summary", "#banner", "#limits"):
+            region = screen.query_one(widget).region
+            assert region.height and region.bottom <= 23 and region.right <= 80, widget
+
+    drive(WhisperwindApp(config, target=run_of(project, "demo")), scenario, size=(80, 24))
 
 
 def test_given_flow_files_when_listed_then_validity_and_last_run_show(project: Path) -> None:

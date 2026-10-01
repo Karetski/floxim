@@ -17,9 +17,11 @@ MIN_WIDTH, MIN_HEIGHT = 80, 24
 
 CSS = """
 #summary { padding: 0 1; height: auto; }
+#failure { padding: 0 1; height: auto; color: $error; text-style: bold; }
 #banner { padding: 0 1; height: auto; background: $boost; }
-#gauges { height: 3; }
-.gauge { width: 1fr; height: 3; padding: 0 1; }
+#inputs { background: transparent; border-top: none; padding: 0; }
+#inputs Contents { padding: 0 0 0 3; }
+#limits { padding: 0 1; height: auto; }
 #body { height: 1fr; }
 #graph-pane { width: 3fr; border: round $primary; }
 #side { width: 2fr; }

@@ -13,12 +13,12 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import (
+    Collapsible,
     DataTable,
     Header,
     Label,
     ListItem,
     ListView,
-    ProgressBar,
     Static,
     TabbedContent,
     TabPane,
@@ -44,6 +44,7 @@ from whisperwind.tui.actions import (
 )
 from whisperwind.tui.common import (
     RUN_STATUS_ORDER,
+    STATUS,
     FileWatcher,
     GraphView,
     NavFooter,
@@ -59,6 +60,7 @@ REFRESH_S = 1.0
 DETAIL_REFRESH_S = 0.5
 FILE_POLL_S = 0.3
 HIGHLIGHT_S = 2.0
+BAR_CELLS = 8
 
 
 def _money(value: float | None) -> str:
@@ -91,6 +93,72 @@ def _times(info: dict[str, Any]) -> str:
     return (
         f"started {local_timestamp(started)}  ·  "
         f"finished {local_timestamp(info['finished_at'])}  ·  took {_duration(info)}"
+    )
+
+
+def _count(value: float) -> str:
+    """A token count in a few characters: 950, 12.3k, 10M."""
+    for size, unit in ((1e6, "M"), (1e3, "k")):
+        if value >= size:
+            return f"{value / size:.1f}".removesuffix(".0") + unit
+    return f"{value:.0f}"
+
+
+def _span(seconds: float) -> str:
+    """A length of time in its two largest units: 32s, 5m12s, 1h30m, 8h."""
+    whole = int(seconds)
+    if whole < 60:
+        return f"{whole}s"
+    if whole < 3600:
+        minutes, rest = divmod(whole, 60)
+        return f"{minutes}m{rest:02d}s" if rest else f"{minutes}m"
+    hours, rest = divmod(whole, 3600)
+    return f"{hours}h{rest // 60:02d}m" if rest // 60 else f"{hours}h"
+
+
+def _limits(totals: dict[str, Any], limits: dict[str, Any]) -> Text:
+    """What a run has spent against each of its limits, on one line. A limit at least half
+    used gets a bar; one that is `none` shows the spend alone."""
+    usd, tokens = run_limits(limits)
+    steps = limits.get("max_steps", 200)
+    steps = None if steps == "none" else float(steps)
+    duration = parse_duration(limits.get("max_duration", "8h"))
+    spent = totals["usd_spent"], totals["tokens_spent"], totals["steps"], totals["active_s"]
+    segments = [
+        (spent[0], usd, f"${spent[0]:.2f}", f"${usd:g}" if usd else "", ""),
+        (spent[1], tokens, _count(spent[1]), _count(tokens) if tokens else "", " tokens"),
+        (spent[2], steps, str(spent[2]), f"{steps:g}" if steps else "", " steps"),
+        (spent[3], duration, _span(spent[3]), _span(duration) if duration else "", ""),
+    ]
+    line = Text()
+    for value, limit, shown, shown_limit, unit in segments:
+        if line:
+            line.append("  ·  ")
+        line.append(f"{shown} / {shown_limit}{unit}" if limit else f"{shown}{unit}")
+        used = value / limit if limit else 0.0
+        if used >= 0.5:
+            filled = min(round(used * BAR_CELLS), BAR_CELLS)
+            line.append(" ")
+            line.append("━" * filled, "yellow")
+            line.append("━" * (BAR_CELLS - filled), "dim")
+            line.append(f" {used:.0%}")
+    return line
+
+
+def _failure(info: dict[str, Any]) -> Text:
+    """Why a run ended without succeeding: where, by whom, and the reason, or nothing."""
+    failure = info["failure"] or {}
+    if not failure:
+        return Text("")
+    node, message = failure.get("node"), str(failure.get("message") or "")
+    if node:  # a node's error message starts with the node's name
+        message = message.removeprefix(f"{node}: ")
+    return Text.assemble(
+        f"{STATUS.get(info['status'], ('?', ''))[0]} {info['status']}",
+        f" at {node}" if node else "",
+        f" by {failure['by']}" if failure.get("by") else "",
+        f"  {failure['reason']}" if failure.get("reason") else "",
+        f": {clean(message)}" if message else "",
     )
 
 
@@ -362,12 +430,11 @@ class RunDetailScreen(RunControl):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static("", id="summary")
+        yield Static("", id="failure")
         yield Static("", id="banner")
-        with Horizontal(id="gauges"):
-            for name in ("usd", "tokens", "steps", "time"):
-                with Vertical(classes="gauge"):
-                    yield Label(name, id=f"gauge-{name}-label")
-                    yield ProgressBar(id=f"gauge-{name}", show_eta=False)
+        with Collapsible(id="inputs"):
+            yield Static("", id="inputs-list")
+        yield Static("", id="limits")
         with Horizontal(id="body"):
             with VerticalScroll(id="graph-pane"):
                 yield GraphView(id="graph")
@@ -388,6 +455,14 @@ class RunDetailScreen(RunControl):
         yield NavFooter()
 
     def on_mount(self) -> None:
+        inputs = self.run.meta().get("inputs") or {}
+        box = self.query_one("#inputs", Collapsible)
+        box.display = bool(inputs)
+        box.title = f"inputs ({len(inputs)})"
+        listed = (
+            f"{name} = {json.dumps(value, ensure_ascii=False)}" for name, value in inputs.items()
+        )
+        self.query_one("#inputs-list", Static).update(Text(clean("\n".join(listed))))
         self.refresh_detail()
         self.set_interval(DETAIL_REFRESH_S, self.refresh_detail)
 
@@ -501,14 +576,19 @@ class RunDetailScreen(RunControl):
         self.seen_events = len(events)
         state = self.run.read_state()
         info = runinfo.detail(self.run, Clock())
+        active = info["current"] and info["status"] in runinfo.ACTIVE
         self.query_one("#summary", Static).update(
             Text.assemble(
                 status_text(info["status"]),
-                f"  {info['run_id']}  ·  {info['flow']}  ·  {_money(info['totals']['usd_spent'])}",
-                f"  ·  {info['totals']['tokens_spent']} tokens\n",
+                f"  {info['run_id']}  ·  {info['flow']}",
+                f"  ·  at {info['current']}" if active else "",
+                "\n",
                 _times(info),
             )
         )
+        failure = self.query_one("#failure", Static)
+        failure.update(_failure(info))
+        failure.display = bool(info["failure"])
         banner = self.query_one("#banner", Static)
         pending = info["pending_human"]
         banner.update(
@@ -540,31 +620,11 @@ class RunDetailScreen(RunControl):
             self.query_one("#graph", GraphView).show(
                 self.flow, node_status(state), state.get("visits")
             )
-            self._gauges(state)
-        self._timeline(events)
+            self.query_one("#limits", Static).update(_limits(info["totals"], self.flow.limits))
+        self._timeline(events, set(info["pending_human"]))
         self._inspect()
 
-    def _gauges(self, state: dict[str, Any]) -> None:
-        assert self.flow is not None
-        usd, tokens = run_limits(self.flow.limits)
-        totals = state["totals"]
-        max_steps = self.flow.limits.get("max_steps", 200)
-        max_duration = parse_duration(self.flow.limits.get("max_duration", "8h"))
-        values = {
-            "usd": (totals["usd_spent"], usd),
-            "tokens": (totals["tokens_spent"], tokens),
-            "steps": (totals["steps"], None if max_steps == "none" else float(max_steps)),
-            "time": (runinfo.summary(self.run, Clock(), state)["totals"]["active_s"], max_duration),
-        }
-        for name, (value, limit) in values.items():
-            bar = self.query_one(f"#gauge-{name}", ProgressBar)
-            bar.update(total=limit or None, progress=float(value or 0))
-            shown = f"{value:.2f}" if isinstance(value, float) else str(value)
-            self.query_one(f"#gauge-{name}-label", Label).update(
-                f"{name} {shown}" + (f" / {limit:g}" if limit else "")
-            )
-
-    def _timeline(self, events: list[dict[str, Any]]) -> None:
+    def _timeline(self, events: list[dict[str, Any]], waiting: set[str]) -> None:
         timeline = self.query_one("#timeline", ListView)
         timeline.clear()
         finished = {(e["node"], e["visit"]): e for e in events if e["type"] == "visit_finished"}
@@ -573,7 +633,9 @@ class RunDetailScreen(RunControl):
                 continue
             key = (event["node"], event["visit"])
             done = finished.get(key)
-            outcome = done["data"]["outcome"] if done else "running"
+            outcome = (
+                done["data"]["outcome"] if done else "waiting" if key[0] in waiting else "running"
+            )
             label = Text.assemble(
                 status_text(outcome),
                 f"  {event['node']} #{event['visit']}",
