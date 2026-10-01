@@ -414,17 +414,20 @@ def render_list(flow: Flow, decorate: Decorate | None = None) -> Picture:
     """The fallback: nodes in topological order, each with its edges."""
     order = _topological(flow)
     edges = _edges(flow)
-    lines = []
+    lines: list[str] = []
+    regions = {}
     for node_id in order:
         node = flow.nodes[node_id]
-        lines.append(_label(node_id, node.type, decorate))
+        label = _label(node_id, node.type, decorate)
+        regions[node_id] = Region(len(lines), 0, len(label), 1)
+        lines.append(label)
         for source, target, when, on_error in edges:
             if source != node_id:
                 continue
             via = " (on_error)" if on_error else ""
             condition = f"  if {when}" if when else ""
             lines.append(f"    → {target}{via}{condition}")
-    return Picture(lines, {}, fallback=True)
+    return Picture(lines, regions, fallback=True)
 
 
 def _topological(flow: Flow) -> list[str]:

@@ -73,6 +73,9 @@ def test_given_more_than_sixty_nodes_when_rendered_then_it_falls_back_to_a_list(
     picture = render.render(flow)
     assert picture.fallback
     assert picture.lines[:2] == ["= n0", "    → n1"]
+    # Each node's line is where it is, so a cursor can select it.
+    assert picture.regions["n0"] == render.Region(0, 0, 4, 1)
+    assert picture.regions["n1"] == render.Region(2, 0, 4, 1)
 
 
 def test_given_slow_layout_when_rendered_then_it_falls_back_to_a_list(
