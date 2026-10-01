@@ -1,4 +1,4 @@
-"""Pieces shared by the TUI's screens: status styles, the graph widget, file watching."""
+"""Pieces shared by the TUI's screens: status styles, graph, footer, file watching."""
 
 from __future__ import annotations
 
@@ -8,7 +8,12 @@ from pathlib import Path
 from typing import Any
 
 from rich.text import Text
-from textual.widgets import Static
+from textual.app import ComposeResult
+from textual.binding import Binding
+from textual.containers import Horizontal
+from textual.content import Content
+from textual.screen import Screen
+from textual.widgets import Footer, Static
 
 from floxim.flow import Flow
 from floxim.render import Picture, render
@@ -84,6 +89,57 @@ class GraphView(Static):
                     start = offsets[row] + region.col
                     text.stylize(style, start, start + region.width)
         self.update(text)
+
+
+class NavKey(Static):
+    """A root view's key, pinned in the bottom bar; clicking it presses the key."""
+
+    def __init__(self, key: str, description: str, action: str) -> None:
+        label = Content.assemble((f" {key} ", "bold $footer-key-foreground"), f"{description} ")
+        super().__init__(label)
+        self.action = action
+
+    async def on_click(self) -> None:
+        await self.app.run_action(self.action)
+
+
+class NavFooter(Horizontal):
+    """The bottom bar: the root views' keys pinned on the left, so they never scroll away,
+    then the screen's own keys in a stock Footer.
+
+    The key of the root view the screen belongs to is highlighted."""
+
+    DEFAULT_CSS = """
+    NavFooter { dock: bottom; height: 1; background: $footer-background; }
+    NavFooter Footer { dock: none; width: 1fr; }
+    NavFooter #nav { width: auto; border-right: vkey $foreground 20%; }
+    NavFooter NavKey { width: auto; color: $footer-description-foreground; }
+    NavFooter NavKey.-active { text-style: reverse; }
+    """
+    # The app's actions that show a root view → that view's mode. Their bindings are
+    # hidden from the Footer.
+    PINNED = {"show_runs": "runs", "show_flows": "flows"}
+
+    def compose(self) -> ComposeResult:
+        # The app's own bindings: the screen's live bindings aren't ready while it composes.
+        bindings = {b.action: b for b in Binding.make_bindings(self.app.BINDINGS)}
+        with Horizontal(id="nav"):
+            for action in self.PINNED:
+                binding = bindings[action]
+                key = self.app.get_key_display(binding)
+                yield NavKey(key, binding.description, action)
+        yield Footer()
+
+    def on_mount(self) -> None:
+        # A screen can compose and mount before the mode switch that created it has updated
+        # `current_mode`; the screen-change signal comes after that update.
+        self.app.screen_change_signal.subscribe(self, self._highlight)
+        self._highlight(self.screen)
+
+    def _highlight(self, screen: Screen[object]) -> None:
+        if screen is self.screen:
+            for key in self.query(NavKey):
+                key.set_class(self.PINNED[key.action] == self.app.current_mode, "-active")
 
 
 def _line_offsets(lines: list[str]) -> list[int]:

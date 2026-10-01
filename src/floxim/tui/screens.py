@@ -15,7 +15,6 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import (
     DataTable,
-    Footer,
     Header,
     Label,
     ListItem,
@@ -44,7 +43,14 @@ from floxim.tui.actions import (
     resume_run,
     who,
 )
-from floxim.tui.common import RUN_STATUS_ORDER, FileWatcher, GraphView, node_status, status_text
+from floxim.tui.common import (
+    RUN_STATUS_ORDER,
+    FileWatcher,
+    GraphView,
+    NavFooter,
+    node_status,
+    status_text,
+)
 from floxim.units import parse_duration
 from floxim.validate import validate
 
@@ -163,7 +169,7 @@ class RunsScreen(RunControl):
         yield Static("", id="banner")
         yield Label("", id="runs-filter")
         yield DataTable(id="runs", cursor_type="row", zebra_stripes=True)
-        yield Footer()
+        yield NavFooter()
 
     def on_mount(self) -> None:
         table = self.query_one("#runs", DataTable)
@@ -236,7 +242,7 @@ class FlowsScreen(Screen[None]):
         yield Header()
         yield Static("", id="banner")
         yield DataTable(id="flows", cursor_type="row", zebra_stripes=True)
-        yield Footer()
+        yield NavFooter()
 
     def on_mount(self) -> None:
         table = self.query_one("#flows", DataTable)
@@ -352,7 +358,7 @@ class RunDetailScreen(RunControl):
                     ):
                         with TabPane(tab.capitalize(), id=f"tab-{tab}"), VerticalScroll():
                             yield Static("", id=f"inspect-{tab}")
-        yield Footer()
+        yield NavFooter()
 
     def on_mount(self) -> None:
         self.refresh_detail()
@@ -632,7 +638,7 @@ class FlowGraphScreen(Screen[None]):
                 with VerticalScroll(id="node-inspector"):
                     yield Static("", id="node-config")
         yield Static("", id="problems")
-        yield Footer()
+        yield NavFooter()
 
     def on_mount(self) -> None:
         self.poll()
