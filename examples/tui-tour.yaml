@@ -1,0 +1,54 @@
+whisperwind: 1
+name: tui-tour
+description: |
+  A tour of run detail in the TUI, at no cost: agent steps use the scripted
+  `fake` harness. Start it detached, then open it in `whisperwind tui`.
+inputs:
+  goal: { type: string, default: add a login page }
+limits:
+  budget: { usd: 0.15 }      # the plan's $0.10 is over half: the limits line shows a bar
+nodes:
+  plan:                      # cost, tokens, session and turns: the Usage tab
+    type: agent
+    harness: fake
+    prompt: "Plan how to ${{ inputs.goal }}."
+    harness_options:
+      responses:
+        - text: "1. Add the form. 2. Wire the session. 3. Test it."
+          cost_usd: 0.1
+          usage: { input_tokens: 1200, output_tokens: 300 }
+          session_id: tour-session
+          num_turns: 3
+    next: flaky
+
+  flaky:                     # fails twice, then succeeds: "3 attempts" in the timeline
+    type: agent
+    harness: fake
+    prompt: Try the risky part.
+    retry: { max_attempts: 3 }
+    harness_options:
+      responses: [{ outcome: failed }, { outcome: failed }, { text: done }]
+    next: build
+
+  build:                     # prints for 10 seconds: open it while it runs to see logs follow
+    type: shell
+    run: for i in 1 2 3 4 5 6 7 8 9 10; do echo "compiling part $i"; sleep 1; done
+    next: lint
+
+  lint:                      # fails, and the flow carries on: a yellow "continued → each"
+    type: shell
+    run: echo "checking style"; echo "2 problems found" >&2; exit 1
+    on_error: continue
+    next: each
+
+  each:                      # three child runs, nested under this step; enter opens one
+    type: map
+    items: [form, session, tests]
+    flow: tui-tour-item.yaml
+    inputs: { part: "${{ item }}" }
+    next: ship
+
+  ship:                      # waits for you: press `a` to answer
+    type: human
+    message: The tour is done. Ship it?
+    choices: [ship, stop]

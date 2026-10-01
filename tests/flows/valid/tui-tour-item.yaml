@@ -1,0 +1,9 @@
+whisperwind: 1
+name: tui-tour-item
+description: One part of the TUI tour, run once per item by its `map` step.
+inputs:
+  part: { type: string, required: true }
+nodes:
+  note:
+    type: set
+    vars: { part: "${{ inputs.part }}" }

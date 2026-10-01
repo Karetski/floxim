@@ -244,12 +244,13 @@ From the TUI you can answer questions, cancel, resume, open handoffs, and open a
 
 ## Examples
 
-`examples/` has four complete flows:
+`examples/` has five complete flows:
 
 - [`implement-feature.yaml`](examples/implement-feature.yaml): plan, implement, loop on tests, approve.
 - [`babysit-pr.yaml`](examples/babysit-pr.yaml): watch a PR's CI and have an agent fix failures.
 - [`nightly-deps.yaml`](examples/nightly-deps.yaml): upgrade npm dependencies in a worktree, test, review, open a PR.
 - [`triage-issues.yaml`](examples/triage-issues.yaml): label and answer new GitHub issues, running [`triage-one.yaml`](examples/triage-one.yaml) once per issue.
+- [`tui-tour.yaml`](examples/tui-tour.yaml): a tour of run detail in the terminal UI that costs nothing: scripted agent steps, a retry, a handled failure, live logs, child runs and a question. Start it with `whisperwind run examples/tui-tour.yaml --detach`, then open `whisperwind tui`.
 
 ## Development
 
