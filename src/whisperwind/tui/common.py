@@ -16,7 +16,7 @@ from textual.content import Content
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
-from whisperwind.clock import parse_iso
+from whisperwind.clock import Clock, parse_iso
 from whisperwind.flow import Flow
 from whisperwind.render import Picture, render
 
@@ -43,7 +43,7 @@ def local_time(stamp: str, now: datetime.datetime | None = None) -> str:
     """A stored UTC timestamp, compact, in the local timezone: the time alone for today,
     the date and the minute for an earlier day."""
     moment = parse_iso(stamp).astimezone()
-    today = (now or datetime.datetime.now(datetime.timezone.utc)).astimezone().date()
+    today = (now or Clock().now()).astimezone().date()
     return moment.strftime("%H:%M:%S" if moment.date() == today else "%b %d %H:%M")
 
 
