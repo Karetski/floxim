@@ -206,6 +206,8 @@ All commands accept `--json`, `--project`, `--config`, `--quiet`, `--verbose`, `
 
 Times show in your machine's local timezone; run IDs and stored timestamps stay in UTC. The runs list shows when each run started and finished: the time alone for today's runs, the date and minute for older ones. An active run has no finish time. In a narrow terminal, the list scrolls sideways while the status and run columns stay put. Run detail shows the full start time with the timezone's abbreviation and, once the run has finished, its finish time and how long it took. The timeline shows when each step started and, once it has finished, how long it took.
 
+The top of run detail sums up the run. While it's active, the summary names the step it's at. A run that failed or was cancelled shows where it stopped, who cancelled it, and why. A run's inputs are listed under a collapsed `inputs` row. One line compares what the run has spent with its limits, e.g. `$0.10 / $25  ·  420 / 10M tokens  ·  2 / 200 steps  ·  4s / 8h`. A limit that is at least half used gets a bar and a percentage. A step waiting for a person shows as waiting in the timeline.
+
 Runs and Flows are the two top-level views. Their keys, `r` and `f`, are pinned at the left of the footer on every screen, and the current view's key is highlighted. Each view keeps its place while you're in the other one: the selected row, the status filter, and any run or flow you opened from it. Pressing the key of the view you're already in goes back to its list.
 
 From the TUI you can answer questions, cancel, resume, open handoffs, and open a step's session in its harness. Every action is a key, and `ctrl+p` opens the command palette.
