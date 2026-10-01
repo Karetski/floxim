@@ -288,6 +288,14 @@ class VisitItem(ListItem):
         self.visit = visit
 
 
+class ChildItem(VisitItem):
+    """A child run of a `map` or `subflow` visit, under that visit; choosing it opens it."""
+
+    def __init__(self, visit: tuple[str, int], run_id: str, *children: Any) -> None:
+        super().__init__(visit, *children)
+        self.run_id = run_id
+
+
 def pending_banner(config: Config) -> Text:
     """Every prompt waiting in the project, for the banner on list screens."""
     lines = []
@@ -532,6 +540,9 @@ class RunDetailScreen(RunControl):
         self.seen_events = -1
         self.selected: tuple[str, int] | None = None
         self.flow_diff = ""
+        self.selected_child: str | None = None
+        # Each child run's status as last shown: a child's progress adds no events here.
+        self.child_status: dict[str, str] = {}
         # The inspector tab the person last picked, and the tab the screen is opening
         # itself (at first, the one the inspector starts on), whose activation is no pick.
         self.picked: str | None = None
@@ -676,7 +687,7 @@ class RunDetailScreen(RunControl):
 
     def refresh_detail(self) -> None:
         events = read_log(self.run.events).events
-        if len(events) == self.seen_events:
+        if len(events) == self.seen_events and not self._children_changed():
             # A running visit's logs grow without new events.
             if self.selected is not None and not self._selected_result():
                 self._inspect()
@@ -739,6 +750,13 @@ class RunDetailScreen(RunControl):
         timeline.clear()
         started = [e for e in events if e["type"] == "visit_started"]
         finished, routes = _visit_ends(events)
+        children: dict[tuple[str, int], list[tuple[str, int | None]]] = {}
+        for e in events:
+            if e["type"] == "child_run":
+                children.setdefault((e["node"], e["visit"]), []).append(
+                    (e["data"]["run_id"], e["data"].get("item_index"))
+                )
+        rows: list[tuple[tuple[str, int], str | None]] = []
         width = max((len(f"{e['node']} #{e['visit']}") for e in started), default=0)
         for event in started:
             key = (event["node"], event["visit"])
@@ -768,18 +786,67 @@ class RunDetailScreen(RunControl):
                 (f"  {local_time(event['ts'])}", "dim"),
                 *(("  " + fact, "dim") for fact in facts),
             )
+            rows.append((key, None))
             timeline.append(VisitItem(key, Label(label)))
-        keys = [(e["node"], e["visit"]) for e in started]
-        if self.selected is None and keys:
-            self.selected = keys[-1]
-        if self.selected in keys:
-            timeline.index = keys.index(self.selected)
+            for run_id, index in children.get(key, []):
+                rows.append((key, run_id))
+                timeline.append(ChildItem(key, run_id, Label(self._child_label(run_id, index))))
+        if self.selected is None and started:
+            self.selected = (started[-1]["node"], started[-1]["visit"])
+        for row in ((self.selected, self.selected_child), (self.selected, None)):
+            if row in rows:
+                timeline.index = rows.index(row)
+                break
+
+    def _child_summary(self, run_id: str) -> dict[str, Any]:
+        try:
+            return runinfo.summary(RunDir(self.run.path.parent / run_id), Clock())
+        except (OSError, ValueError, KeyError):
+            return {}
+
+    def _child_label(self, run_id: str, index: int | None) -> Text:
+        """A child run under its visit: status, flow, item index, and how it stands."""
+        info = self._child_summary(run_id)
+        status = str(info.get("status") or "?")
+        self.child_status[run_id] = status
+        marker, style = STATUS.get(status, ("?", ""))
+        facts = []
+        if info.get("finished_at"):
+            started = info["started_at"] or info["created_at"]
+            facts.append(
+                _span((parse_iso(info["finished_at"]) - parse_iso(started)).total_seconds())
+            )
+        elif info.get("current") and status in runinfo.ACTIVE:
+            facts.append(f"at {info['current']}")
+        if (info.get("totals") or {}).get("usd_spent"):
+            facts.append(f"${info['totals']['usd_spent']:.2f}")
+        return Text.assemble(
+            "   ↳ ",
+            (marker, style),
+            f" {info.get('flow') or run_id}",
+            f" [{index}]" if index is not None else "",
+            *(("  " + fact, "dim") for fact in facts),
+        )
+
+    def _children_changed(self) -> bool:
+        """Whether an active child run has moved on since the timeline last showed it."""
+        return any(
+            self._child_summary(run_id).get("status") != status
+            for run_id, status in self.child_status.items()
+            if status in runinfo.ACTIVE
+        )
 
     @on(ListView.Highlighted, "#timeline")
     def _highlighted(self, event: ListView.Highlighted) -> None:
         if event.item is not None:
             self.selected = getattr(event.item, "visit", None)
+            self.selected_child = getattr(event.item, "run_id", None)
             self._inspect()
+
+    @on(ListView.Selected, "#timeline")
+    def _chosen(self, event: ListView.Selected) -> None:
+        if isinstance(event.item, ChildItem):
+            self.app.push_screen(RunDetailScreen(self.config, event.item.run_id))
 
     @on(TabbedContent.TabActivated, "#inspector")
     def _tab_activated(self, event: TabbedContent.TabActivated) -> None:
