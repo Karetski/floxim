@@ -12,7 +12,6 @@ from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.geometry import Region
 from textual.screen import Screen
 from textual.widgets import (
     Collapsible,
@@ -49,6 +48,7 @@ from whisperwind.tui.common import (
     RUN_STATUS_ORDER,
     STATUS,
     FileWatcher,
+    GraphPane,
     GraphView,
     NavFooter,
     local_time,
@@ -562,7 +562,9 @@ class RunDetailScreen(RunControl):
         self.selected: tuple[str, int] | None = None
         self.flow_diff = ""
         self.selected_child: str | None = None
-        # Whether selection follows the latest visit: until a visit is picked in the timeline.
+        # A node with no visits, picked in the graph; no visit is selected meanwhile.
+        self.unvisited: str | None = None
+        # Whether selection follows the latest visit: until a visit or node is picked.
         self.follow_latest = True
         self.latest: tuple[str, int] | None = None
         self.followed: str | None = None  # the current node the graph last scrolled to
@@ -583,7 +585,7 @@ class RunDetailScreen(RunControl):
             yield Static("", id="inputs-list")
         yield Static("", id="limits")
         with Horizontal(id="body"):
-            with VerticalScroll(id="graph-pane"):
+            with GraphPane(id="graph-pane"):
                 yield GraphView(id="graph")
             with Vertical(id="side"):
                 yield Timeline(id="timeline")
@@ -770,7 +772,7 @@ class RunDetailScreen(RunControl):
             self._draw_graph()
             if info["current"] != self.followed:
                 self.followed = info["current"]
-                self._scroll_graph_to(info["current"])
+                self.query_one("#graph", GraphView).reveal(info["current"])
             self.query_one("#limits", Static).update(_limits(info["totals"], self.flow.limits))
         self._inspect()
 
@@ -826,7 +828,7 @@ class RunDetailScreen(RunControl):
                 timeline.append(ChildItem(key, run_id, Label(self._child_label(run_id, index))))
         if started:
             self.latest = (started[-1]["node"], started[-1]["visit"])
-        if self.selected is None or self.follow_latest:
+        if self.follow_latest:
             self.selected, self.selected_child = self.latest, None
         for row in ((self.selected, self.selected_child), (self.selected, None)):
             if row in rows:
@@ -879,18 +881,9 @@ class RunDetailScreen(RunControl):
             self.flow,
             statuses,
             visits,
-            selected=self.selected[0] if self.selected else None,
+            selected=self.selected[0] if self.selected else self.unvisited,
             reached=reached,
         )
-
-    def _scroll_graph_to(self, node: str | None) -> None:
-        """Scroll the graph, after its next layout, just enough to show `node`'s box."""
-        picture = self.query_one("#graph", GraphView).picture
-        box = picture.regions.get(node) if picture and node else None
-        if box is not None:
-            pane = self.query_one("#graph-pane", VerticalScroll)
-            region = Region(box.col, box.row, box.width, box.height)
-            self.call_after_refresh(pane.scroll_to_region, region, animate=False)
 
     @on(ListView.Highlighted, "#timeline")
     def _highlighted(self, event: ListView.Highlighted) -> None:
@@ -902,9 +895,34 @@ class RunDetailScreen(RunControl):
         # A visit picked away from the latest one stops selection following the run.
         self.follow_latest = row == (self.latest, None)
         self.selected, self.selected_child = row
+        self.unvisited = None
         self._inspect()
         self._draw_graph()
-        self._scroll_graph_to(self.selected[0] if self.selected else None)
+        self.query_one("#graph", GraphView).reveal(self.selected[0] if self.selected else None)
+
+    @on(GraphView.Picked)
+    def _picked(self, event: GraphView.Picked) -> None:
+        """A node picked in the graph selects its latest visit, or no visit when it has none."""
+        timeline = self.query_one("#timeline", Timeline)
+        rows = [
+            index
+            for index, item in enumerate(timeline.children)
+            if isinstance(item, VisitItem)
+            and not isinstance(item, ChildItem)
+            and item.visit[0] == event.node
+        ]
+        if rows:
+            item = timeline.children[rows[-1]]
+            assert isinstance(item, VisitItem)
+            self.selected, self.unvisited = item.visit, None
+        else:
+            self.selected, self.unvisited = None, event.node
+        self.selected_child = None
+        timeline.index = rows[-1] if rows else None
+        self.follow_latest = self.selected is not None and self.selected == self.latest
+        self._inspect()
+        self._draw_graph()
+        self.query_one("#graph", GraphView).reveal(event.node)
 
     @on(ListView.Selected, "#timeline")
     def _chosen(self, event: ListView.Selected) -> None:
@@ -958,13 +976,14 @@ class RunDetailScreen(RunControl):
     def _inspect(self) -> None:
         """Show the selected visit's tabs. The tab last picked stays open when the visit
         has it; otherwise the most useful one opens: a failed visit's logs, else output."""
-        if self.selected is None:
+        if self.selected is None and self.unvisited is None:
             return
-        contents = self._visit_tabs(*self.selected)
+        contents = self._visit_tabs(*self.selected) if self.selected else {}
         if self.flow_diff:
             contents["flow"] = Text(self.flow_diff)
         if not contents:
-            contents["output"] = Text("(nothing recorded yet)", style="dim")
+            empty = "nothing recorded yet" if self.selected else f"{self.unvisited} has not run"
+            contents["output"] = Text(f"({empty})", style="dim")
         failed = self._selected_result().get("outcome") not in (None, "succeeded")
         best = "logs" if failed and "logs" in contents else "output"
         wanted = next(
@@ -989,6 +1008,10 @@ class RunDetailScreen(RunControl):
             self.call_after_refresh(logs.scroll_end, animate=False)
 
 
+# The targets every flow has, which the graph shows as nodes.
+BUILT_IN = {"end": "the run succeeds here.", "fail": "the run fails here."}
+
+
 class FlowGraphScreen(Screen[None]):
     """A flow's graph, live-synced with its file, and its editor."""
 
@@ -1011,13 +1034,14 @@ class FlowGraphScreen(Screen[None]):
         self.watcher = FileWatcher(path)
         self.flow: Flow | None = None
         self.previous: dict[str, Any] = {}
-        self.node: str | None = None
+        self.node: str | None = None  # a node of the flow, or `end` or `fail`
+        self.changed: set[str] = set()  # nodes the last change to the file touched
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static(str(self.path), id="flow-title")
         with Horizontal(id="body"):
-            with VerticalScroll(id="graph-pane"):
+            with GraphPane(id="graph-pane"):
                 yield GraphView(id="graph")
             with Vertical(id="side"):
                 yield ListView(id="node-list")
@@ -1043,40 +1067,80 @@ class FlowGraphScreen(Screen[None]):
                 graph.show(self.flow, dim=True)
             return
         panel.update("")
-        changed = {
+        self.changed = {
             node.id
             for node in flow.nodes.values()
             if self.previous and self.previous.get(node.id) != node.config
         }
         self.previous = {node.id: node.config for node in flow.nodes.values()}
         self.flow = flow
-        graph.show(flow, highlight=changed)
-        if changed:
-            self.set_timer(HIGHLIGHT_S, lambda: graph.show(flow))
+        if self.changed:
+            self.set_timer(HIGHLIGHT_S, self._unhighlight)
         self._list_nodes(flow)
+
+    def _unhighlight(self) -> None:
+        self.changed = set()
+        self._draw_graph()
 
     def _list_nodes(self, flow: Flow) -> None:
         listing = self.query_one("#node-list", ListView)
         listing.clear()
         for node in flow.nodes.values():
             listing.append(NodeItem(node.id, Label(f"{node.id}  ({node.type})")))
-        if self.node not in flow.nodes:
+        if self.node not in (*flow.nodes, *BUILT_IN):
             self.node = next(iter(flow.nodes), None)
-        index = list(flow.nodes).index(self.node) if self.node else 0
-        listing.index = index
+        self._select(self.node)
+
+    def _select(self, node: str | None) -> None:
+        """Select a node in the list, the graph and the inspector alike."""
+        self.node = node
+        listing = self.query_one("#node-list", ListView)
+        listed = [item.node for item in listing.query(NodeItem)]
+        index = listed.index(node) if node in listed else None
+        if listing.index != index:
+            listing.index = index
         self._inspect()
+        self._draw_graph()
+        self.query_one("#graph", GraphView).reveal(node)
+
+    def _draw_graph(self) -> None:
+        if self.flow is not None:
+            self.query_one("#graph", GraphView).show(
+                self.flow, highlight=self.changed, selected=self.node
+            )
 
     @on(ListView.Highlighted, "#node-list")
     def _highlighted(self, event: ListView.Highlighted) -> None:
-        # A rebuilt list still delivers highlights for the items it replaced.
-        if isinstance(event.item, NodeItem) and self.flow and event.item.node in self.flow.nodes:
-            self.node = event.item.node
-            self._inspect()
+        # A rebuilt list still delivers highlights for the items it replaced, and a
+        # selection made elsewhere moves the list without being a new pick.
+        item = event.item
+        if (
+            isinstance(item, NodeItem)
+            and self.flow
+            and item.node in self.flow.nodes
+            and item.node != self.node
+        ):
+            self._select(item.node)
+
+    @on(GraphView.Picked)
+    def _picked(self, event: GraphView.Picked) -> None:
+        self._select(event.node)
+
+    @on(GraphView.Chosen)
+    def _chosen(self, event: GraphView.Chosen) -> None:
+        self.action_edit_field()
 
     def _inspect(self) -> None:
         from whisperwind.tui.editor import yaml_text
 
-        if self.flow is None or self.node not in self.flow.nodes:
+        if self.flow is None:
+            return
+        if self.node in BUILT_IN:
+            self.query_one("#node-config", Static).update(
+                Text(f"{self.node} is built in: {BUILT_IN[self.node]} It has nothing to edit.")
+            )
+            return
+        if self.node not in self.flow.nodes:
             return
         node = self.flow.nodes[self.node]
         self.query_one("#node-config", Static).update(
@@ -1124,6 +1188,9 @@ class FlowGraphScreen(Screen[None]):
             self.notify(failure.message, severity="error")
 
     def _current(self) -> Any:
+        if self.node in BUILT_IN:
+            self.notify(f"{self.node} is built in; it has nothing to edit")
+            return None
         if self.flow is None or self.node is None or self.node not in self.flow.nodes:
             self.notify("select a node first")
             return None
@@ -1159,7 +1226,7 @@ class FlowGraphScreen(Screen[None]):
     def action_add_node(self) -> None:
         from whisperwind.tui.editor import AddNodeModal
 
-        self._edit(AddNodeModal(self.node))
+        self._edit(AddNodeModal(None if self.node in BUILT_IN else self.node))
 
     def action_remove_node(self) -> None:
         from whisperwind.tui.editor import RemoveNodeModal

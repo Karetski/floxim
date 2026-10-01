@@ -9,16 +9,20 @@ from pathlib import Path
 from typing import Any
 
 from rich.text import Text
+from textual import geometry
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
+from textual.containers import Horizontal, VerticalScroll
 from textual.content import Content
+from textual.events import Click
+from textual.message import Message
 from textual.screen import Screen
+from textual.widget import Widget
 from textual.widgets import Footer, Static
 
 from whisperwind.clock import Clock, parse_iso
 from whisperwind.flow import Flow
-from whisperwind.render import Picture, render
+from whisperwind.render import Picture, Region, render
 
 # Status → (marker, style). The marker carries the meaning; colour only helps.
 STATUS = {
@@ -70,12 +74,91 @@ def node_status(state: dict[str, Any], run_status: str) -> dict[str, str]:
     return statuses
 
 
+def neighbour(regions: dict[str, Region], node: str | None, direction: str) -> str | None:
+    """The box an arrow key moves the cursor to from `node`'s: up and down to the nearest
+    row of boxes above or below, to the box closest in column; left and right to the
+    nearest box in the same row. The top-left box when `node` has none; None when no box
+    lies that way."""
+    if node not in regions:
+        return min(regions, key=lambda n: (regions[n].row, regions[n].col), default=None)
+    here = regions[node]
+
+    def centre(box: Region) -> float:
+        return box.col + box.width / 2
+
+    if direction in ("left", "right"):
+        sign = -1 if direction == "left" else 1
+        row = [
+            n
+            for n, box in regions.items()
+            if box.row == here.row and box.col * sign > here.col * sign
+        ]
+        return min(row, key=lambda n: abs(regions[n].col - here.col), default=None)
+    sign = -1 if direction == "up" else 1
+    rows = [box.row for box in regions.values() if box.row * sign > here.row * sign]
+    if not rows:
+        return None
+    target = min(rows, key=lambda row: abs(row - here.row))
+    return min(
+        (n for n, box in regions.items() if box.row == target),
+        key=lambda n: abs(centre(regions[n]) - centre(here)),
+    )
+
+
 class GraphView(Static):
-    """A flow's graph from the shared renderer, coloured by node status."""
+    """A flow's graph from the shared renderer, coloured by node status.
+
+    The screen owns the selection: arrow keys in the `GraphPane` and clicks ask it to move
+    by posting `Picked`, and `enter` posts `Chosen`; the screen redraws with the node it
+    settles on."""
+
+    # A press picks a node, so it must not also start selecting text.
+    ALLOW_SELECT = False
+
+    class Picked(Message):
+        """A node was picked in the graph, with an arrow key or a click."""
+
+        def __init__(self, node: str) -> None:
+            super().__init__()
+            self.node = node
+
+    class Chosen(Message):
+        """`enter` was pressed on the selected node."""
+
+        def __init__(self, node: str) -> None:
+            super().__init__()
+            self.node = node
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.picture: Picture | None = None
+        self.selected: str | None = None
+
+    def move(self, direction: str) -> None:
+        node = neighbour(self.picture.regions, self.selected, direction) if self.picture else None
+        if node is not None:
+            self.post_message(self.Picked(node))
+
+    def choose(self) -> None:
+        if self.selected is not None:
+            self.post_message(self.Chosen(self.selected))
+
+    def on_click(self, event: Click) -> None:
+        at = event.get_content_offset(self)
+        if at is None or self.picture is None:
+            return
+        for node, box in self.picture.regions.items():
+            if box.row <= at.y < box.row + box.height and box.col <= at.x < box.col + box.width:
+                self.post_message(self.Picked(node))
+                return
+
+    def reveal(self, node: str | None) -> None:
+        """Scroll the pane holding the graph, after its next layout, just enough to show
+        `node`'s box."""
+        box = self.picture.regions.get(node) if self.picture and node else None
+        if box is not None and isinstance(self.parent, Widget):
+            area = geometry.Region(box.col, box.row, box.width, box.height)
+            self.call_after_refresh(self.parent.scroll_to_region, area, animate=False)
 
     def show(
         self,
@@ -98,6 +181,7 @@ class GraphView(Static):
             return f"{mark} {count}" if mark else count
 
         self.picture = render(flow, decorate)
+        self.selected = selected
         text = Text("\n".join(self.picture.lines), style="dim" if dim else "")
         if not dim:
             offsets = _line_offsets(self.picture.lines)
@@ -115,6 +199,23 @@ class GraphView(Static):
                     start = offsets[row] + region.col
                     text.stylize(style, start, start + region.width)
         self.update(text)
+
+
+class GraphPane(VerticalScroll):
+    """The scrolling pane around a `GraphView`, which takes focus and keys for it. The
+    graph itself must not take focus: Textual scrolls a focused widget taller than its
+    view to the widget's top, away from the selected node."""
+
+    BINDINGS = [
+        *(Binding(key, f"move('{key}')", show=False) for key in ("up", "down", "left", "right")),
+        Binding("enter", "choose", show=False),
+    ]
+
+    def action_move(self, direction: str) -> None:
+        self.query_one(GraphView).move(direction)
+
+    def action_choose(self) -> None:
+        self.query_one(GraphView).choose()
 
 
 class NavKey(Static):
