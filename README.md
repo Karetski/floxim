@@ -1,6 +1,6 @@
 # Whisperwind
 
-Whisperwind runs multi-step workflows for AI coding agents from the terminal. You write a **flow**, a graph of steps in one YAML file. A flow might be "plan with one agent, implement with another, run the tests, loop until they pass, ask me before merging". Whisperwind runs it by driving the agent CLIs you already use, **Claude Code** and **Codex CLI**, in headless mode. It never calls model APIs itself.
+Whisperwind runs durable, harness-agnostic workflows for AI coding agents from the terminal. You write a **flow**, a graph of steps in one YAML file. A flow might be "plan with one agent, implement with another, run the tests, loop until they pass, ask me before merging". Whisperwind runs it by driving the agent CLIs you already use, **Claude Code** and **Codex CLI**, in headless mode. It never calls model APIs itself.
 
 - **Flows are plain files.** You can edit them by hand, from the TUI or with `whw flow` commands, and comments and formatting are kept.
 - **Runs are durable.** Every step is saved before the next one starts. A crashed or killed run resumes where it stopped. A run can wait days for your answer with no process running.
