@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from floxim.validate import validate
+from whisperwind.validate import validate
 
 CORPUS = Path(__file__).parent / "flows"
 EXAMPLES = Path(__file__).parent.parent / "examples"

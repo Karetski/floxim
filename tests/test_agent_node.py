@@ -13,15 +13,15 @@ from typing import Any
 import pytest
 from engine_support import Result, run_flow
 
-from floxim.adapters import Capabilities, registry
-from floxim.adapters.fake import FakeAdapter
-from floxim.config import load_config
-from floxim.engine.runner import FullPermissionsRefused, create_run
-from floxim.store.events import read_log
-from floxim.store.ids import resolve_run
-from floxim.store.rundir import RunDir
-from floxim.testing import VirtualClock
-from floxim.validate import validate
+from whisperwind.adapters import Capabilities, registry
+from whisperwind.adapters.fake import FakeAdapter
+from whisperwind.config import load_config
+from whisperwind.engine.runner import FullPermissionsRefused, create_run
+from whisperwind.store.events import read_log
+from whisperwind.store.ids import resolve_run
+from whisperwind.store.rundir import RunDir
+from whisperwind.testing import VirtualClock
+from whisperwind.validate import validate
 
 
 def agent_flow(nodes: str, extra: str = "") -> str:
@@ -256,9 +256,9 @@ def _cli(
 ) -> subprocess.CompletedProcess[str]:
     env = {"PATH": os.environ["PATH"], "HOME": str(project), "XDG_CONFIG_HOME": str(project / "x")}
     if crash_at:
-        env["FLOXIM_TEST_CRASH_AT"] = crash_at
+        env["WHISPERWIND_TEST_CRASH_AT"] = crash_at
     return subprocess.run(
-        [sys.executable, "-m", "floxim", *args],
+        [sys.executable, "-m", "whisperwind", *args],
         cwd=project,
         env=env,
         capture_output=True,
@@ -270,7 +270,7 @@ def test_given_crash_after_session_started_when_resumed_then_that_session_is_res
     tmp_path: Path,
 ) -> None:
     # Given
-    (tmp_path / ".floxim").mkdir()
+    (tmp_path / ".whisperwind").mkdir()
     (tmp_path / "flow.yaml").write_text(
         agent_flow(
             "  work:\n    prompt: Do the thing.\n    harness_options:\n      responses: [{text: done}]\n"
@@ -283,7 +283,7 @@ def test_given_crash_after_session_started_when_resumed_then_that_session_is_res
 
     # Then
     assert resumed.returncode == 0, resumed.stderr
-    runs = tmp_path / ".floxim" / "runs"
+    runs = tmp_path / ".whisperwind" / "runs"
     run = RunDir(runs / resolve_run(runs, "@last"))
     events = read_log(run.events).events
     first_session = next(e for e in events if e["type"] == "session_started")["data"]["session_id"]
@@ -297,7 +297,7 @@ def test_given_full_permissions_when_run_without_allow_full_then_it_is_refused(
     tmp_path: Path,
 ) -> None:
     # Given
-    (tmp_path / ".floxim").mkdir()
+    (tmp_path / ".whisperwind").mkdir()
     (tmp_path / "flow.yaml").write_text(
         agent_flow("  work:\n    prompt: Go.\n    permissions: full\n")
     )

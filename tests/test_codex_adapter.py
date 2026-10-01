@@ -13,12 +13,12 @@ import pytest
 from engine_support import run_flow
 from test_claude_adapter import request
 
-from floxim.adapters import AgentRequest, SessionSpec
-from floxim.adapters.codex import CodexAdapter, CodexStream
-from floxim.adapters.process import parse_lines
-from floxim.checks import strict_schema_problem
-from floxim.conformance import FIXTURES_DIR
-from floxim.validate import validate
+from whisperwind.adapters import AgentRequest, SessionSpec
+from whisperwind.adapters.codex import CodexAdapter, CodexStream
+from whisperwind.adapters.process import parse_lines
+from whisperwind.checks import strict_schema_problem
+from whisperwind.conformance import FIXTURES_DIR
+from whisperwind.validate import validate
 
 FIXTURES = FIXTURES_DIR / "codex-0.147.0"
 THREAD = "0199aaaa-bbbb-7ccc-8ddd-eeeeeeeeeeee"

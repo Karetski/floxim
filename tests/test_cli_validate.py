@@ -1,11 +1,11 @@
-"""`floxim validate` and `floxim schema flow` on the command line."""
+"""`whisperwind validate` and `whisperwind schema flow` on the command line."""
 
 import json
 from pathlib import Path
 
 import pytest
 
-from floxim import cli
+from whisperwind import cli
 
 INVALID = Path(__file__).parent / "flows" / "invalid"
 

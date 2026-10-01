@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "floxim"
+name = "whisperwind"
 dynamic = ["version"]
 description = "Terminal-first, harness-agnostic workflow orchestrator for AI coding agents."
 readme = "README.md"
@@ -28,12 +28,12 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/Karetski/floxim"
-Issues = "https://github.com/Karetski/floxim/issues"
+Repository = "https://github.com/Karetski/whisperwind"
+Issues = "https://github.com/Karetski/whisperwind/issues"
 
 [project.scripts]
-floxim = "floxim.cli:run"
-flx = "floxim.cli:run"
+whisperwind = "whisperwind.cli:run"
+whw = "whisperwind.cli:run"
 
 [dependency-groups]
 dev = [
@@ -45,7 +45,7 @@ dev = [
 ]
 
 [tool.hatch.version]
-path = "src/floxim/__init__.py"
+path = "src/whisperwind/__init__.py"
 
 [tool.hatch.build.targets.sdist]
 # Agent and CI configuration are for working on the repository, not for users.
@@ -55,7 +55,7 @@ exclude = [".claude", ".github"]
 testpaths = ["tests"]
 pythonpath = ["tools", "tests"]
 addopts = ["--strict-markers", "-m", "not live"]
-markers = ["live: runs a real harness and spends money; opt in with FLOXIM_LIVE=1 -m live"]
+markers = ["live: runs a real harness and spends money; opt in with WHISPERWIND_LIVE=1 -m live"]
 
 [tool.ruff]
 target-version = "py310"
@@ -72,7 +72,7 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 # Tests hold whole flows in string literals.
 "tests/*" = ["E501"]
 # Textual declares BINDINGS and CSS as class-level lists.
-"src/floxim/tui/*" = ["RUF012"]
+"src/whisperwind/tui/*" = ["RUF012"]
 
 [tool.mypy]
 strict = true

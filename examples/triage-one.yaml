@@ -1,4 +1,4 @@
-floxim: 1
+whisperwind: 1
 name: triage-one
 include: [shared/templates.yaml]
 inputs:

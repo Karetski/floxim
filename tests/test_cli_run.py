@@ -1,11 +1,11 @@
-"""`floxim run` on the command line: exit codes and the --json document."""
+"""`whisperwind run` on the command line: exit codes and the --json document."""
 
 import json
 from pathlib import Path
 
 import pytest
 
-from floxim import cli
+from whisperwind import cli
 
 OK_FLOW = """
 name: ok
@@ -31,7 +31,7 @@ nodes:
 
 @pytest.fixture
 def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    (tmp_path / ".floxim").mkdir()
+    (tmp_path / ".whisperwind").mkdir()
     (tmp_path / "ok.yaml").write_text(OK_FLOW)
     (tmp_path / "nope.yaml").write_text(FAIL_FLOW)
     monkeypatch.chdir(tmp_path)
@@ -50,7 +50,7 @@ def test_given_succeeding_flow_when_run_with_json_then_exits_0_with_outputs(
     assert document["ok"] is True
     assert document["data"]["status"] == "succeeded"
     assert document["data"]["outputs"] == {"x": 7}
-    run_dir = project / ".floxim" / "runs" / document["data"]["run_id"]
+    run_dir = project / ".whisperwind" / "runs" / document["data"]["run_id"]
     assert (run_dir / "events.jsonl").exists()
 
 
@@ -79,7 +79,7 @@ def test_given_bad_inputs_when_run_then_exits_3_before_creating_a_run(
     # Then
     assert code == 3
     assert json.loads(capsys.readouterr().out)["error"]["code"] == "E-INVALID-INPUT"
-    assert not (project / ".floxim" / "runs").exists()
+    assert not (project / ".whisperwind" / "runs").exists()
 
 
 def test_given_invalid_flow_when_run_then_exits_3_with_problems(

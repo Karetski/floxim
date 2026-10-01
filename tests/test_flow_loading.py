@@ -7,9 +7,9 @@ from typing import Any
 import fastjsonschema
 import pytest
 
-from floxim.flow import load_flow
-from floxim.flowspec import flow_json_schema
-from floxim.yamlio import load_file
+from whisperwind.flow import load_flow
+from whisperwind.flowspec import flow_json_schema
+from whisperwind.yamlio import load_file
 
 VALID = Path(__file__).parent / "flows" / "valid"
 INVALID = Path(__file__).parent / "flows" / "invalid"
@@ -177,7 +177,7 @@ def test_given_a_schema_when_checked_and_used_then_it_is_never_modified() -> Non
     # Given
     import copy
 
-    from floxim import jsonschemas
+    from whisperwind import jsonschemas
 
     schema = {"type": "object", "properties": {"a": {"enum": [1]}, "b": {"default": 5}}}
     output = {"a": 1}

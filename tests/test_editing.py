@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from floxim import cli, edit
+from whisperwind import cli, edit
 
 FLOWS = Path(__file__).parent / "flows"
 HAND = (FLOWS / "edit" / "hand.yaml").read_text()

@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from floxim import render
-from floxim.flow import load_flow
+from whisperwind import render
+from whisperwind.flow import load_flow
 
 FLOWS = Path(__file__).parent / "flows"
 GOLDEN = Path(__file__).parent / "golden" / "graphs"
@@ -33,7 +33,7 @@ def test_given_corpus_flow_when_rendered_then_it_matches_its_golden_picture(
 
     # Then
     golden = GOLDEN / f"{path.parent.name}-{path.stem}.txt"
-    if os.environ.get("FLOXIM_UPDATE_GOLDEN"):
+    if os.environ.get("WHISPERWIND_UPDATE_GOLDEN"):
         golden.write_text(picture.text)
     assert picture.text == golden.read_text()
     assert set(picture.regions) >= set(flow.nodes)

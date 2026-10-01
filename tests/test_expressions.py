@@ -8,7 +8,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from floxim.expr import EvalError, ExprError, parse
+from whisperwind.expr import EvalError, ExprError, parse
 
 STATE: dict[str, Any] = {
     "inputs": {"feature": "login", "max_attempts": 3, "mode": "careful"},

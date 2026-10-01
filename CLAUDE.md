@@ -1,13 +1,13 @@
-# Floxim
+# Whisperwind
 
-Floxim is a terminal-first, harness-agnostic workflow orchestrator for AI coding agents. Users define flows (graphs of nodes such as `agent`, `shell`, `condition` and `human`) in YAML files; Floxim runs them durably by driving existing harnesses (Claude Code, Codex CLI) in headless mode. The CLI is the engine; a TUI is a client on top.
+Whisperwind is a terminal-first, harness-agnostic workflow orchestrator for AI coding agents. Users define flows (graphs of nodes such as `agent`, `shell`, `condition` and `human`) in YAML files; Whisperwind runs them durably by driving existing harnesses (Claude Code, Codex CLI) in headless mode. The CLI is the engine; a TUI is a client on top.
 
 ## Where things are
 
 | Read | For |
 |---|---|
 | `README.md` | What the tool does today: flow format, node types, CLI, TUI, adapters, configuration. |
-| `src/floxim/` | The implementation. |
+| `src/whisperwind/` | The implementation. |
 | `tests/` | Behavior as tested; `tests/flows/` is the validation corpus. |
 | `examples/` | Example flows, kept identical to their copies in the valid corpus. |
 
@@ -25,7 +25,7 @@ Floxim is a terminal-first, harness-agnostic workflow orchestrator for AI coding
 
 ## Vendored agentkit
 
-`.claude/conduct.md` and `.claude/skills/` are verbatim copies from [agentkit](https://github.com/Karetski/agentkit) at commit `e8216e1`. Edit them upstream in agentkit and re-copy; don't edit the copies here. `hot-path-budget-audit` is intentionally not vendored: Floxim's engine is I/O-bound, with no per-tick latency budget. Ignore mentions of it in the conduct and other skills.
+`.claude/conduct.md` and `.claude/skills/` are verbatim copies from [agentkit](https://github.com/Karetski/agentkit) at commit `e8216e1`. Edit them upstream in agentkit and re-copy; don't edit the copies here. `hot-path-budget-audit` is intentionally not vendored: Whisperwind's engine is I/O-bound, with no per-tick latency budget. Ignore mentions of it in the conduct and other skills.
 
 Re-sync from a local agentkit checkout:
 

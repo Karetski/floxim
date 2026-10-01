@@ -7,7 +7,7 @@ resolution-markers = [
 ]
 
 [[package]]
-name = "floxim"
+name = "whisperwind"
 source = { editable = "." }
 dependencies = [
     { name = "fastjsonschema" },

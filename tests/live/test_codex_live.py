@@ -1,6 +1,6 @@
 """Live contract tests against a real Codex CLI.
 
-Marked `live` and excluded by default; run with FLOXIM_LIVE=1. They settle
+Marked `live` and excluded by default; run with WHISPERWIND_LIVE=1. They settle
 what the offline suite cannot: signals, exit codes and the schema subset.
 """
 
@@ -16,8 +16,8 @@ from engine_support import run_flow
 pytestmark = [
     pytest.mark.live,
     pytest.mark.skipif(
-        os.environ.get("FLOXIM_LIVE") != "1" or shutil.which("codex") is None,
-        reason="live tests need FLOXIM_LIVE=1 and the codex CLI",
+        os.environ.get("WHISPERWIND_LIVE") != "1" or shutil.which("codex") is None,
+        reason="live tests need WHISPERWIND_LIVE=1 and the codex CLI",
     ),
 ]
 ENV = {k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "OPENAI_API_KEY", "CODEX_HOME")}

@@ -8,7 +8,7 @@ PURE = "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n"
 def test_given_only_pure_wheels_when_checked_then_nothing_is_reported() -> None:
     # Given
     wheels = {
-        "floxim": PURE,
+        "whisperwind": PURE,
         "legacy-pure": "Root-Is-Purelib: true\nTag: py2-none-any\nTag: py3-none-any\n",
     }
 
@@ -19,7 +19,7 @@ def test_given_only_pure_wheels_when_checked_then_nothing_is_reported() -> None:
 def test_given_a_native_wheel_when_checked_then_it_is_reported() -> None:
     # Given
     wheels = {
-        "floxim": PURE,
+        "whisperwind": PURE,
         "rpds-py": "Root-Is-Purelib: false\nTag: cp312-cp312-macosx_11_0_arm64\n",
     }
 

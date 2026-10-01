@@ -2,7 +2,7 @@ name: Release
 
 # Pushing a tag vX.Y.Z publishes that version: the wheel and sdist
 # to PyPI through trusted publishing, and a GitHub release with them and
-# floxim.pyz attached.
+# whisperwind.pyz attached.
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
 
       - name: The tag matches the package version
         run: |
-          version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/floxim/__init__.py)
+          version=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' src/whisperwind/__init__.py)
           test "v$version" = "$GITHUB_REF_NAME" || {
             echo "tag $GITHUB_REF_NAME does not match version $version"; exit 1; }
 
@@ -42,8 +42,8 @@ jobs:
 
       - name: Build the zipapp and run it on Python 3.10
         run: |
-          uv run python tools/build_zipapp.py dist/floxim-*.whl pyz/floxim.pyz
-          "${{ steps.py310.outputs.python-path }}" pyz/floxim.pyz --version
+          uv run python tools/build_zipapp.py dist/whisperwind-*.whl pyz/whisperwind.pyz
+          "${{ steps.py310.outputs.python-path }}" pyz/whisperwind.pyz --version
 
       - uses: actions/upload-artifact@v7
         with:
@@ -59,7 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/floxim
+      url: https://pypi.org/p/whisperwind
     permissions:
       id-token: write
     steps:
@@ -85,4 +85,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" artifacts/* \
-            --title "Floxim ${GITHUB_REF_NAME#v}" --generate-notes --verify-tag
+            --title "Whisperwind ${GITHUB_REF_NAME#v}" --generate-notes --verify-tag

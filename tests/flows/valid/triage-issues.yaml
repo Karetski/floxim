@@ -1,4 +1,4 @@
-floxim: 1
+whisperwind: 1
 name: triage-issues
 description: Label and answer new GitHub issues, one subflow run per issue.
 
@@ -43,7 +43,7 @@ nodes:
 
   report:
     type: notify
-    command: 'notify-send "Floxim triage" "$FLOXIM_MESSAGE"'
+    command: 'notify-send "Whisperwind triage" "$WHISPERWIND_MESSAGE"'
     message: "${{ vars.failed }} of ${{ vars.triaged + vars.failed }} issues failed triage."
 
 outputs:

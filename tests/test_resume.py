@@ -15,14 +15,14 @@ from typing import Any
 import pytest
 from engine_support import run_flow
 
-from floxim.clock import Clock
-from floxim.config import load_config
-from floxim.engine.runner import ResumeOptions, ResumeRefused, Runner
-from floxim.runinfo import display_status
-from floxim.store.events import read_log
-from floxim.store.ids import resolve_run
-from floxim.store.rundir import RunDir
-from floxim.testing import VirtualClock, run_virtual
+from whisperwind.clock import Clock
+from whisperwind.config import load_config
+from whisperwind.engine.runner import ResumeOptions, ResumeRefused, Runner
+from whisperwind.runinfo import display_status
+from whisperwind.store.events import read_log
+from whisperwind.store.ids import resolve_run
+from whisperwind.store.rundir import RunDir
+from whisperwind.testing import VirtualClock, run_virtual
 
 COUNTER = """
 name: counter
@@ -51,7 +51,7 @@ name: fix-loop
 nodes:
   implement:
     type: shell
-    run: echo "$FLOXIM_NODE_ID $FLOXIM_VISIT $FLOXIM_ATTEMPT" >> side-effects.txt
+    run: echo "$WHISPERWIND_NODE_ID $WHISPERWIND_VISIT $WHISPERWIND_ATTEMPT" >> side-effects.txt
     next: test
   test:
     type: shell
@@ -71,7 +71,7 @@ name: approval
 nodes:
   build:
     type: shell
-    run: echo "$FLOXIM_NODE_ID $FLOXIM_VISIT" >> side-effects.txt
+    run: echo "$WHISPERWIND_NODE_ID $WHISPERWIND_VISIT" >> side-effects.txt
     next: approve
   approve:
     type: human
@@ -101,9 +101,9 @@ def _cli(
         "XDG_CONFIG_HOME": str(project / "xdg"),
     }
     if crash_at:
-        env["FLOXIM_TEST_CRASH_AT"] = crash_at
+        env["WHISPERWIND_TEST_CRASH_AT"] = crash_at
     return subprocess.run(
-        [sys.executable, "-m", "floxim", *args],
+        [sys.executable, "-m", "whisperwind", *args],
         cwd=project,
         env=env,
         capture_output=True,
@@ -114,13 +114,13 @@ def _cli(
 
 def _project(tmp_path: Path, name: str, flow: str) -> Path:
     project = tmp_path / name
-    (project / ".floxim").mkdir(parents=True)
+    (project / ".whisperwind").mkdir(parents=True)
     (project / "flow.yaml").write_text(flow)
     return project
 
 
 def _latest(project: Path) -> RunDir:
-    runs = project / ".floxim" / "runs"
+    runs = project / ".whisperwind" / "runs"
     return RunDir(runs / resolve_run(runs, "@last"))
 
 
@@ -192,7 +192,7 @@ def test_given_crash_at_every_event_boundary_when_resumed_then_the_run_ends_as_i
     # crashing after the final event leaves nothing to resume.
     for event in events[1:-1]:
         if event["type"] == "human_responded":
-            continue  # written by `floxim respond`, not by a runner
+            continue  # written by `whisperwind respond`, not by a runner
         seen[event["type"]] += 1
         boundaries.append(f"{event['type']}:{seen[event['type']]}")
 
@@ -216,7 +216,7 @@ def test_given_crash_at_every_event_boundary_when_resumed_then_the_run_ends_as_i
 
 def test_given_created_but_never_started_run_when_resumed_then_it_starts(tmp_path: Path) -> None:
     # Given
-    from floxim.engine.runner import create_run
+    from whisperwind.engine.runner import create_run
 
     project = _project(tmp_path, "pending", COUNTER)
     config, _ = load_config(project)
@@ -246,14 +246,14 @@ def test_given_foreground_run_when_interrupted_then_it_detaches_and_resumes_late
     )
     env = {"PATH": os.environ["PATH"], "HOME": str(project), "XDG_CONFIG_HOME": str(project / "x")}
     process = subprocess.Popen(
-        [sys.executable, "-m", "floxim", "run", "flow.yaml"],
+        [sys.executable, "-m", "whisperwind", "run", "flow.yaml"],
         cwd=project,
         env=env,
         stderr=subprocess.PIPE,
         text=True,
     )
     deadline = time.monotonic() + 20
-    runs = project / ".floxim" / "runs"
+    runs = project / ".whisperwind" / "runs"
     while time.monotonic() < deadline:
         logs = list(runs.glob("*/events.jsonl")) if runs.exists() else []
         if logs and "attempt_started" in logs[0].read_text():
@@ -394,7 +394,7 @@ def test_given_crash_mid_attempt_when_resumed_with_rerun_then_a_new_attempt_runs
     project = _project(
         tmp_path,
         "rerun",
-        "name: once\nnodes:\n  work:\n    type: shell\n    run: echo $FLOXIM_ATTEMPT >> tries\n",
+        "name: once\nnodes:\n  work:\n    type: shell\n    run: echo $WHISPERWIND_ATTEMPT >> tries\n",
     )
     assert _cli(project, "run", "flow.yaml", crash_at="attempt_started:1").returncode == 137
 

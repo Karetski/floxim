@@ -1,6 +1,6 @@
-"""Build the single-file `floxim.pyz` from a built wheel.
+"""Build the single-file `whisperwind.pyz` from a built wheel.
 
-Usage: python tools/build_zipapp.py dist/floxim-<version>-py3-none-any.whl dist/floxim.pyz
+Usage: python tools/build_zipapp.py dist/whisperwind-<version>-py3-none-any.whl dist/whisperwind.pyz
 
 The wheel and its runtime dependencies are installed into a staging directory
 with `uv pip install --target`, which is then zipped with the standard library's
@@ -32,7 +32,7 @@ def build(wheel: Path, output: Path) -> None:
             staging,
             output,
             interpreter="/usr/bin/env python3",
-            main="floxim.cli:run",
+            main="whisperwind.cli:run",
             compressed=True,
         )
 

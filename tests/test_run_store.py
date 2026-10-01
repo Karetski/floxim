@@ -11,13 +11,13 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from floxim.clock import FakeClock, iso
-from floxim.store import inbox
-from floxim.store.events import CorruptLog, EventWriter, read_log
-from floxim.store.ids import AmbiguousRun, RunNotFound, new_run_id, resolve_run
-from floxim.store.lock import STALE_AFTER_S, LockHeld, RunLock, hostname
-from floxim.store.rundir import RunDir
-from floxim.store.state import active_seconds, apply, initial_state, reduce
+from whisperwind.clock import FakeClock, iso
+from whisperwind.store import inbox
+from whisperwind.store.events import CorruptLog, EventWriter, read_log
+from whisperwind.store.ids import AmbiguousRun, RunNotFound, new_run_id, resolve_run
+from whisperwind.store.lock import STALE_AFTER_S, LockHeld, RunLock, hostname
+from whisperwind.store.rundir import RunDir
+from whisperwind.store.state import active_seconds, apply, initial_state, reduce
 
 T0 = datetime.datetime(2026, 9, 30, 14, 15, 3, tzinfo=datetime.timezone.utc)
 

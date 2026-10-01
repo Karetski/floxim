@@ -14,18 +14,18 @@ import pytest
 from engine_support import run_flow
 from textual.widgets import DataTable, Label, ListView, Static
 
-from floxim import runinfo
-from floxim.clock import Clock, parse_iso
-from floxim.config import load_config
-from floxim.engine.human import Answer
-from floxim.engine.respond import respond
-from floxim.engine.runner import Runner
-from floxim.store.events import read_log
-from floxim.store.rundir import RunDir
-from floxim.testing import VirtualClock, run_virtual
-from floxim.tui.app import FloximApp
-from floxim.tui.common import NavKey, local_time, local_timestamp
-from floxim.tui.screens import (
+from whisperwind import runinfo
+from whisperwind.clock import Clock, parse_iso
+from whisperwind.config import load_config
+from whisperwind.engine.human import Answer
+from whisperwind.engine.respond import respond
+from whisperwind.engine.runner import Runner
+from whisperwind.store.events import read_log
+from whisperwind.store.rundir import RunDir
+from whisperwind.testing import VirtualClock, run_virtual
+from whisperwind.tui.app import WhisperwindApp
+from whisperwind.tui.common import NavKey, local_time, local_timestamp
+from whisperwind.tui.screens import (
     FlowGraphScreen,
     FlowsScreen,
     RunDetailScreen,
@@ -50,7 +50,7 @@ QUICK = "name: quick\nnodes:\n  a: {type: set, vars: {x: 1}}\n"
 
 
 def drive(
-    app: FloximApp,
+    app: WhisperwindApp,
     scenario: Callable[[Any], Awaitable[None]],
     size: tuple[int, int] = (140, 45),
 ) -> None:
@@ -98,8 +98,8 @@ def project(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def run_like_cli(app: FloximApp, scenario: Callable[[Any], Awaitable[None]]) -> int | None:
-    """Run the app with `App.run`, as `floxim tui` does, and return its exit code.
+def run_like_cli(app: WhisperwindApp, scenario: Callable[[Any], Awaitable[None]]) -> int | None:
+    """Run the app with `App.run`, as `whisperwind tui` does, and return its exit code.
 
     Unlike the pilot's `run_test`, `App.run` starts tasks eagerly, so a new screen composes
     before the switch that created it has finished."""
@@ -114,7 +114,7 @@ def run_like_cli(app: FloximApp, scenario: Callable[[Any], Awaitable[None]]) -> 
     return app.return_code
 
 
-def test_given_a_project_when_the_tui_starts_as_floxim_tui_does_then_it_runs(
+def test_given_a_project_when_the_tui_starts_as_whisperwind_tui_does_then_it_runs(
     project: Path,
 ) -> None:
     config, _ = load_config(project)
@@ -122,7 +122,7 @@ def test_given_a_project_when_the_tui_starts_as_floxim_tui_does_then_it_runs(
     async def nothing(pilot: Any) -> None:
         pass
 
-    assert run_like_cli(FloximApp(config), nothing) == 0
+    assert run_like_cli(WhisperwindApp(config), nothing) == 0
 
 
 def test_given_views_when_switching_between_them_then_the_current_ones_key_is_highlighted(
@@ -138,7 +138,7 @@ def test_given_views_when_switching_between_them_then_the_current_ones_key_is_hi
             keys = pilot.app.screen.query(NavKey)
             highlighted.append([str(k.render()).strip() for k in keys if k.has_class("-active")])
 
-    assert run_like_cli(FloximApp(config), switch) == 0
+    assert run_like_cli(WhisperwindApp(config), switch) == 0
     assert highlighted == [["f Flows"], ["r Runs"], ["f Flows"]]
 
 
@@ -170,7 +170,7 @@ def test_given_runs_when_listed_then_start_and_finish_show_in_local_time(
             else:
                 assert finished in compact_in_zone(info["finished_at"])
 
-    drive(FloximApp(config), scenario)
+    drive(WhisperwindApp(config), scenario)
 
 
 def test_given_runs_at_80_columns_when_scrolled_right_then_status_and_run_stay(
@@ -186,7 +186,7 @@ def test_given_runs_at_80_columns_when_scrolled_right_then_status_and_run_stay(
         row = table.render_line(1).text
         assert table.get_row_at(0)[1] in row and "waiting" in row
 
-    drive(FloximApp(config), scenario, size=(80, 24))
+    drive(WhisperwindApp(config), scenario, size=(80, 24))
 
 
 def test_given_runs_when_the_tui_opens_then_waiting_runs_come_first(project: Path) -> None:
@@ -203,7 +203,7 @@ def test_given_runs_when_the_tui_opens_then_waiting_runs_come_first(project: Pat
         await pilot.press("s", "s")  # running, then failed: nothing
         assert table.row_count == 0
 
-    drive(FloximApp(config), scenario)
+    drive(WhisperwindApp(config), scenario)
 
 
 def test_given_waiting_run_when_opened_then_graph_banner_and_inspector_show_it(
@@ -224,7 +224,7 @@ def test_given_waiting_run_when_opened_then_graph_banner_and_inspector_show_it(
         assert "Plan the demo." in text_of(screen.query_one("#inspect-prompt", Static))
         assert "~$0.10" in text_of(screen.query_one("#summary", Static))
 
-    drive(FloximApp(config), scenario)
+    drive(WhisperwindApp(config), scenario)
 
 
 def test_given_run_that_finishes_while_open_when_refreshed_then_the_screen_follows(
@@ -257,7 +257,7 @@ def test_given_run_that_finishes_while_open_when_refreshed_then_the_screen_follo
         assert "succeeded" in text_of(screen.query_one("#summary", Static))
         assert "✓ ☺ approve" in text_of(screen.query_one("#graph", Static))
 
-    drive(FloximApp(config, target=waiting.name), scenario)
+    drive(WhisperwindApp(config, target=waiting.name), scenario)
 
 
 @pytest.mark.parametrize("flow", ["demo", "quick"])
@@ -282,7 +282,7 @@ def test_given_a_run_when_opened_then_its_summary_and_timeline_show_local_times(
         for label, start in zip(labels, starts, strict=True):
             assert any(shown in label for shown in compact_in_zone(start))
 
-    drive(FloximApp(config, target=run.id), scenario)
+    drive(WhisperwindApp(config, target=run.id), scenario)
 
 
 def test_given_flow_files_when_listed_then_validity_and_last_run_show(project: Path) -> None:
@@ -302,7 +302,7 @@ def test_given_flow_files_when_listed_then_validity_and_last_run_show(project: P
         assert [(str(r[0]), r[1]) for r in rows] == [("✗", "broken"), ("✓", "demo")]
         assert "waiting" in str(rows[1][3])
 
-    drive(FloximApp(config), scenario)
+    drive(WhisperwindApp(config), scenario)
 
 
 def test_given_lists_when_switching_runs_flows_runs_then_each_keeps_its_cursor_and_filter(
@@ -326,7 +326,7 @@ def test_given_lists_when_switching_runs_flows_runs_then_each_keeps_its_cursor_a
         assert runs.status_filter == "waiting"
         assert runs.query_one("#runs", DataTable).row_count == 1
 
-    drive(FloximApp(config), scenario)
+    drive(WhisperwindApp(config), scenario)
 
 
 def test_given_a_flow_open_when_switching_away_and_back_then_it_is_still_open(
@@ -345,7 +345,7 @@ def test_given_a_flow_open_when_switching_away_and_back_then_it_is_still_open(
         await pilot.press("f")  # again, from inside Flows: back to its list
         assert isinstance(pilot.app.screen, FlowsScreen)
 
-    drive(FloximApp(config), scenario)
+    drive(WhisperwindApp(config), scenario)
 
 
 def test_given_runs_when_the_pinned_flows_key_is_clicked_then_flows_show(project: Path) -> None:
@@ -357,7 +357,7 @@ def test_given_runs_when_the_pinned_flows_key_is_clicked_then_flows_show(project
         await pilot.pause()
         assert isinstance(pilot.app.screen, FlowsScreen)
 
-    drive(FloximApp(config), scenario)
+    drive(WhisperwindApp(config), scenario)
 
 
 @pytest.mark.parametrize("view", ["runs", "flows"])
@@ -381,7 +381,7 @@ def test_given_a_drilled_in_screen_at_80x24_then_the_root_views_stay_pinned_in_t
         ]
 
     target = run_id if view == "runs" else str(flow)
-    drive(FloximApp(config, target=target), scenario, size=(80, 24))
+    drive(WhisperwindApp(config, target=target), scenario, size=(80, 24))
 
 
 def test_given_flow_file_edited_while_shown_then_the_graph_follows_and_survives_bad_saves(
@@ -390,7 +390,7 @@ def test_given_flow_file_edited_while_shown_then_the_graph_follows_and_survives_
     # Given
     path = tmp_path / "flow.yaml"
     path.write_text(QUICK)
-    (tmp_path / ".floxim").mkdir()
+    (tmp_path / ".whisperwind").mkdir()
     config, _ = load_config(tmp_path)
 
     async def scenario(pilot: Any) -> None:
@@ -412,7 +412,7 @@ def test_given_flow_file_edited_while_shown_then_the_graph_follows_and_survives_
         assert "◷ b" in text_of(graph)
         assert "E-UNKNOWN-TARGET" in text_of(screen.query_one("#problems", Static))
 
-    drive(FloximApp(config, target=str(path)), scenario)
+    drive(WhisperwindApp(config, target=str(path)), scenario)
 
 
 def test_given_flow_graph_screen_when_rendered_then_it_matches_the_snapshot(
@@ -420,6 +420,8 @@ def test_given_flow_graph_screen_when_rendered_then_it_matches_the_snapshot(
 ) -> None:
     corpus = Path(__file__).parent / "flows" / "valid"
     monkeypatch.chdir(corpus)
-    (tmp_path / ".floxim").mkdir()
+    (tmp_path / ".whisperwind").mkdir()
     config, _ = load_config(tmp_path)
-    assert snap_compare(FloximApp(config, target="implement-feature.yaml"), terminal_size=(120, 50))
+    assert snap_compare(
+        WhisperwindApp(config, target="implement-feature.yaml"), terminal_size=(120, 50)
+    )

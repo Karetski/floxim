@@ -4,8 +4,8 @@ from typing import Any
 
 import pytest
 
-from floxim.expr import ExprError
-from floxim.templates import jinja_like_offsets, parse_template, render_value
+from whisperwind.expr import ExprError
+from whisperwind.templates import jinja_like_offsets, parse_template, render_value
 
 STATE: dict[str, Any] = {
     "inputs": {"n": 3, "name": "x", "flag": True, "items": [1, 2], "cfg": {"a": 1}},

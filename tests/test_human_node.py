@@ -13,10 +13,10 @@ from typing import Any
 import pytest
 from engine_support import run_flow
 
-from floxim.engine.human import Answer, InvalidAnswer, check_answer
-from floxim.store.events import read_log
-from floxim.store.ids import resolve_run
-from floxim.store.rundir import RunDir
+from whisperwind.engine.human import Answer, InvalidAnswer, check_answer
+from whisperwind.store.events import read_log
+from whisperwind.store.ids import resolve_run
+from whisperwind.store.rundir import RunDir
 
 APPROVE = """name: approve
 nodes:
@@ -40,8 +40,8 @@ nodes:
 
 
 def project(tmp_path: Path, flow: str, config: str = "") -> Path:
-    (tmp_path / ".floxim").mkdir(exist_ok=True)
-    (tmp_path / ".floxim" / "config.yaml").write_text(config)
+    (tmp_path / ".whisperwind").mkdir(exist_ok=True)
+    (tmp_path / ".whisperwind" / "config.yaml").write_text(config)
     (tmp_path / "flow.yaml").write_text(flow)
     return tmp_path
 
@@ -54,7 +54,7 @@ def cli(root: Path, *args: str, stdin: str | None = None) -> subprocess.Complete
         "USER": "ada",
     }
     return subprocess.run(
-        [sys.executable, "-m", "floxim", *args],
+        [sys.executable, "-m", "whisperwind", *args],
         cwd=root,
         env=env,
         capture_output=True,
@@ -65,7 +65,7 @@ def cli(root: Path, *args: str, stdin: str | None = None) -> subprocess.Complete
 
 
 def latest(root: Path) -> RunDir:
-    runs = root / ".floxim" / "runs"
+    runs = root / ".whisperwind" / "runs"
     return RunDir(runs / resolve_run(runs, "@last"))
 
 
@@ -137,7 +137,7 @@ def test_given_live_runner_waiting_when_answered_then_it_takes_the_answer_from_i
     root = project(tmp_path, APPROVE)
     env = {"PATH": os.environ["PATH"], "HOME": str(root), "XDG_CONFIG_HOME": str(root / "x")}
     runner = subprocess.Popen(
-        [sys.executable, "-m", "floxim", "run", "flow.yaml", "--on-wait", "wait"],
+        [sys.executable, "-m", "whisperwind", "run", "flow.yaml", "--on-wait", "wait"],
         cwd=root,
         env=env,
         stderr=subprocess.PIPE,
@@ -145,7 +145,7 @@ def test_given_live_runner_waiting_when_answered_then_it_takes_the_answer_from_i
     )
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
-        runs = list((root / ".floxim" / "runs").glob("*/events.jsonl"))
+        runs = list((root / ".whisperwind" / "runs").glob("*/events.jsonl"))
         if runs and "run_waiting" in runs[0].read_text():
             break
         time.sleep(0.05)
@@ -207,16 +207,16 @@ def test_given_on_wait_hook_when_waiting_starts_then_it_gets_the_prompt_in_its_e
     tmp_path: Path,
 ) -> None:
     # Given
-    root = project(tmp_path, APPROVE, config="on_wait: 'env | grep ^FLOXIM_ > hook-env.txt'\n")
+    root = project(tmp_path, APPROVE, config="on_wait: 'env | grep ^WHISPERWIND_ > hook-env.txt'\n")
 
     # When
     assert cli(root, "run", "flow.yaml", "--on-wait", "exit").returncode == 4
 
     # Then
     env = dict(line.split("=", 1) for line in (root / "hook-env.txt").read_text().splitlines())
-    assert env["FLOXIM_MESSAGE"] == "Built. Ship it?"
-    assert env["FLOXIM_NODE_ID"] == "approve"
-    assert env["FLOXIM_RESPOND_CMD"].startswith("floxim respond ")
+    assert env["WHISPERWIND_MESSAGE"] == "Built. Ship it?"
+    assert env["WHISPERWIND_NODE_ID"] == "approve"
+    assert env["WHISPERWIND_RESPOND_CMD"].startswith("whisperwind respond ")
     hook = next(e for e in read_log(latest(root).events).events if e["type"] == "hook_ran")
     assert hook["data"]["exit_code"] == 0
 

@@ -1,6 +1,6 @@
-floxim: 2
+whisperwind: 2
 name: future
 nodes:
   a: {type: shell, run: echo}
 
-# expect: E-VERSION @ 1:9
+# expect: E-VERSION @ 1:14

@@ -1,4 +1,4 @@
-"""Behaviour of the `floxim` entry point that every command relies on."""
+"""Behaviour of the `whisperwind` entry point that every command relies on."""
 
 import subprocess
 import sys
@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-import floxim
-from floxim import cli
+import whisperwind
+from whisperwind import cli
 
 
 def _run(*args: str) -> subprocess.CompletedProcess[str]:
@@ -16,14 +16,14 @@ def _run(*args: str) -> subprocess.CompletedProcess[str]:
 
 def test_when_version_requested_then_prints_name_and_version() -> None:
     # When
-    result = _run(sys.executable, "-m", "floxim", "--version")
+    result = _run(sys.executable, "-m", "whisperwind", "--version")
 
     # Then
     assert result.returncode == 0
-    assert result.stdout.strip() == f"floxim {floxim.__version__}"
+    assert result.stdout.strip() == f"whisperwind {whisperwind.__version__}"
 
 
-@pytest.mark.parametrize("script", ["floxim", "flx"])
+@pytest.mark.parametrize("script", ["whisperwind", "whw"])
 def test_given_installed_scripts_when_version_requested_then_both_names_work(
     script: str,
 ) -> None:
@@ -35,12 +35,12 @@ def test_given_installed_scripts_when_version_requested_then_both_names_work(
 
     # Then
     assert result.returncode == 0
-    assert result.stdout.strip() == f"floxim {floxim.__version__}"
+    assert result.stdout.strip() == f"whisperwind {whisperwind.__version__}"
 
 
 def test_when_arguments_are_invalid_then_exits_with_usage_error() -> None:
     # When
-    result = _run(sys.executable, "-m", "floxim", "--no-such-flag")
+    result = _run(sys.executable, "-m", "whisperwind", "--no-such-flag")
 
     # Then
     assert result.returncode == 2
@@ -64,4 +64,4 @@ def test_given_a_bug_when_a_command_raises_then_exits_70_and_asks_for_a_report(
     err = capsys.readouterr().err
     assert "internal error" in err
     assert "boom" in err
-    assert "github.com/Karetski/floxim/issues" in err
+    assert "github.com/Karetski/whisperwind/issues" in err

@@ -11,12 +11,12 @@ from test_tui import drive, text_of
 from test_tui_control import run_dir, wait_until
 from textual.widgets import ListView, Select, Static, TextArea
 
-from floxim import edit
-from floxim.config import load_config
-from floxim.store.events import read_log
-from floxim.tui.app import FloximApp
-from floxim.tui.editor import ConfirmModal
-from floxim.tui.screens import FlowGraphScreen
+from whisperwind import edit
+from whisperwind.config import load_config
+from whisperwind.store.events import read_log
+from whisperwind.tui.app import WhisperwindApp
+from whisperwind.tui.editor import ConfirmModal
+from whisperwind.tui.screens import FlowGraphScreen
 
 FLOW = """name: pair
 # Build, then record the result.
@@ -68,7 +68,7 @@ def select(pilot: Any, node: str) -> None:
 def test_given_edits_made_in_the_tui_then_the_file_matches_the_same_cli_edits(
     tmp_path: Path,
 ) -> None:
-    # Given: the same flow twice, one for the TUI and one for `floxim flow`
+    # Given: the same flow twice, one for the TUI and one for `whisperwind flow`
     root = project(tmp_path, FLOW)
     (tmp_path / "twin").mkdir()
     twin = project(tmp_path / "twin", FLOW)
@@ -94,7 +94,7 @@ def test_given_edits_made_in_the_tui_then_the_file_matches_the_same_cli_edits(
         await submit(pilot, {"#target": "done"}, "x")
 
     # When
-    drive(FloximApp(config, target=str(root / "flow.yaml")), scenario)
+    drive(WhisperwindApp(config, target=str(root / "flow.yaml")), scenario)
     for args in (
         ["add-node", "flow.yaml", "check", "--type", "shell", "--after", "build"],
         ["rename-node", "flow.yaml", "build", "compile"],
@@ -117,7 +117,7 @@ def test_given_edits_made_in_the_tui_then_the_file_matches_the_same_cli_edits(
 def test_given_reorder_and_change_type_in_the_tui_then_the_file_matches_the_edit_library(
     tmp_path: Path,
 ) -> None:
-    # Given: `floxim flow` has no operation for these, so compare with `floxim.edit`
+    # Given: `whisperwind flow` has no operation for these, so compare with `whisperwind.edit`
     flow = FLOW.replace(
         "    next: done\n",
         "    next:\n      - to: done\n        when: vars.fast\n"
@@ -134,7 +134,7 @@ def test_given_reorder_and_change_type_in_the_tui_then_the_file_matches_the_edit
         await submit(pilot, {"#field": "vars", "#value": "{built: true}"}, "e")
 
     # When
-    drive(FloximApp(config, target=str(root / "flow.yaml")), scenario)
+    drive(WhisperwindApp(config, target=str(root / "flow.yaml")), scenario)
     for operation in (
         lambda ed: edit.reorder_cases(ed, "build", [1, 0, 2]),
         lambda ed: edit.change_type(ed, "build", "set", drop=True),
@@ -172,7 +172,7 @@ def test_given_file_changed_while_a_form_is_open_then_the_tui_reloads_and_asks(
         await pilot.click("#confirm-yes")
         await pilot.pause(0.5)
 
-    drive(FloximApp(config, target=str(path)), scenario)
+    drive(WhisperwindApp(config, target=str(path)), scenario)
     text = path.read_text()
     assert "run: make all" in text and "vars: {ok: false}" in text
 
@@ -193,7 +193,7 @@ def test_given_field_edit_that_breaks_the_flow_then_it_is_kept_only_as_a_confirm
         problems = text_of(pilot.app.screen.query_one("#problems", Static))
         assert "run" in problems
 
-    drive(FloximApp(config, target=str(path)), scenario)
+    drive(WhisperwindApp(config, target=str(path)), scenario)
     assert "run:\n    - make\n    - all\n" in path.read_text()
 
 
@@ -211,7 +211,7 @@ def test_given_node_added_by_hand_then_the_node_list_shows_it_within_a_poll(
         await pilot.pause(0.6)  # two polling intervals
         assert [item.node for item in listing.children] == ["build", "done", "extra"]
 
-    drive(FloximApp(config, target=str(path)), scenario)
+    drive(WhisperwindApp(config, target=str(path)), scenario)
 
 
 @pytest.fixture
@@ -238,7 +238,7 @@ def test_given_flow_edited_since_the_run_started_then_detail_shows_the_diff_and_
         await pilot.press("L")
         await pilot.pause()
 
-    drive(FloximApp(config, target=run.id), scenario)
+    drive(WhisperwindApp(config, target=run.id), scenario)
 
     # Then
     def reloaded() -> bool:
@@ -264,7 +264,7 @@ def test_given_edit_that_retypes_a_visited_node_then_reload_is_not_offered(
         await pilot.press("L")
         await pilot.pause()
 
-    drive(FloximApp(config, target=run.id), scenario)
+    drive(WhisperwindApp(config, target=run.id), scenario)
     assert "flow_reloaded" not in [e["type"] for e in read_log(run.events).events]
     assert not list(run.path.glob("snapshot-*"))
 
@@ -280,7 +280,7 @@ def test_given_add_node_form_with_a_taken_id_then_the_error_is_shown_and_the_fil
         await submit(pilot, {"#node-id": "done"}, "n")
         assert isinstance(pilot.app.screen, FlowGraphScreen)
 
-    drive(FloximApp(config, target=str(path)), scenario)
+    drive(WhisperwindApp(config, target=str(path)), scenario)
     assert path.read_text() == FLOW
 
 
@@ -309,7 +309,7 @@ def test_given_type_that_needs_a_value_when_chosen_in_the_tui_then_the_form_asks
         await pilot.pause()
         await submit(pilot, {"#node-id": "review", "#field-harness": "fake"}, "")
 
-    drive(FloximApp(config, target=str(root / "flow.yaml")), scenario)
+    drive(WhisperwindApp(config, target=str(root / "flow.yaml")), scenario)
     editable = edit.open_flow(twin)
     edit.change_type(editable, "done", "agent", drop=True, fields={"harness": "fake"})
     edit.add_node(editable, "review", "agent", after="done", fields={"harness": "fake"})

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from floxim.validate import validate
+from whisperwind.validate import validate
 
 ROOT = Path(__file__).parent.parent
 DOCS = [ROOT / "README.md"]

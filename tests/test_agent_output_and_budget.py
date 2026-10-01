@@ -9,10 +9,10 @@ from typing import Any
 import pytest
 from engine_support import Result, run_flow
 
-from floxim.adapters import Capabilities, registry
-from floxim.adapters.fake import FakeAdapter
-from floxim.engine.structured import extract_json
-from floxim.validate import validate
+from whisperwind.adapters import Capabilities, registry
+from whisperwind.adapters.fake import FakeAdapter
+from whisperwind.engine.structured import extract_json
+from whisperwind.validate import validate
 
 SCHEMA = "{type: object, required: [status], properties: {status: {enum: [ready, blocked]}}}"
 
@@ -211,7 +211,7 @@ def test_given_usd_budget_on_adapter_without_cost_or_price_when_validated_then_w
 
 
 IMPLEMENT_FEATURE = """
-floxim: 1
+whisperwind: 1
 name: implement-feature
 description: implement-feature without its human nodes, on the fake adapter.
 inputs:

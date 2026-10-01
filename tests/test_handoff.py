@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from test_human_node import cli, latest, project
 
-from floxim.validate import validate
+from whisperwind.validate import validate
 
 FLOW = """name: hand
 nodes:
@@ -63,7 +63,7 @@ def test_given_a_pseudo_terminal_when_run_then_the_handoff_uses_it_by_default(
 
     # When
     process = subprocess.Popen(
-        [sys.executable, "-m", "floxim", "run", "flow.yaml"],
+        [sys.executable, "-m", "whisperwind", "run", "flow.yaml"],
         cwd=root, env=env, stdin=slave, stdout=slave, stderr=slave,
     )  # fmt: skip
     os.close(slave)
@@ -84,7 +84,7 @@ def test_given_a_pseudo_terminal_when_run_then_the_handoff_uses_it_by_default(
     assert b"resuming fake session" in output
 
 
-def test_given_no_terminal_when_handoff_is_reached_then_the_run_waits_for_floxim_handoff(
+def test_given_no_terminal_when_handoff_is_reached_then_the_run_waits_for_whisperwind_handoff(
     tmp_path: Path,
 ) -> None:
     # Given
@@ -107,7 +107,7 @@ def test_given_no_terminal_when_handoff_is_reached_then_the_run_waits_for_floxim
 
 def test_given_bad_handoff_sources_when_validated_then_they_are_rejected(tmp_path: Path) -> None:
     # Given
-    harnesses = tmp_path / ".floxim" / "harnesses"
+    harnesses = tmp_path / ".whisperwind" / "harnesses"
     harnesses.mkdir(parents=True)
     (harnesses / "plain.yaml").write_text(
         "name: plain\ncommand: [plain]\npermissions: {edit: []}\n"

@@ -1,8 +1,8 @@
-# Floxim
+# Whisperwind
 
-Floxim runs multi-step workflows for AI coding agents from the terminal. You write a **flow**, a graph of steps in one YAML file. A flow might be "plan with one agent, implement with another, run the tests, loop until they pass, ask me before merging". Floxim runs it by driving the agent CLIs you already use, **Claude Code** and **Codex CLI**, in headless mode. It never calls model APIs itself.
+Whisperwind runs multi-step workflows for AI coding agents from the terminal. You write a **flow**, a graph of steps in one YAML file. A flow might be "plan with one agent, implement with another, run the tests, loop until they pass, ask me before merging". Whisperwind runs it by driving the agent CLIs you already use, **Claude Code** and **Codex CLI**, in headless mode. It never calls model APIs itself.
 
-- **Flows are plain files.** You can edit them by hand, from the TUI or with `floxim flow` commands, and comments and formatting are kept.
+- **Flows are plain files.** You can edit them by hand, from the TUI or with `whisperwind flow` commands, and comments and formatting are kept.
 - **Runs are durable.** Every step is saved before the next one starts. A crashed or killed run resumes where it stopped. A run can wait days for your answer with no process running.
 - **Runs are bounded.** Every run has budgets (USD and tokens), step and visit limits, and timeouts.
 - **There is no daemon.** Schedule runs with cron, systemd or CI. Every command has stable exit codes and `--json` output.
@@ -12,29 +12,29 @@ Floxim runs multi-step workflows for AI coding agents from the terminal. You wri
 You need Python 3.10+, git, and Linux or macOS.
 
 ```sh
-pipx install floxim        # or: uv tool install floxim
-floxim --version           # `flx` is a short alias
+pipx install whisperwind        # or: uv tool install whisperwind
+whisperwind --version           # `whw` is a short alias
 ```
 
-All dependencies are pure Python. Each GitHub release also ships a single-file `floxim.pyz`, which you run with `python3 floxim.pyz`.
+All dependencies are pure Python. Each GitHub release also ships a single-file `whisperwind.pyz`, which you run with `python3 whisperwind.pyz`.
 
-To run agent steps, install and log in to [Claude Code](https://code.claude.com/docs/en/overview) and/or [Codex CLI](https://github.com/openai/codex). `floxim adapters --probe` shows what Floxim can find.
+To run agent steps, install and log in to [Claude Code](https://code.claude.com/docs/en/overview) and/or [Codex CLI](https://github.com/openai/codex). `whisperwind adapters --probe` shows what Whisperwind can find.
 
 ## Quickstart
 
 ```sh
-floxim init                                   # creates .floxim/ and flows/hello.yaml
-floxim run flows/hello.yaml --input name=Ada  # runs a shell step, then asks you a question
-floxim status @last                           # what happened
-floxim tui                                    # the terminal UI
+whisperwind init                                   # creates .whisperwind/ and flows/hello.yaml
+whisperwind run flows/hello.yaml --input name=Ada  # runs a shell step, then asks you a question
+whisperwind status @last                           # what happened
+whisperwind tui                                    # the terminal UI
 ```
 
-`hello.yaml` needs no agent and costs nothing. Every run is recorded under `.floxim/runs/<run-id>/`.
+`hello.yaml` needs no agent and costs nothing. Every run is recorded under `.whisperwind/runs/<run-id>/`.
 
 ## A flow file
 
 ```yaml
-floxim: 1
+whisperwind: 1
 name: fix-tests
 description: Let an agent fix failing tests, then ask before committing.
 
@@ -116,22 +116,22 @@ Steps run one at a time; there is no parallelism.
 
 ## Running flows
 
-- **Run**: `floxim run <flow> --input k=v`. Use `--input k=@file` to read a value from a file, or `--inputs-file`. Add `--detach` to run in the background.
+- **Run**: `whisperwind run <flow> --input k=v`. Use `--input k=@file` to read a value from a file, or `--inputs-file`. Add `--detach` to run in the background.
 - **Waiting for people.** When a run reaches a `human` step:
-  - In a terminal, Floxim asks you inline.
-  - Without a terminal (cron, CI, `--on-wait exit`), Floxim stops with exit code 4.
-  - Anyone can answer later with `floxim respond <run> --choice X` (or `--text`, `--ack`), or from the TUI. The run then continues in the background.
-  - `floxim resume --due` from cron applies expired human timeouts.
-- **Resume**: `floxim resume <run>` continues after a crash, kill or reboot. Steps that already finished are never rerun.
+  - In a terminal, Whisperwind asks you inline.
+  - Without a terminal (cron, CI, `--on-wait exit`), Whisperwind stops with exit code 4.
+  - Anyone can answer later with `whisperwind respond <run> --choice X` (or `--text`, `--ack`), or from the TUI. The run then continues in the background.
+  - `whisperwind resume --due` from cron applies expired human timeouts.
+- **Resume**: `whisperwind resume <run>` continues after a crash, kill or reboot. Steps that already finished are never rerun.
   - `--from <step>` jumps to a step.
   - `--reload` uses the edited flow file.
   - `--rerun` restarts an interrupted step.
   - `--force` reopens a failed or cancelled run.
   - Side effects of a step that was cut off halfway are not undone. Set `on_resume: ask` on steps that must not run twice.
-- **Cancel**: `floxim cancel <run>`. Ctrl-C only pauses a run, which can then be resumed.
+- **Cancel**: `whisperwind cancel <run>`. Ctrl-C only pauses a run, which can then be resumed.
 - **Budgets.** Cost and tokens are tracked per step and per run, and the run stops when a budget is reached. USD figures are estimates. For harnesses that report only tokens, prices come from the config file.
-- **Workspaces.** By default all steps share the working directory. `workspace: worktree` gives a step, or a named group of steps, its own git worktree under `.floxim/worktrees/`. Floxim never merges or pushes branches; your flow does that with shell steps.
-- **Artifacts.** Each step gets an artifacts directory (`FLOXIM_ARTIFACTS_DIR`). List it with `floxim artifacts <run>`.
+- **Workspaces.** By default all steps share the working directory. `workspace: worktree` gives a step, or a named group of steps, its own git worktree under `.whisperwind/worktrees/`. Whisperwind never merges or pushes branches; your flow does that with shell steps.
+- **Artifacts.** Each step gets an artifacts directory (`WHISPERWIND_ARTIFACTS_DIR`). List it with `whisperwind artifacts <run>`.
 - **Snapshots.** A run copies the flow and its files when it starts, so editing the flow never affects a run in progress.
 
 ## Agents and permissions
@@ -150,13 +150,13 @@ Steps run one at a time; there is no parallelism.
 |---|---|
 | `read-only` | Cannot change files. |
 | `edit` (default) | Can edit files in its workspace, and run only the commands you allow. |
-| `full` | Can do anything you can. `floxim run` refuses it unless you pass `--allow-full` or set `allow_full: true` in the config. |
+| `full` | Can do anything you can. `whisperwind run` refuses it unless you pass `--allow-full` or set `allow_full: true` in the config. |
 
 **Other agent CLIs**:
 
-- **Command adapters.** Add any agent CLI that prints JSON lines with a YAML file, `.floxim/harnesses/<name>.yaml`, which maps its command line and output events. No code needed.
-- **Python plugins.** A package can register an adapter under the `floxim.adapters` entry point.
-- **Conformance kit.** `floxim adapter test <name>` checks an adapter against recorded streams. Add `--live` to check it against the real CLI, which costs money.
+- **Command adapters.** Add any agent CLI that prints JSON lines with a YAML file, `.whisperwind/harnesses/<name>.yaml`, which maps its command line and output events. No code needed.
+- **Python plugins.** A package can register an adapter under the `whisperwind.adapters` entry point.
+- **Conformance kit.** `whisperwind adapter test <name>` checks an adapter against recorded streams. Add `--live` to check it against the real CLI, which costs money.
 
 ## Commands
 
@@ -164,7 +164,7 @@ All commands accept `--json`, `--project`, `--config`, `--quiet`, `--verbose`, `
 
 | Command | Purpose |
 |---|---|
-| `init` | Set up `.floxim/` and a starter flow. |
+| `init` | Set up `.whisperwind/` and a starter flow. |
 | `validate <flow>… [--strict]` | Check flows. Errors show line and column; `--strict` turns warnings into errors. |
 | `graph <flow> [--format ascii\|mermaid\|dot\|json]` | Draw a flow's graph. |
 | `flows` | List the flow files in the project. |
@@ -197,7 +197,7 @@ All commands accept `--json`, `--project`, `--config`, `--quiet`, `--verbose`, `
 
 ## Terminal UI
 
-`floxim tui` has four screens:
+`whisperwind tui` has four screens:
 
 - **Runs**: live list of runs, with pending questions first.
 - **Run detail**: a live graph and each step's prompt, output, logs, cost and artifacts.
@@ -212,7 +212,7 @@ From the TUI you can answer questions, cancel, resume, open handoffs, and open a
 
 ## Configuration
 
-`.floxim/config.yaml` is created by `init`. A per-user file, `~/.config/floxim/config.yaml`, applies under it. The config describes the environment, never flow behavior:
+`.whisperwind/config.yaml` is created by `init`. A per-user file, `~/.config/whisperwind/config.yaml`, applies under it. The config describes the environment, never flow behavior:
 
 - `flow_paths`: where to look for flow files
 - `harnesses`: binary paths and tested versions
@@ -233,7 +233,7 @@ From the TUI you can answer questions, cancel, resume, open handoffs, and open a
   - a risky command such as `git push` has no human approval before it
   - a loop is unbounded
   - a step uses the `full` profile
-- Floxim notes when you run a flow file that git does not track.
+- Whisperwind notes when you run a flow file that git does not track.
 - `python` steps, plugins and command adapters run with your privileges.
 
 ## Examples
@@ -257,7 +257,7 @@ uv run ruff format .    # format
 uv run mypy             # type check
 ```
 
-Releases are published to PyPI and GitHub by pushing a `vX.Y.Z` tag that matches `__version__` in `src/floxim/__init__.py`.
+Releases are published to PyPI and GitHub by pushing a `vX.Y.Z` tag that matches `__version__` in `src/whisperwind/__init__.py`.
 
 ## License
 

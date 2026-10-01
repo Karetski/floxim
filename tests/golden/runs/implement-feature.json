@@ -3,12 +3,12 @@
     "branch": "main",
     "data": {
       "flow": "implement-feature",
-      "flow_sha256": "0fdd6be1c755744f499869afb45cd31c2e11148c590e0e28ad7a648771c1cb43",
-      "floxim_version": "<version>",
+      "flow_sha256": "a9ec44d44752e9d996a03818ee551683c98fe9d9e420ef32a06d8ae45f56e166",
       "inputs": {
         "feature": "login"
       },
       "parent": null,
+      "whisperwind_version": "<version>",
       "workdir": "<tmp>"
     },
     "seq": 1,
@@ -131,7 +131,7 @@
     "data": {
       "outcome": "succeeded",
       "result": {
-        "artifacts_dir": "<tmp>/.floxim/runs/<run>/nodes/plan/1/artifacts",
+        "artifacts_dir": "<tmp>/.whisperwind/runs/<run>/nodes/plan/1/artifacts",
         "attempts": 1,
         "cost_estimated": true,
         "cost_usd": 0.05,
@@ -295,7 +295,7 @@
     "data": {
       "outcome": "succeeded",
       "result": {
-        "artifacts_dir": "<tmp>/.floxim/runs/<run>/nodes/implement/1/artifacts",
+        "artifacts_dir": "<tmp>/.whisperwind/runs/<run>/nodes/implement/1/artifacts",
         "attempts": 1,
         "cost_estimated": true,
         "cost_usd": 0.1,
@@ -398,7 +398,7 @@
     "data": {
       "outcome": "failed",
       "result": {
-        "artifacts_dir": "<tmp>/.floxim/runs/<run>/nodes/test/1/artifacts",
+        "artifacts_dir": "<tmp>/.whisperwind/runs/<run>/nodes/test/1/artifacts",
         "attempts": 1,
         "duration_s": 0,
         "error": {
@@ -412,10 +412,10 @@
         "signal": null,
         "started_at": "<time>",
         "stderr": "",
-        "stderr_file": "<tmp>/.floxim/runs/<run>/nodes/test/1/attempt-1/stderr.log",
+        "stderr_file": "<tmp>/.whisperwind/runs/<run>/nodes/test/1/attempt-1/stderr.log",
         "stderr_truncated": false,
         "stdout": "",
-        "stdout_file": "<tmp>/.floxim/runs/<run>/nodes/test/1/attempt-1/stdout.log",
+        "stdout_file": "<tmp>/.whisperwind/runs/<run>/nodes/test/1/attempt-1/stdout.log",
         "stdout_truncated": false,
         "visit": 1,
         "workspace": {
@@ -549,7 +549,7 @@
     "data": {
       "outcome": "succeeded",
       "result": {
-        "artifacts_dir": "<tmp>/.floxim/runs/<run>/nodes/implement/2/artifacts",
+        "artifacts_dir": "<tmp>/.whisperwind/runs/<run>/nodes/implement/2/artifacts",
         "attempts": 1,
         "cost_estimated": true,
         "cost_usd": 0.1,
@@ -649,7 +649,7 @@
     "data": {
       "outcome": "succeeded",
       "result": {
-        "artifacts_dir": "<tmp>/.floxim/runs/<run>/nodes/test/2/artifacts",
+        "artifacts_dir": "<tmp>/.whisperwind/runs/<run>/nodes/test/2/artifacts",
         "attempts": 1,
         "duration_s": 0,
         "error": null,
@@ -660,10 +660,10 @@
         "signal": null,
         "started_at": "<time>",
         "stderr": "",
-        "stderr_file": "<tmp>/.floxim/runs/<run>/nodes/test/2/attempt-1/stderr.log",
+        "stderr_file": "<tmp>/.whisperwind/runs/<run>/nodes/test/2/attempt-1/stderr.log",
         "stderr_truncated": false,
         "stdout": "",
-        "stdout_file": "<tmp>/.floxim/runs/<run>/nodes/test/2/attempt-1/stdout.log",
+        "stdout_file": "<tmp>/.whisperwind/runs/<run>/nodes/test/2/attempt-1/stdout.log",
         "stdout_truncated": false,
         "visit": 2,
         "workspace": {

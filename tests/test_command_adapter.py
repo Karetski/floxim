@@ -10,9 +10,9 @@ from pathlib import Path
 import pytest
 from engine_support import run_flow
 
-from floxim import cli
-from floxim.adapters.command import substitute
-from floxim.validate import validate
+from whisperwind import cli
+from whisperwind.adapters.command import substitute
+from whisperwind.validate import validate
 
 HARNESS = """name: echo
 command: ["{cli}", run, -m, "{{model}}", --cwd, "{{cwd}}"]
@@ -64,7 +64,7 @@ def project(tmp_path: Path) -> Path:
     cli_path.parent.mkdir()
     cli_path.write_text(CLI.format(python=sys.executable))
     cli_path.chmod(0o755)
-    harnesses = tmp_path / ".floxim" / "harnesses"
+    harnesses = tmp_path / ".whisperwind" / "harnesses"
     (harnesses / "echo" / "fixtures").mkdir(parents=True)
     (harnesses / "echo.yaml").write_text(HARNESS.format(cli=cli_path))
     fixtures = harnesses / "echo" / "fixtures"
@@ -143,7 +143,7 @@ def test_given_wrong_expectation_when_kit_runs_then_the_case_fails(
 ) -> None:
     # Given
     monkeypatch.chdir(project)
-    expected = project / ".floxim" / "harnesses" / "echo" / "fixtures" / "expected.yaml"
+    expected = project / ".whisperwind" / "harnesses" / "echo" / "fixtures" / "expected.yaml"
     expected.write_text("cases:\n  success: {outcome: succeeded, text: nope}\n")
 
     # When
@@ -165,7 +165,7 @@ def test_given_malformed_harness_file_when_a_flow_is_validated_then_its_problems
     tmp_path: Path,
 ) -> None:
     # Given
-    harnesses = tmp_path / ".floxim" / "harnesses"
+    harnesses = tmp_path / ".whisperwind" / "harnesses"
     harnesses.mkdir(parents=True)
     (harnesses / "bad.yaml").write_text(
         "name: bad\ncommand: [bad, '{prompt_text}']\nstream:\n  result: {when: 'event.type ==', success: 'true'}\n"
@@ -185,7 +185,7 @@ def test_given_malformed_harness_file_when_a_flow_is_validated_then_its_problems
 
 def test_given_aap_harness_when_validated_then_it_is_not_implemented(tmp_path: Path) -> None:
     # Given
-    harnesses = tmp_path / ".floxim" / "harnesses"
+    harnesses = tmp_path / ".whisperwind" / "harnesses"
     harnesses.mkdir(parents=True)
     (harnesses / "ext.yaml").write_text("name: ext\nprotocol: aap\ncommand: [ext]\nstream: {}\n")
     (tmp_path / "flow.yaml").write_text(

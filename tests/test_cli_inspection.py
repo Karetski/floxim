@@ -22,7 +22,7 @@ nodes:
     next: note
   note:
     type: shell
-    run: echo report > "$FLOXIM_ARTIFACTS_DIR/report.txt"
+    run: echo report > "$WHISPERWIND_ARTIFACTS_DIR/report.txt"
 outputs:
   planned: ${{ nodes.plan.text }}
 """
@@ -201,11 +201,11 @@ def test_given_unknown_run_when_inspected_then_exits_6(root: Path) -> None:
 def test_given_crashed_runner_when_status_shown_then_the_run_is_interrupted(root: Path) -> None:
     env = {
         **os.environ,
-        "FLOXIM_TEST_CRASH_AT": "visit_started:1",
+        "WHISPERWIND_TEST_CRASH_AT": "visit_started:1",
         "XDG_CONFIG_HOME": str(root / "x"),
     }
     subprocess.run(
-        [sys.executable, "-m", "floxim", "run", "flow.yaml"],
+        [sys.executable, "-m", "whisperwind", "run", "flow.yaml"],
         cwd=root,
         env=env,
         capture_output=True,

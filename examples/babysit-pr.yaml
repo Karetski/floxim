@@ -1,4 +1,4 @@
-floxim: 1
+whisperwind: 1
 name: babysit-pr
 description: Watch a pull request's CI; when it fails, have an agent fix it; ask a person when the agent is stuck.
 
