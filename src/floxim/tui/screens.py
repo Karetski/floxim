@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 import json
 from pathlib import Path
 from typing import Any
@@ -70,11 +69,7 @@ def _duration(item: dict[str, Any]) -> str:
     started = item.get("started_at") or item.get("created_at")
     if not started:
         return "—"
-    end = (
-        parse_iso(item["finished_at"])
-        if item.get("finished_at")
-        else datetime.datetime.now(datetime.timezone.utc)
-    )
+    end = parse_iso(item["finished_at"]) if item.get("finished_at") else Clock().now()
     seconds = int((end - parse_iso(started)).total_seconds())
     return (
         f"{seconds // 3600}h{seconds % 3600 // 60:02d}m"
