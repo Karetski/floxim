@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 from engine_support import run_flow
-from textual.widgets import Collapsible, DataTable, Label, ListView, Static
+from textual.widgets import Collapsible, DataTable, Label, ListView, Static, TabbedContent, TabPane
 
 from whisperwind import runinfo
 from whisperwind.clock import Clock, parse_iso
@@ -221,7 +221,10 @@ def test_given_waiting_run_when_opened_then_graph_banner_and_inspector_show_it(
         graph = text_of(screen.query_one("#graph", Static))
         assert "✓ ◆ plan" in graph and "… ☺ approve" in graph
         assert len(screen.query_one("#timeline", ListView)) == 2
-        assert "Plan the demo." in text_of(screen.query_one("#inspect-prompt", Static))
+        # The waiting visit is selected, and its prompt opens.
+        assert screen.query_one("#inspector", TabbedContent).active == "tab-prompt"
+        prompt = text_of(screen.query_one("#inspect-prompt", Static))
+        assert "Ship the demo?" in prompt and "ship / stop" in prompt
         assert text_of(screen.query_one("#limits", Static)).startswith("$0.10 / $25")
 
     drive(WhisperwindApp(config), scenario)
@@ -256,6 +259,7 @@ def test_given_run_that_finishes_while_open_when_refreshed_then_the_screen_follo
         await pilot.pause(1.0)
         assert "succeeded" in text_of(screen.query_one("#summary", Static))
         assert "✓ ☺ approve" in text_of(screen.query_one("#graph", Static))
+        assert "answer   ship" in text_of(screen.query_one("#inspect-prompt", Static))
 
     drive(WhisperwindApp(config, target=waiting.name), scenario)
 
@@ -645,6 +649,85 @@ def test_given_a_project_when_a_screen_is_shown_then_it_matches_the_snapshot(
     monkeypatch.chdir(project)  # flow paths show relative to the project, not tmp_path
     config, _ = load_config(Path("."))
     assert snap_compare(WhisperwindApp(config), press=SCREENS[screen], terminal_size=(120, 36))
+
+
+def shown_tabs(screen: Any) -> list[str]:
+    tabs = screen.query_one("#inspector", TabbedContent)
+    return [str(pane.id) for pane in tabs.query(TabPane) if tabs.get_tab(str(pane.id)).display]
+
+
+async def select_visit(pilot: Any, index: int) -> None:
+    pilot.app.screen.query_one("#timeline", ListView).index = index
+    await pilot.pause()
+
+
+def test_given_an_agent_visit_when_selected_then_only_its_tabs_show_and_output_opens(
+    tmp_path: Path,
+) -> None:
+    run = run_flow(tmp_path, STORY).run
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        await select_visit(pilot, 0)  # plan #1
+        screen = pilot.app.screen
+        assert shown_tabs(screen) == ["tab-prompt", "tab-output", "tab-activity", "tab-usage"]
+        assert screen.query_one("#inspector", TabbedContent).active == "tab-output"
+        assert text_of(screen.query_one("#inspect-output", Static)) == "planned"
+        usage = text_of(screen.query_one("#inspect-usage", Static))
+        assert "cost" in usage and "$0.10" in usage
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
+
+
+def test_given_a_tab_picked_when_another_visit_is_selected_then_it_stays_open_where_shown(
+    tmp_path: Path,
+) -> None:
+    run = run_flow(tmp_path, STORY).run
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        tabs = pilot.app.screen.query_one("#inspector", TabbedContent)
+        await select_visit(pilot, 0)  # plan #1, an agent
+        await pilot.click(f"#{tabs.get_tab('tab-usage').id}")
+        assert tabs.active == "tab-usage"
+        await select_visit(pilot, 3)  # ask #1, a human step: no usage
+        assert tabs.active == "tab-prompt"
+        await select_visit(pilot, 1)  # flaky #1, an agent again
+        assert tabs.active == "tab-usage"
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
+
+
+def test_given_the_tab_the_screen_opened_when_picked_back_then_it_counts_as_a_pick(
+    tmp_path: Path,
+) -> None:
+    run = run_flow(tmp_path, STORY).run
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        tabs = pilot.app.screen.query_one("#inspector", TabbedContent)
+        await select_visit(pilot, 0)  # plan #1 opens on output
+        await pilot.click(f"#{tabs.get_tab('tab-usage').id}")
+        await pilot.click(f"#{tabs.get_tab('tab-output').id}")
+        await select_visit(pilot, 1)
+        assert tabs.active == "tab-output"
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
+
+
+def test_given_a_failed_shell_visit_when_opened_then_its_logs_open(tmp_path: Path) -> None:
+    flow = "name: sh\nnodes:\n  check:\n    type: shell\n    run: echo out; echo oops >&2; exit 3\n"
+    run = run_flow(tmp_path, flow, virtual=False).run
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        assert shown_tabs(screen) == ["tab-output", "tab-logs"]
+        assert screen.query_one("#inspector", TabbedContent).active == "tab-logs"
+        assert "oops" in text_of(screen.query_one("#inspect-logs", Static))
+        assert "exit_code" in text_of(screen.query_one("#inspect-output", Static))
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
 
 
 def test_given_a_failure_routed_by_on_error_when_opened_then_its_visit_says_so(

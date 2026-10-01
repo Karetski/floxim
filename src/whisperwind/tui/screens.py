@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from rich.json import JSON
 from rich.text import Text
 from textual import on
 from textual.app import ComposeResult
@@ -28,6 +29,7 @@ from whisperwind import runinfo
 from whisperwind.clock import Clock, parse_iso
 from whisperwind.config import Config
 from whisperwind.engine.budget import run_limits
+from whisperwind.engine.human import choice_values
 from whisperwind.engine.runner import reload_problem
 from whisperwind.flow import Flow, load_flow
 from whisperwind.store.events import read_log
@@ -61,6 +63,10 @@ DETAIL_REFRESH_S = 0.5
 FILE_POLL_S = 0.3
 HIGHLIGHT_S = 2.0
 BAR_CELLS = 8
+LOG_TAIL = 4000
+# The inspector's tabs, in order. A tab shows only when the selected visit has something
+# for it; Flow shows while the flow file differs from the run's snapshot.
+TABS = ("prompt", "output", "activity", "logs", "artifacts", "usage", "flow")
 
 
 def _money(value: float | None) -> str:
@@ -190,6 +196,75 @@ def _route_text(outcome: str, route: dict[str, Any]) -> str:
     if outcome != "succeeded":  # `on_error: continue` routes a failure through `next`
         return f"continued → {route['to']}"
     return f"→ {route['to']}"
+
+
+def _human_prompt(asked: dict[str, Any], result: dict[str, Any]) -> Text:
+    """What a person was asked, what answer it takes, and, once given, the answer."""
+    text = Text(clean(str(asked.get("message") or "")).strip())
+    for line in asked.get("show") or []:
+        text.append(f"\n  {clean(str(line))}", "dim")
+    values = choice_values(asked.get("choices"))
+    takes = " / ".join(values) if values else "an acknowledgement" if asked.get("ack") else "text"
+    text.append(f"\n\ntakes    {clean(takes)}", "dim")
+    if result:
+        answer = result.get("choice") or result.get("text")
+        answer = answer or ("acknowledged" if result.get("acknowledged") else "none")
+        if result.get("timed_out"):
+            answer = f"{answer} (timed out)"
+        by = f"  by {result['responder']}" if result.get("responder") else ""
+        via = f" via {result['via']}" if result.get("via") else ""
+        text.append(f"\nanswer   {clean(str(answer))}{by}{via}")
+    return text
+
+
+def _output(result: dict[str, Any]) -> Text | None:
+    """A finished visit's error and what it produced: structured output, an agent's
+    text, the values a `set` node stored, a condition's branch or a shell's exit code."""
+    parts: list[Text] = []
+    error = result.get("error")
+    if error:
+        message = clean(str(error.get("message") or ""))
+        parts.append(Text(f"{error.get('kind')}: {message}", style="red"))
+    output = result.get("output")
+    if isinstance(output, str):
+        parts.append(Text(clean(output)))
+    elif output is not None:
+        parts.append(JSON.from_data(output).text)
+    elif result.get("text"):
+        parts.append(Text(clean(str(result["text"]))))
+    elif result.get("values"):
+        parts.append(JSON.from_data(result["values"]).text)
+    elif result.get("branch"):
+        parts.append(Text(f"→ {result['branch']}"))
+    elif result.get("exit_code") is not None:
+        parts.append(Text(f"exit_code {result['exit_code']}"))
+    return Text("\n").join(parts) if parts else None
+
+
+def _usage(result: dict[str, Any]) -> Text | None:
+    """A visit's harness, session, turns, cost and tokens, in two aligned columns."""
+    usage = result.get("usage") or {}
+    rows = [
+        ("harness", " ".join(str(result[k]) for k in ("harness", "model") if result.get(k))),
+        ("session", result.get("session_id") or ""),
+        ("turns", str(result["num_turns"]) if result.get("num_turns") is not None else ""),
+        (
+            "cost",
+            f"${result['cost_usd']:.2f}" + (" (estimated)" if result.get("cost_estimated") else "")
+            if result.get("cost_usd") is not None
+            else "",
+        ),
+    ]
+    for kind in ("input", "cached_input", "output", "reasoning", "total"):
+        if usage.get(f"{kind}_tokens"):
+            rows.append((f"{kind.replace('_', ' ')} tokens", f"{usage[f'{kind}_tokens']:,}"))
+    rows = [(name, value) for name, value in rows if value]
+    if not rows:
+        return None
+    width = max(len(name) for name, _ in rows)
+    return Text("\n").join(
+        Text.assemble((name.ljust(width + 2), "dim"), clean(str(value))) for name, value in rows
+    )
 
 
 def snapshot_of(run: RunDir) -> Path | None:
@@ -456,6 +531,11 @@ class RunDetailScreen(RunControl):
         self.flow = run_flow_of(self.run)
         self.seen_events = -1
         self.selected: tuple[str, int] | None = None
+        self.flow_diff = ""
+        # The inspector tab the person last picked, and the tab the screen is opening
+        # itself (at first, the one the inspector starts on), whose activation is no pick.
+        self.picked: str | None = None
+        self.opened: str | None = "tab-prompt"
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -471,16 +551,11 @@ class RunDetailScreen(RunControl):
             with Vertical(id="side"):
                 yield ListView(id="timeline")
                 with TabbedContent(id="inspector"):
-                    for tab in (
-                        "prompt",
-                        "output",
-                        "activity",
-                        "logs",
-                        "artifacts",
-                        "usage",
-                        "flow",
-                    ):
-                        with TabPane(tab.capitalize(), id=f"tab-{tab}"), VerticalScroll():
+                    for tab in TABS:
+                        with (
+                            TabPane(tab.capitalize(), id=f"tab-{tab}"),
+                            VerticalScroll(id=f"scroll-{tab}"),
+                        ):
                             yield Static("", id=f"inspect-{tab}")
         yield NavFooter()
 
@@ -602,6 +677,9 @@ class RunDetailScreen(RunControl):
     def refresh_detail(self) -> None:
         events = read_log(self.run.events).events
         if len(events) == self.seen_events:
+            # A running visit's logs grow without new events.
+            if self.selected is not None and not self._selected_result():
+                self._inspect()
             return
         self.seen_events = len(events)
         state = self.run.read_state()
@@ -643,9 +721,7 @@ class RunDetailScreen(RunControl):
             lines.append(f"flow changed since this run started; {hint}")
             banner.update(Text("\n".join(line for line in lines if line), style="magenta bold"))
         banner.display = bool(pending) or bool(changed)
-        self.query_one("#inspect-flow", Static).update(
-            Text(changed or "(unchanged since the run started)")
-        )
+        self.flow_diff = changed
         if self.flow is not None:
             self.query_one("#graph", GraphView).show(
                 self.flow, node_status(state, info["status"]), state.get("visits")
@@ -693,8 +769,11 @@ class RunDetailScreen(RunControl):
                 *(("  " + fact, "dim") for fact in facts),
             )
             timeline.append(VisitItem(key, Label(label)))
-        if self.selected is None and finished:
-            self.selected = list(finished)[-1]
+        keys = [(e["node"], e["visit"]) for e in started]
+        if self.selected is None and keys:
+            self.selected = keys[-1]
+        if self.selected in keys:
+            timeline.index = keys.index(self.selected)
 
     @on(ListView.Highlighted, "#timeline")
     def _highlighted(self, event: ListView.Highlighted) -> None:
@@ -702,50 +781,82 @@ class RunDetailScreen(RunControl):
             self.selected = getattr(event.item, "visit", None)
             self._inspect()
 
+    @on(TabbedContent.TabActivated, "#inspector")
+    def _tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        if event.pane.id == self.opened:
+            self.opened = None
+        else:
+            self.picked = event.pane.id
+
+    def _visit_tabs(self, node: str, visit: int) -> dict[str, Text]:
+        """The inspector's content for one visit, by tab, for the tabs it has anything for."""
+        result = self._selected_result()
+        events = runinfo.events(self.run, node, visit)
+        tabs: dict[str, Text] = {}
+        prompt = runinfo.visit_files(self.run, node, visit, "prompt.md")
+        asked = next((e["data"] for e in events if e["type"] == "human_waiting"), None)
+        if prompt:
+            tabs["prompt"] = Text(clean(prompt[0].read_text(errors="replace")))
+        elif asked is not None:
+            tabs["prompt"] = _human_prompt(asked, result)
+        # A person's answer is shown with the prompt; only an error remains as output.
+        output = _output({"error": result.get("error")} if asked is not None else result)
+        if output is not None:
+            tabs["output"] = output
+        activity = [
+            f"{e['data'].get('kind')}: {e['data'].get('summary')}"
+            for e in events
+            if e["type"] == "progress"
+        ]
+        if activity:
+            tabs["activity"] = Text(clean("\n".join(activity)))
+        logs = [
+            f"--- {path.parent.name}/{path.name}\n{path.read_text(errors='replace')[-LOG_TAIL:]}"
+            for name in ("stdout.log", "stderr.log")
+            for path in runinfo.visit_files(self.run, node, visit, name)
+        ]
+        if logs:
+            tabs["logs"] = Text(clean("\n".join(logs)))
+        artifacts = [a["path"] for a in runinfo.artifacts(self.run, node) if a["visit"] == visit]
+        if artifacts:
+            tabs["artifacts"] = Text(clean("\n".join(artifacts)))
+        usage = _usage(result)
+        if usage is not None:
+            tabs["usage"] = usage
+        return tabs
+
     def _inspect(self) -> None:
+        """Show the selected visit's tabs. The tab last picked stays open when the visit
+        has it; otherwise the most useful one opens: a failed visit's logs, else output."""
         if self.selected is None:
             return
-        node, visit = self.selected
-        result: dict[str, Any] = next(
-            (
-                v
-                for v in (self.run.read_state()["nodes"].get(node) or {}).get("visits", [])
-                if v.get("visit") == visit
-            ),
-            {},
+        contents = self._visit_tabs(*self.selected)
+        if self.flow_diff:
+            contents["flow"] = Text(self.flow_diff)
+        if not contents:
+            contents["output"] = Text("(nothing recorded yet)", style="dim")
+        failed = self._selected_result().get("outcome") not in (None, "succeeded")
+        best = "logs" if failed and "logs" in contents else "output"
+        wanted = next(
+            f"tab-{tab}"
+            for tab in (self.picked and self.picked.removeprefix("tab-"), best, *TABS)
+            if tab in contents
         )
-        prompt = runinfo.visit_files(self.run, node, visit, "prompt.md")
-        texts = {
-            "prompt": prompt[0].read_text(errors="replace") if prompt else "(no prompt)",
-            "output": json.dumps(result.get("output"), indent=2)
-            if result.get("output") is not None
-            else (result.get("text") or "(no output)"),
-            "activity": "\n".join(
-                f"{e['data'].get('kind')}: {e['data'].get('summary')}"
-                for e in runinfo.events(self.run, node, visit)
-                if e["type"] == "progress"
-            )
-            or "(no activity)",
-            "logs": "\n".join(
-                f"--- {path.parent.name}/{path.name}\n{path.read_text(errors='replace')[-4000:]}"
-                for name in ("stdout.log", "stderr.log")
-                for path in runinfo.visit_files(self.run, node, visit, name)
-            )
-            or "(no logs)",
-            "artifacts": "\n".join(
-                a["path"] for a in runinfo.artifacts(self.run, node) if a["visit"] == visit
-            )
-            or "(no artifacts)",
-            "usage": json.dumps(
-                {
-                    k: result.get(k)
-                    for k in ("usage", "cost_usd", "num_turns", "session_id", "duration_s", "error")
-                },
-                indent=2,
-            ),
-        }
-        for tab, text in texts.items():
-            self.query_one(f"#inspect-{tab}", Static).update(Text(clean(text)))
+        tabs = self.query_one("#inspector", TabbedContent)
+        logs = self.query_one("#scroll-logs", VerticalScroll)
+        following = logs.scroll_y >= logs.max_scroll_y
+        for tab, content in contents.items():
+            self.query_one(f"#inspect-{tab}", Static).update(content)
+            tabs.show_tab(f"tab-{tab}")
+        # Open the wanted tab before hiding the rest, so hiding never opens another one.
+        if tabs.active != wanted:
+            self.opened = wanted
+            tabs.active = wanted
+        for tab in TABS:
+            if tab not in contents:
+                tabs.hide_tab(f"tab-{tab}")
+        if following:
+            self.call_after_refresh(logs.scroll_end, animate=False)
 
 
 class FlowGraphScreen(Screen[None]):
