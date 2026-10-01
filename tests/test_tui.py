@@ -535,6 +535,49 @@ def test_given_a_tall_graph_then_it_follows_the_current_node_and_the_selected_vi
     drive(WhisperwindApp(config, target=run.id), scenario, size=(80, 24))
 
 
+def test_given_the_graph_focused_when_a_node_is_picked_then_its_latest_visit_is_selected(
+    tmp_path: Path,
+) -> None:
+    run = run_flow(tmp_path, CHAIN).run
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        screen.query_one("#graph", GraphView).focus()
+        await pilot.press(*["up"] * 8)  # s8 → s0
+        await pilot.pause()
+        assert screen.selected == ("s0", 1) and not screen.follow_latest
+        timeline = screen.query_one("#timeline", ListView)
+        assert timeline.highlighted_child.visit == ("s0", 1)
+        assert node_in_view(screen, "s0")
+
+    drive(WhisperwindApp(config, target=run.id), scenario, size=(80, 24))
+
+
+def test_given_a_node_without_visits_when_clicked_then_no_visit_is_selected(
+    tmp_path: Path,
+) -> None:
+    run = run_flow(tmp_path, STORY).run  # waiting at `ask`; `end` not reached
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        box = screen.query_one("#graph", GraphView).picture.regions["end"]
+        await pilot.click("#graph", offset=(box.col + 2, box.row + 1))
+        await pilot.pause()
+        assert screen.selected is None
+        assert screen.query_one("#timeline", ListView).index is None
+        assert any(" on " in f" {style}" for style in styles_of(screen, "end"))
+        assert "end has not run" in text_of(screen.query_one("#inspect-output", Static))
+        # Picking a visited node again selects its visit.
+        box = screen.query_one("#graph", GraphView).picture.regions["plan"]
+        await pilot.click("#graph", offset=(box.col + 2, box.row + 1))
+        await pilot.pause()
+        assert screen.selected == ("plan", 1)
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
+
+
 FOLLOW = FLOW.replace(
     "    choices: [ship, stop]\n",
     "    choices: [ship, stop]\n    next: done\n  done: {type: set, vars: {x: 1}}\n",

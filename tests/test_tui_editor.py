@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 from test_human_node import cli, project
-from test_tui import drive, text_of
+from test_tui import drive, styles_of, text_of
 from test_tui_control import run_dir, wait_until
 from textual.widgets import ListView, Select, Static, TextArea
 
@@ -15,7 +15,8 @@ from whisperwind import edit
 from whisperwind.config import load_config
 from whisperwind.store.events import read_log
 from whisperwind.tui.app import WhisperwindApp
-from whisperwind.tui.editor import ConfirmModal
+from whisperwind.tui.common import GraphView
+from whisperwind.tui.editor import ConfirmModal, FieldModal
 from whisperwind.tui.screens import FlowGraphScreen
 
 FLOW = """name: pair
@@ -212,6 +213,145 @@ def test_given_node_added_by_hand_then_the_node_list_shows_it_within_a_poll(
         assert [item.node for item in listing.children] == ["build", "done", "extra"]
 
     drive(WhisperwindApp(config, target=str(path)), scenario)
+
+
+FORK = """name: fork
+nodes:
+  a:
+    type: set
+    vars: {x: 1}
+    next:
+      - when: vars.x > 0
+        to: b
+      - to: c
+  b: {type: set, vars: {y: 1}}
+  c: {type: set, vars: {z: 1}}
+"""
+
+
+def listed(screen: Any) -> str | None:
+    """The node highlighted in the node list."""
+    item = screen.query_one("#node-list", ListView).highlighted_child
+    return getattr(item, "node", None)
+
+
+def test_given_the_graph_focused_when_arrows_are_pressed_then_the_selection_moves_spatially(
+    tmp_path: Path,
+) -> None:
+    root = project(tmp_path, FORK)
+    config, _ = load_config(root)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        graph = screen.query_one("#graph", GraphView)
+        graph.focus()
+        await pilot.pause()
+        regions = graph.picture.regions
+        left, right = sorted(("b", "c"), key=lambda node: regions[node].col)
+        await pilot.press("down", "left")
+        await pilot.pause()
+        assert screen.node == left and graph.selected == left
+        assert listed(screen) == left
+        var = {"b": "y", "c": "z"}[left]
+        assert f"{var}: 1" in text_of(screen.query_one("#node-config", Static))
+        await pilot.press("right")
+        await pilot.pause()
+        assert screen.node == right and listed(screen) == right
+        await pilot.press("up")
+        await pilot.pause()
+        assert screen.node == "a" and listed(screen) == "a"
+        assert "x: 1" in text_of(screen.query_one("#node-config", Static))
+
+    drive(WhisperwindApp(config, target=str(root / "flow.yaml")), scenario)
+
+
+def test_given_a_node_box_when_clicked_then_it_is_selected(tmp_path: Path) -> None:
+    root = project(tmp_path, FLOW)
+    config, _ = load_config(root)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        box = screen.query_one("#graph", GraphView).picture.regions["done"]
+        await pilot.click("#graph", offset=(box.col + 2, box.row + 1))
+        await pilot.pause()
+        assert screen.node == "done" and listed(screen) == "done"
+        assert "ok: true" in text_of(screen.query_one("#node-config", Static))
+
+    drive(WhisperwindApp(config, target=str(root / "flow.yaml")), scenario)
+
+
+def test_given_a_node_box_when_the_mouse_is_pressed_on_it_then_no_text_selection_starts(
+    tmp_path: Path,
+) -> None:
+    root = project(tmp_path, FLOW)
+    config, _ = load_config(root)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        box = screen.query_one("#graph", GraphView).picture.regions["done"]
+        await pilot.mouse_down("#graph", offset=(box.col + 2, box.row + 1))
+        await pilot.hover("#graph", offset=(box.col + 4, box.row + 1))
+        await pilot.pause()
+        assert not screen.selections
+
+    drive(WhisperwindApp(config, target=str(root / "flow.yaml")), scenario)
+
+
+def test_given_a_node_selected_in_the_list_then_the_graph_marks_it(tmp_path: Path) -> None:
+    root = project(tmp_path, FLOW)
+    config, _ = load_config(root)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        select(pilot, "done")
+        await pilot.pause()
+        assert screen.query_one("#graph", GraphView).selected == "done"
+        assert any(" on " in f" {style}" for style in styles_of(screen, "done"))
+        assert not any(" on " in f" {style}" for style in styles_of(screen, "build"))
+
+    drive(WhisperwindApp(config, target=str(root / "flow.yaml")), scenario)
+
+
+def test_given_a_node_in_the_graph_when_enter_is_pressed_then_its_fields_open_unless_built_in(
+    tmp_path: Path,
+) -> None:
+    root = project(tmp_path, FLOW)
+    config, _ = load_config(root)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        screen.query_one("#graph", GraphView).focus()
+        await pilot.press("down", "down")  # build → done → end
+        await pilot.pause()
+        assert screen.node == "end" and listed(screen) is None
+        assert "built in" in text_of(screen.query_one("#node-config", Static))
+        await pilot.press("enter")
+        await pilot.pause()
+        assert pilot.app.screen is screen
+        await pilot.press("up", "enter")
+        await pilot.pause()
+        assert isinstance(pilot.app.screen, FieldModal)
+
+    drive(WhisperwindApp(config, target=str(root / "flow.yaml")), scenario)
+
+
+def test_given_a_flow_too_big_to_lay_out_then_the_listed_graph_selects_line_by_line(
+    tmp_path: Path,
+) -> None:
+    nodes = "".join(f"  n{i}: {{type: set, vars: {{x: {i}}}, next: n{i + 1}}}\n" for i in range(60))
+    root = project(tmp_path, f"name: long\nnodes:\n{nodes}  n60: {{type: set, vars: {{x: 0}}}}\n")
+    config, _ = load_config(root)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        graph = screen.query_one("#graph", GraphView)
+        assert graph.picture.fallback
+        graph.focus()
+        await pilot.press("down", "down")
+        await pilot.pause()
+        assert screen.node == "n2" and listed(screen) == "n2"
+
+    drive(WhisperwindApp(config, target=str(root / "flow.yaml")), scenario)
 
 
 @pytest.fixture
