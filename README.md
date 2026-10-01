@@ -257,6 +257,8 @@ uv run ruff format .    # format
 uv run mypy             # type check
 ```
 
+TUI screens are checked against SVG snapshots in `tests/__snapshots__/`. After an intended screen change, run `uv run pytest --snapshot-update` and commit the updated snapshots. On every pull request, CI posts a comment showing each added, changed or removed screen as text, with a diff for the changed ones.
+
 Releases are published to PyPI and GitHub by pushing a `vX.Y.Z` tag that matches `__version__` in `src/floxim/__init__.py`.
 
 ## License
