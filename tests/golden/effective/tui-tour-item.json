@@ -1,0 +1,14 @@
+{
+  "nodes": {
+    "note": {
+      "config": {
+        "type": "set",
+        "vars": {
+          "part": "${{ inputs.part }}"
+        }
+      },
+      "type": "set"
+    }
+  },
+  "start": "note"
+}
