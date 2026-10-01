@@ -162,6 +162,36 @@ def _failure(info: dict[str, Any]) -> Text:
     )
 
 
+def _visit_ends(
+    events: list[dict[str, Any]],
+) -> tuple[dict[tuple[str, int], dict[str, Any]], dict[tuple[str, int], dict[str, Any]]]:
+    """Each finished visit's `visit_finished` event, and the route the run took after it:
+    a route leaves the latest finished visit of the node it comes from."""
+    finished: dict[tuple[str, int], dict[str, Any]] = {}
+    routes: dict[tuple[str, int], dict[str, Any]] = {}
+    latest: dict[str, tuple[str, int]] = {}
+    for event in events:
+        if event["type"] == "visit_finished":
+            key = (event["node"], event["visit"])
+            finished[key] = event
+            latest[event["node"]] = key
+        elif event["type"] == "route_taken" and event["data"].get("from") in latest:
+            routes.setdefault(latest[event["data"]["from"]], event["data"])
+    return finished, routes
+
+
+def _route_text(outcome: str, route: dict[str, Any]) -> str:
+    """Where the run went after a visit, and how when it wasn't the usual `next`."""
+    via = route.get("via")
+    if via == "resume":
+        return f"resumed → {route['to']}"
+    if via == "on_error":
+        return f"on_error → {route['to']}"
+    if outcome != "succeeded":  # `on_error: continue` routes a failure through `next`
+        return f"continued → {route['to']}"
+    return f"→ {route['to']}"
+
+
 def snapshot_of(run: RunDir) -> Path | None:
     relative = run.read_state().get("run", {}).get("snapshot") or run.meta().get("snapshot_flow")
     return run.path / str(relative) if relative else None
@@ -625,27 +655,42 @@ class RunDetailScreen(RunControl):
         self._inspect()
 
     def _timeline(self, events: list[dict[str, Any]], waiting: set[str], status: str) -> None:
-        """Every visit with its outcome. An unfinished visit is waiting when its node has
-        a pending prompt; otherwise it shares the run's status, such as interrupted."""
+        """Every visit with its outcome and start time; once finished, how long it took,
+        its cost and attempts, and where the run went next. An unfinished visit is waiting
+        when its node has a pending prompt; otherwise it shares the run's status, such as
+        interrupted."""
         timeline = self.query_one("#timeline", ListView)
         timeline.clear()
-        finished = {(e["node"], e["visit"]): e for e in events if e["type"] == "visit_finished"}
-        for event in events:
-            if event["type"] != "visit_started":
-                continue
+        started = [e for e in events if e["type"] == "visit_started"]
+        finished, routes = _visit_ends(events)
+        width = max((len(f"{e['node']} #{e['visit']}") for e in started), default=0)
+        for event in started:
             key = (event["node"], event["visit"])
-            done = finished.get(key)
+            done, route = finished.get(key), routes.get(key)
             outcome = (
                 done["data"]["outcome"] if done else "waiting" if key[0] in waiting else status
             )
+            marker, style = STATUS.get(outcome, ("?", ""))
+            facts = []
+            # Only new events redraw the timeline, so a running visit's duration would stall.
+            if done:
+                result = done["data"].get("result") or {}
+                facts.append(
+                    _span((parse_iso(done["ts"]) - parse_iso(event["ts"])).total_seconds())
+                )
+                if result.get("cost_usd"):
+                    facts.append(f"${result['cost_usd']:.2f}")
+                if (result.get("attempts") or 1) > 1:
+                    facts.append(f"{result['attempts']} attempts")
+            if route is not None:
+                facts.append(_route_text(outcome, route))
+                if outcome != "succeeded" and route.get("via") != "resume":
+                    style = "yellow"  # a failure the flow handled
             label = Text.assemble(
-                status_text(outcome),
-                f"  {event['node']} #{event['visit']}",
+                (marker, style),
+                f" {f'{key[0]} #{key[1]}':<{width}}",
                 (f"  {local_time(event['ts'])}", "dim"),
-                # Only new events redraw the timeline, so a running visit's duration would stall.
-                (f"  {_duration({'started_at': event['ts'], 'finished_at': done['ts']})}", "dim")
-                if done
-                else "",
+                *(("  " + fact, "dim") for fact in facts),
             )
             timeline.append(VisitItem(key, Label(label)))
         if self.selected is None and finished:

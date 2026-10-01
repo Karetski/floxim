@@ -299,9 +299,67 @@ def test_given_a_waiting_run_when_opened_then_its_current_step_and_visit_show_wa
         screen = pilot.app.screen
         assert "  ·  at approve" in text_of(screen.query_one("#summary", Static))
         labels = [str(item.query_one(Label).render()) for item in screen.query(VisitItem)]
-        assert labels[-1].startswith("… waiting  approve #1")
+        assert labels[-1].startswith("… approve #1")
 
     drive(WhisperwindApp(config, target=run_of(project, "demo")), scenario)
+
+
+STORY = """name: story
+nodes:
+  plan:
+    type: agent
+    harness: fake
+    prompt: Plan.
+    harness_options: {responses: [{text: planned, cost_usd: 0.1}]}
+    next: flaky
+  flaky:
+    type: agent
+    harness: fake
+    prompt: Try.
+    retry: {max_attempts: 3}
+    harness_options:
+      responses: [{outcome: failed}, {outcome: failed}, {text: done}]
+    next: broken
+  broken:
+    type: agent
+    harness: fake
+    prompt: Break.
+    on_error: continue
+    harness_options: {responses: [{outcome: failed}]}
+    next: ask
+  ask:
+    type: human
+    message: Go on?
+"""
+
+
+def test_given_a_run_when_opened_then_each_visit_says_what_it_cost_and_where_it_went(
+    tmp_path: Path,
+) -> None:
+    run = run_flow(tmp_path, STORY).run
+    config, _ = load_config(tmp_path)
+    starts = [
+        local_time(e["ts"]) for e in read_log(run.events).events if e["type"] == "visit_started"
+    ]
+
+    async def scenario(pilot: Any) -> None:
+        labels = [str(item.query_one(Label).render()) for item in pilot.app.screen.query(VisitItem)]
+        # Each label split around its start time, which lines up in one column.
+        split = [label.partition(start) for label, start in zip(labels, starts, strict=True)]
+        assert [head for head, _, _ in split] == [
+            "✓ plan #1    ",
+            "✓ flaky #1   ",
+            "✗ broken #1  ",
+            "… ask #1     ",
+        ]
+        assert [tail for _, _, tail in split] == [
+            "  0s  $0.10  → flaky",
+            "  0s  3 attempts  → broken",
+            "  0s  continued → ask",
+            "",
+        ]
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
 
 
 def test_given_a_finished_run_when_opened_then_no_current_step_or_failure_shows(
@@ -587,6 +645,28 @@ def test_given_a_project_when_a_screen_is_shown_then_it_matches_the_snapshot(
     monkeypatch.chdir(project)  # flow paths show relative to the project, not tmp_path
     config, _ = load_config(Path("."))
     assert snap_compare(WhisperwindApp(config), press=SCREENS[screen], terminal_size=(120, 36))
+
+
+def test_given_a_failure_routed_by_on_error_when_opened_then_its_visit_says_so(
+    tmp_path: Path,
+) -> None:
+    flow = STORY.replace("    on_error: continue\n", "    on_error: ask\n")
+    run = run_flow(tmp_path, flow).run
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        labels = [str(item.query_one(Label).render()) for item in pilot.app.screen.query(VisitItem)]
+        assert labels[2].startswith("✗ broken #1") and labels[2].endswith("  on_error → ask")
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
+
+
+def test_given_a_run_with_retries_and_a_handled_failure_then_it_matches_the_snapshot(
+    snap_compare: Any, pinned_time: None, tmp_path: Path
+) -> None:
+    run = run_flow(tmp_path, STORY).run
+    config, _ = load_config(tmp_path)
+    assert snap_compare(WhisperwindApp(config, target=run.id), terminal_size=(120, 36))
 
 
 def test_given_no_runs_when_the_tui_opens_then_it_matches_the_snapshot(
