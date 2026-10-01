@@ -425,3 +425,49 @@ def test_given_flow_graph_screen_when_rendered_then_it_matches_the_snapshot(
     assert snap_compare(
         WhisperwindApp(config, target="implement-feature.yaml"), terminal_size=(120, 50)
     )
+
+
+SCREENS: dict[str, tuple[str, ...]] = {
+    "runs": (),
+    "run-waiting": ("enter",),
+    "run-succeeded": ("down", "enter"),
+    "answer": ("a",),
+    "flows": ("f",),
+    "flow-with-problems": ("f", "enter"),
+    "add-node": ("f", "down", "enter", "n"),
+}
+
+
+@pytest.fixture
+def pinned_time(monkeypatch: pytest.MonkeyPatch, local_zone: None) -> None:
+    """Run IDs and the TUI's clock fixed, so screens render the same on every machine."""
+    suffixes = iter("abcdefghijklmnop")
+    monkeypatch.setattr("whisperwind.store.ids.secrets.choice", lambda _: next(suffixes))
+    now = datetime.datetime(2026, 9, 30, 12, 5, tzinfo=datetime.timezone.utc)
+    monkeypatch.setattr(Clock, "now", lambda self: now)
+
+
+@pytest.mark.parametrize("screen", list(SCREENS))
+def test_given_a_project_when_a_screen_is_shown_then_it_matches_the_snapshot(
+    snap_compare: Any,
+    pinned_time: None,
+    project: Path,
+    screen: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (project / "flows").mkdir()
+    (project / "flows" / "demo.yaml").write_text(FLOW)
+    (project / "flows" / "broken.yaml").write_text(
+        "name: broken\nnodes:\n  a: {type: set, next: nowhere}\n"
+    )
+    monkeypatch.chdir(project)  # flow paths show relative to the project, not tmp_path
+    config, _ = load_config(Path("."))
+    assert snap_compare(WhisperwindApp(config), press=SCREENS[screen], terminal_size=(120, 36))
+
+
+def test_given_no_runs_when_the_tui_opens_then_it_matches_the_snapshot(
+    snap_compare: Any, pinned_time: None, tmp_path: Path
+) -> None:
+    (tmp_path / ".whisperwind").mkdir()
+    config, _ = load_config(tmp_path)
+    assert snap_compare(WhisperwindApp(config), terminal_size=(120, 36))
