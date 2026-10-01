@@ -48,8 +48,9 @@ dev = [
 path = "src/whisperwind/__init__.py"
 
 [tool.hatch.build.targets.sdist]
-# Agent and CI configuration are for working on the repository, not for users.
-exclude = [".claude", ".github"]
+# Agent and CI configuration, and the repository's own Whisperwind project, are for
+# working on the repository, not for users.
+exclude = [".claude", ".github", "/.whisperwind", "/flows"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

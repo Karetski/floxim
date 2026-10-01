@@ -263,6 +263,13 @@ uv run ruff format .    # format
 uv run mypy             # type check
 ```
 
+The repository is itself a Whisperwind project: `.whisperwind/config.yaml` configures it, and `flows/` holds flows for working on Whisperwind. `flows/tui-tour.yaml` runs through every part of the run detail screen at no cost, using the scripted `fake` harness. To get `whisperwind` and `whw` commands that run this checkout, with your edits live, install it in editable mode:
+
+```sh
+uv tool install -e .
+whw tui                 # from the repository root: this project's flows and runs
+```
+
 TUI screens are checked against SVG snapshots in `tests/__snapshots__/`. After an intended screen change, run `uv run pytest --snapshot-update` and commit the updated snapshots. On every pull request, CI posts a comment showing each added, changed or removed screen as text, with a diff for the changed ones.
 
 Releases are published to PyPI and GitHub by pushing a `vX.Y.Z` tag that matches `__version__` in `src/whisperwind/__init__.py`.

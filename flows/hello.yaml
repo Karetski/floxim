@@ -1,0 +1,24 @@
+whisperwind: 1
+name: hello
+description: A first flow. Run it with `whisperwind run flows/hello.yaml --input name=you`.
+
+inputs:
+  name: {type: string, default: world}
+
+nodes:
+  greet:
+    type: shell
+    run: echo "Hello, $NAME"
+    env: {NAME: "${{ inputs.name }}"}
+    next: ask
+  ask:
+    type: human
+    message: "Greeted ${{ inputs.name }}. Finish?"
+    choices: [finish, again]
+    next:
+      - when: nodes.ask.choice == "again" and visits.greet < 3
+        to: greet
+      - to: end
+
+outputs:
+  said: ${{ strip(nodes.greet.stdout) }}
