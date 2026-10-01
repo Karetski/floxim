@@ -3,23 +3,35 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+import datetime
+import os
+import time
+from collections.abc import Awaitable, Callable, Iterator
 from pathlib import Path
 from typing import Any
 
 import pytest
 from engine_support import run_flow
-from textual.widgets import DataTable, ListView, Static
+from textual.widgets import DataTable, Label, ListView, Static
 
-from floxim.clock import Clock
+from floxim import runinfo
+from floxim.clock import Clock, parse_iso
 from floxim.config import load_config
 from floxim.engine.human import Answer
 from floxim.engine.respond import respond
 from floxim.engine.runner import Runner
+from floxim.store.events import read_log
+from floxim.store.rundir import RunDir
 from floxim.testing import VirtualClock, run_virtual
 from floxim.tui.app import FloximApp
-from floxim.tui.common import NavKey
-from floxim.tui.screens import FlowGraphScreen, FlowsScreen, RunDetailScreen, RunsScreen
+from floxim.tui.common import NavKey, local_time, local_timestamp
+from floxim.tui.screens import (
+    FlowGraphScreen,
+    FlowsScreen,
+    RunDetailScreen,
+    RunsScreen,
+    VisitItem,
+)
 
 FLOW = """name: demo
 nodes:
@@ -52,6 +64,31 @@ def drive(
 
 def text_of(widget: Static) -> str:
     return str(widget.render())
+
+
+@pytest.fixture
+def local_zone() -> Iterator[None]:
+    """Pins the local timezone to UTC+3, named FLX, whatever the machine's zone is."""
+    previous = os.environ.get("TZ")
+    os.environ["TZ"] = "FLX-3"
+    time.tzset()
+    yield
+    if previous is None:
+        del os.environ["TZ"]
+    else:
+        os.environ["TZ"] = previous
+    time.tzset()
+
+
+def in_zone(stamp: str, form: str) -> str:
+    """A stored UTC timestamp as the pinned zone's clock shows it."""
+    return (parse_iso(stamp) + datetime.timedelta(hours=3)).strftime(form)
+
+
+def compact_in_zone(stamp: str) -> set[str]:
+    """Both compact forms of a timestamp in the pinned zone: which one shows depends on
+    whether it falls on the real today."""
+    return {in_zone(stamp, "%H:%M:%S"), in_zone(stamp, "%b %d %H:%M")}
 
 
 @pytest.fixture
@@ -105,6 +142,53 @@ def test_given_views_when_switching_between_them_then_the_current_ones_key_is_hi
     assert highlighted == [["f Flows"], ["r Runs"], ["f Flows"]]
 
 
+def test_given_a_utc_timestamp_when_shown_then_it_is_in_the_local_timezone(
+    local_zone: None,
+) -> None:
+    stamp = "2026-09-30T22:30:00.000Z"  # 01:30 on Oct 1 in UTC+3
+    assert local_timestamp(stamp) == "2026-10-01 01:30:00 FLX"
+    # Today is the local day, not the UTC one.
+    assert local_time(stamp, now=parse_iso("2026-10-01T05:00:00Z")) == "01:30:00"
+    assert local_time(stamp, now=parse_iso("2026-10-02T05:00:00Z")) == "Oct 01 01:30"
+
+
+def test_given_runs_when_listed_then_start_and_finish_show_in_local_time(
+    project: Path, local_zone: None
+) -> None:
+    config, _ = load_config(project)
+    runs = {run.id: runinfo.summary(run, Clock()) for run in map(RunDir, config.runs_dir.iterdir())}
+
+    async def scenario(pilot: Any) -> None:
+        table = pilot.app.screen.query_one("#runs", DataTable)
+        labels = [str(column.label) for column in table.columns.values()]
+        assert labels[4:7] == ["started", "finished", "duration"]
+        for run_id, info in runs.items():
+            started, finished = table.get_row(run_id)[4:6]
+            assert started in compact_in_zone(info["started_at"])
+            if info["status"] == "waiting":
+                assert finished == ""
+            else:
+                assert finished in compact_in_zone(info["finished_at"])
+
+    drive(FloximApp(config), scenario)
+
+
+def test_given_runs_at_80_columns_when_scrolled_right_then_status_and_run_stay(
+    project: Path,
+) -> None:
+    config, _ = load_config(project)
+
+    async def scenario(pilot: Any) -> None:
+        table = pilot.app.screen.query_one("#runs", DataTable)
+        assert table.virtual_size.width > 80
+        table.scroll_to(x=table.max_scroll_x, animate=False)
+        await pilot.pause()
+        row = table.render_line(1).text
+        assert table.get_row_at(0)[1] in row and "waiting" in row
+
+    drive(FloximApp(config), scenario, size=(80, 24))
+
+
 def test_given_runs_when_the_tui_opens_then_waiting_runs_come_first(project: Path) -> None:
     config, _ = load_config(project)
 
@@ -154,8 +238,6 @@ def test_given_run_that_finishes_while_open_when_refreshed_then_the_screen_follo
         assert isinstance(screen, RunDetailScreen)
         assert "waiting" in text_of(screen.query_one("#summary", Static))
         # Another process answers and finishes the run.
-        from floxim.store.rundir import RunDir
-
         run = RunDir(waiting)
         respond(
             run,
@@ -176,6 +258,31 @@ def test_given_run_that_finishes_while_open_when_refreshed_then_the_screen_follo
         assert "✓ ☺ approve" in text_of(screen.query_one("#graph", Static))
 
     drive(FloximApp(config, target=waiting.name), scenario)
+
+
+@pytest.mark.parametrize("flow", ["demo", "quick"])
+def test_given_a_run_when_opened_then_its_summary_and_timeline_show_local_times(
+    project: Path, local_zone: None, flow: str
+) -> None:
+    config, _ = load_config(project)
+    run = next(r for r in map(RunDir, config.runs_dir.iterdir()) if f"-{flow}-" in r.id)
+    info = runinfo.summary(run, Clock())
+    full = "%Y-%m-%d %H:%M:%S FLX"
+    starts = [e["ts"] for e in read_log(run.events).events if e["type"] == "visit_started"]
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        summary = text_of(screen.query_one("#summary", Static))
+        assert f"started {in_zone(info['started_at'], full)}" in summary
+        if flow == "demo":  # still waiting
+            assert "finished" not in summary and "took" not in summary
+        else:
+            assert f"finished {in_zone(info['finished_at'], full)}  ·  took " in summary
+        labels = [str(item.query_one(Label).render()) for item in screen.query(VisitItem)]
+        for label, start in zip(labels, starts, strict=True):
+            assert any(shown in label for shown in compact_in_zone(start))
+
+    drive(FloximApp(config, target=run.id), scenario)
 
 
 def test_given_flow_files_when_listed_then_validity_and_last_run_show(project: Path) -> None:
