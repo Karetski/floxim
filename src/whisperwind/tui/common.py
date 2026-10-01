@@ -52,8 +52,9 @@ def local_timestamp(stamp: str) -> str:
     return parse_iso(stamp).astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
 
 
-def node_status(state: dict[str, Any]) -> dict[str, str]:
-    """The status of every node that has been visited, for the graph."""
+def node_status(state: dict[str, Any], run_status: str) -> dict[str, str]:
+    """The status of every node that has been visited, for the graph. The node in
+    progress shares the run's status: running, or interrupted when no runner is live."""
     statuses = {
         node: str(result.get("outcome"))
         for node, result in (state.get("nodes") or {}).items()
@@ -61,7 +62,7 @@ def node_status(state: dict[str, Any]) -> dict[str, str]:
     }
     progress = state.get("in_progress")
     if progress:
-        statuses[progress["node"]] = "running"
+        statuses[progress["node"]] = run_status
     for node in state.get("pending_human") or {}:
         statuses[node] = "waiting"
     return statuses

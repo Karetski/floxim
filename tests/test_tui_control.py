@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 from test_human_node import cli, project
 from test_tui import drive, text_of
-from textual.widgets import Input, Static
+from textual.widgets import Input, Label, Static
 
 from whisperwind.config import load_config
 from whisperwind.store.events import read_log
@@ -21,7 +21,7 @@ from whisperwind.store.ids import resolve_run
 from whisperwind.store.rundir import RunDir
 from whisperwind.tui import actions
 from whisperwind.tui.app import WhisperwindApp
-from whisperwind.tui.screens import RunDetailScreen
+from whisperwind.tui.screens import RunDetailScreen, VisitItem
 
 ASK = """name: ask
 nodes:
@@ -137,8 +137,9 @@ def test_given_waiting_run_when_cancelled_from_the_runs_list_then_it_ends_cancel
     assert run_dir(waiting).read_state()["status"] == "cancelled"
 
 
-def test_given_interrupted_run_when_resumed_from_the_tui_then_it_finishes(tmp_path: Path) -> None:
-    # Given
+@pytest.fixture
+def interrupted(tmp_path: Path) -> Path:
+    """A project whose run crashed after its first step started."""
     root = project(tmp_path, HELLO)
     env = {
         **os.environ,
@@ -149,8 +150,15 @@ def test_given_interrupted_run_when_resumed_from_the_tui_then_it_finishes(tmp_pa
         [sys.executable, "-m", "whisperwind", "run", "flow.yaml", "--input", "who=ada"],
         cwd=root, env=env, capture_output=True,
     )  # fmt: skip
-    config, _ = load_config(root)
-    run = run_dir(root)
+    return root
+
+
+def test_given_interrupted_run_when_resumed_from_the_tui_then_it_finishes(
+    interrupted: Path,
+) -> None:
+    # Given
+    config, _ = load_config(interrupted)
+    run = run_dir(interrupted)
 
     async def scenario(pilot: Any) -> None:
         await pilot.press("u")
@@ -162,6 +170,28 @@ def test_given_interrupted_run_when_resumed_from_the_tui_then_it_finishes(tmp_pa
     # Then
     wait_until(lambda: run.read_state()["status"] == "succeeded")
     assert run.read_state()["outputs"] == {"said": "hello ada"}
+
+
+@pytest.mark.parametrize("cancelled", [False, True])
+def test_given_a_run_stopped_mid_step_when_opened_then_the_step_shows_how_the_run_stopped(
+    interrupted: Path, cancelled: bool
+) -> None:
+    run = run_dir(interrupted)
+    if cancelled:
+        assert cli(interrupted, "cancel", run.id).returncode == 0
+    config, _ = load_config(interrupted)
+    expected = "⊘ cancelled" if cancelled else "‖ interrupted"
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        labels = [str(item.query_one(Label).render()) for item in screen.query(VisitItem)]
+        assert len(labels) == 1 and labels[0].startswith(f"{expected}  greet #1")
+        graph = text_of(screen.query_one("#graph", Static))
+        assert "▶" not in graph
+        if not cancelled:  # a cancelled run's unfinished step has no result to mark
+            assert "‖ = greet" in graph
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
 
 
 def test_given_flow_when_run_from_the_flows_screen_then_the_form_supplies_inputs(

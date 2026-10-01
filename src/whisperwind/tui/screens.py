@@ -618,13 +618,15 @@ class RunDetailScreen(RunControl):
         )
         if self.flow is not None:
             self.query_one("#graph", GraphView).show(
-                self.flow, node_status(state), state.get("visits")
+                self.flow, node_status(state, info["status"]), state.get("visits")
             )
             self.query_one("#limits", Static).update(_limits(info["totals"], self.flow.limits))
-        self._timeline(events, set(info["pending_human"]))
+        self._timeline(events, set(info["pending_human"]), info["status"])
         self._inspect()
 
-    def _timeline(self, events: list[dict[str, Any]], waiting: set[str]) -> None:
+    def _timeline(self, events: list[dict[str, Any]], waiting: set[str], status: str) -> None:
+        """Every visit with its outcome. An unfinished visit is waiting when its node has
+        a pending prompt; otherwise it shares the run's status, such as interrupted."""
         timeline = self.query_one("#timeline", ListView)
         timeline.clear()
         finished = {(e["node"], e["visit"]): e for e in events if e["type"] == "visit_finished"}
@@ -634,7 +636,7 @@ class RunDetailScreen(RunControl):
             key = (event["node"], event["visit"])
             done = finished.get(key)
             outcome = (
-                done["data"]["outcome"] if done else "waiting" if key[0] in waiting else "running"
+                done["data"]["outcome"] if done else "waiting" if key[0] in waiting else status
             )
             label = Text.assemble(
                 status_text(outcome),
