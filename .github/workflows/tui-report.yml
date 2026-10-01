@@ -1,0 +1,67 @@
+name: TUI report
+
+# On a pull request, run the tests and post one comment, updated on every push, that
+# shows as text each TUI snapshot the pull request adds, changes or removes. When the
+# tests fail, pytest-textual-snapshot's full-colour HTML diff is uploaded as an artifact.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: tui-report-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the base branch, to diff the snapshots against
+      - uses: astral-sh/setup-uv@v10.2.0
+      - run: uv sync --locked
+
+      - name: Tests
+        id: tests
+        continue-on-error: true
+        run: uv run pytest
+
+      - name: Write the report
+        env:
+          BASE: origin/${{ github.base_ref }}
+          STATUS: ${{ steps.tests.outcome == 'success' && 'passed' || 'failed' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          uv run python tools/tui_report.py "$BASE" --status "$STATUS" --run-url "$RUN_URL" > report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the snapshot diff
+        if: steps.tests.outcome == 'failure' && hashFiles('snapshot_report.html') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: snapshot-report
+          path: snapshot_report.html
+
+      # A pull request from a fork gets a read-only token and cannot comment; its
+      # report is still in the job summary.
+      - name: Post or update the comment
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          id=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+            --jq '.[] | select(.body | startswith("<!-- whisperwind-tui-report -->")) | .id' | head -n1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@report.md
+          else
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file report.md
+          fi
+
+      - name: Fail when the tests failed
+        if: steps.tests.outcome == 'failure'
+        run: exit 1
