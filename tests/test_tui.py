@@ -18,7 +18,7 @@ from whisperwind import runinfo
 from whisperwind.clock import Clock, parse_iso
 from whisperwind.config import load_config
 from whisperwind.engine.human import Answer
-from whisperwind.engine.respond import respond
+from whisperwind.engine.respond import cancel, respond
 from whisperwind.engine.runner import Runner
 from whisperwind.store.events import read_log
 from whisperwind.store.rundir import RunDir
@@ -469,6 +469,96 @@ def test_given_a_waiting_run_at_80x24_then_summary_prompt_and_limits_are_all_vis
             assert region.height and region.bottom <= 23 and region.right <= 80, widget
 
     drive(WhisperwindApp(config, target=run_of(project, "demo")), scenario, size=(80, 24))
+
+
+MAPPER = """name: mapper
+nodes:
+  each:
+    type: map
+    items: [1, 2]
+    flow: item.yaml
+    inputs: {n: "${{ item }}"}
+"""
+ITEM = """name: item
+inputs:
+  n: {type: integer, required: true}
+nodes:
+  note: {type: set, vars: {n: "${{ inputs.n }}"}}
+"""
+ASKING_ITEM = ITEM.replace(
+    '  note: {type: set, vars: {n: "${{ inputs.n }}"}}\n',
+    "  ask: {type: human, message: Keep it?, choices: [yes, no]}\n",
+)
+
+
+def children_of(run: RunDir) -> list[str]:
+    return [e["data"]["run_id"] for e in read_log(run.events).events if e["type"] == "child_run"]
+
+
+def visit_labels(screen: Any) -> list[str]:
+    return [str(item.query_one(Label).render()) for item in screen.query(VisitItem)]
+
+
+def test_given_a_map_run_when_opened_then_its_child_runs_nest_under_its_visit(
+    tmp_path: Path,
+) -> None:
+    run = run_flow(tmp_path, MAPPER, files={"item.yaml": ITEM}).run
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        labels = visit_labels(pilot.app.screen)
+        assert len(labels) == 3 and labels[0].startswith("✓ each #1")
+        assert labels[1].startswith("   ↳ ✓ item [0]  0s")
+        assert labels[2].startswith("   ↳ ✓ item [1]  0s")
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
+
+
+def test_given_a_subflow_run_when_opened_then_its_child_run_nests_without_an_index(
+    tmp_path: Path,
+) -> None:
+    flow = "name: outer\nnodes:\n  sub: {type: subflow, flow: item.yaml, inputs: {n: 1}}\n"
+    run = run_flow(tmp_path, flow, files={"item.yaml": ITEM}).run
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        assert visit_labels(pilot.app.screen)[1].startswith("   ↳ ✓ item  0s")
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
+
+
+def test_given_a_child_run_row_when_chosen_then_the_child_run_opens(tmp_path: Path) -> None:
+    run = run_flow(tmp_path, MAPPER, files={"item.yaml": ITEM}).run
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        parent = pilot.app.screen
+        await pilot.click(list(parent.query(VisitItem))[2])
+        await pilot.pause()
+        child = pilot.app.screen
+        assert isinstance(child, RunDetailScreen) and child.run.id == children_of(run)[1]
+        await pilot.press("escape")
+        assert pilot.app.screen is parent
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
+
+
+def test_given_a_waiting_child_when_it_is_cancelled_elsewhere_then_its_row_follows(
+    tmp_path: Path,
+) -> None:
+    flow = MAPPER.replace("items: [1, 2]", "items: [1]")
+    run = run_flow(tmp_path, flow, files={"item.yaml": ASKING_ITEM}).run
+    config, _ = load_config(tmp_path)
+    child = RunDir(config.runs_dir / children_of(run)[0])
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        assert visit_labels(screen)[1].startswith("   ↳ … item [0]  at ask")
+        cancel(child, by="ada", reason=None, clock=Clock())
+        await pilot.pause(1.0)
+        assert visit_labels(screen)[1].startswith("   ↳ ⊘ item [0]")
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
 
 
 def test_given_flow_files_when_listed_then_validity_and_last_run_show(project: Path) -> None:
