@@ -24,7 +24,12 @@ from whisperwind.store.events import read_log
 from whisperwind.store.rundir import RunDir
 from whisperwind.testing import VirtualClock, run_virtual
 from whisperwind.tui.app import WhisperwindApp
-from whisperwind.tui.common import NavKey, local_time, local_timestamp
+from whisperwind.tui.common import (
+    GraphView,
+    NavKey,
+    local_time,
+    local_timestamp,
+)
 from whisperwind.tui.screens import (
     FlowGraphScreen,
     FlowsScreen,
@@ -471,6 +476,96 @@ def test_given_a_waiting_run_at_80x24_then_summary_prompt_and_limits_are_all_vis
     drive(WhisperwindApp(config, target=run_of(project, "demo")), scenario, size=(80, 24))
 
 
+def styles_of(screen: Any, node: str) -> set[str]:
+    """The styles on a node's label row in the run's graph."""
+    graph = screen.query_one("#graph", GraphView)
+    box = graph.picture.regions[node]
+    start = sum(len(line) + 1 for line in graph.picture.lines[: box.row + 1]) + box.col
+    return {str(span.style) for span in graph.render().spans if span.start <= start < span.end}
+
+
+def node_in_view(screen: Any, node: str) -> bool:
+    pane = screen.query_one("#graph-pane")
+    box = screen.query_one("#graph", GraphView).picture.regions[node]
+    return bool(
+        pane.scroll_y <= box.row and box.row + box.height <= pane.scroll_y + pane.size.height
+    )
+
+
+def test_given_a_visit_selected_then_its_node_is_marked_and_unreached_nodes_are_dim(
+    tmp_path: Path,
+) -> None:
+    run = run_flow(tmp_path, STORY).run
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        await select_visit(pilot, 1)  # flaky #1
+        # The selected node's box has a background; no other box has one.
+        assert any(" on " in f" {style}" for style in styles_of(screen, "flaky"))
+        assert not any(" on " in f" {style}" for style in styles_of(screen, "plan"))
+        assert any("dim" in style for style in styles_of(screen, "end"))  # still waiting at ask
+        assert not any("dim" in style for style in styles_of(screen, "plan"))
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
+
+
+CHAIN = (
+    "name: chain\nnodes:\n"
+    + "".join(f"  s{i}: {{type: set, vars: {{x: {i}}}, next: s{i + 1}}}\n" for i in range(8))
+    + "  s8: {type: human, message: Done?, choices: [yes]}\n"
+)
+
+
+def test_given_a_tall_graph_then_it_follows_the_current_node_and_the_selected_visit(
+    tmp_path: Path,
+) -> None:
+    run = run_flow(tmp_path, CHAIN).run
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        await pilot.pause()
+        assert node_in_view(screen, "s8") and not node_in_view(screen, "s0")
+        screen.query_one("#timeline").focus()
+        await pilot.press(*["up"] * 8)  # to s0 #1
+        await pilot.pause()
+        assert screen.selected == ("s0", 1) and node_in_view(screen, "s0")
+
+    drive(WhisperwindApp(config, target=run.id), scenario, size=(80, 24))
+
+
+FOLLOW = FLOW.replace(
+    "    choices: [ship, stop]\n",
+    "    choices: [ship, stop]\n    next: done\n  done: {type: set, vars: {x: 1}}\n",
+)
+
+
+@pytest.mark.parametrize("picked", [False, True])
+def test_given_a_run_moving_on_then_the_selection_follows_unless_a_visit_was_picked(
+    tmp_path: Path, picked: bool
+) -> None:
+    run = run_flow(tmp_path, FOLLOW).run
+    config, _ = load_config(tmp_path)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        if picked:
+            await select_visit(pilot, 0)  # plan #1
+        respond(run, "approve", Answer(choice="ship"), clock=Clock(), project_root=tmp_path,
+                continue_run=False)  # fmt: skip
+        await asyncio.get_running_loop().run_in_executor(
+            None,
+            lambda: run_virtual(
+                Runner(run, config, VirtualClock(), heartbeat=False, environ={}).run()
+            ),
+        )
+        await pilot.pause(1.0)
+        assert screen.selected == (("plan", 1) if picked else ("done", 1))
+
+    drive(WhisperwindApp(config, target=run.id), scenario)
+
+
 MAPPER = """name: mapper
 nodes:
   each:
@@ -747,7 +842,7 @@ def shown_tabs(screen: Any) -> list[str]:
 
 
 async def select_visit(pilot: Any, index: int) -> None:
-    pilot.app.screen.query_one("#timeline", ListView).index = index
+    await pilot.click(list(pilot.app.screen.query(VisitItem))[index])
     await pilot.pause()
 
 

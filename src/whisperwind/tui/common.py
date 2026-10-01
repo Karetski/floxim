@@ -31,6 +31,8 @@ STATUS = {
     "timed_out": ("⌛", "red"),
     "pending": ("·", "dim"),
 }
+# The selected node's box, distinct from the status styles and the "changed" `reverse`.
+SELECTED_STYLE = "on #1f3a5f"
 RUN_STATUS_ORDER = {"waiting": 0, "running": 1, "interrupted": 2, "pending": 3}
 
 
@@ -82,7 +84,11 @@ class GraphView(Static):
         visits: dict[str, int] | None = None,
         dim: bool = False,
         highlight: set[str] | None = None,
+        selected: str | None = None,
+        reached: set[str] | None = None,
     ) -> None:
+        """Draw the flow. `highlight` marks changed nodes, `selected` the node being
+        inspected; when `reached` is given, the nodes outside it are dimmed."""
         statuses = statuses or {}
         visits = visits or {}
 
@@ -99,6 +105,10 @@ class GraphView(Static):
                 style = STATUS.get(statuses.get(node, ""), ("", ""))[1]
                 if node in (highlight or set()):
                     style = f"{style} reverse".strip()
+                if reached is not None and node not in reached:
+                    style = f"{style} dim".strip()
+                if node == selected:
+                    style = f"{style} {SELECTED_STYLE}".strip()
                 if not style:
                     continue
                 for row in range(region.row, region.row + region.height):

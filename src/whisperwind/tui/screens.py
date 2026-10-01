@@ -12,6 +12,7 @@ from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.geometry import Region
 from textual.screen import Screen
 from textual.widgets import (
     Collapsible,
@@ -288,6 +289,26 @@ class VisitItem(ListItem):
         self.visit = visit
 
 
+class Timeline(ListView):
+    """The run's visits. It notes when a person moves its cursor, since a redraw also
+    moves the highlight and can report an item it has replaced."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.moved = False
+
+    def action_cursor_up(self) -> None:
+        self.moved = True
+        super().action_cursor_up()
+
+    def action_cursor_down(self) -> None:
+        self.moved = True
+        super().action_cursor_down()
+
+    def on_mouse_down(self) -> None:
+        self.moved = True
+
+
 class ChildItem(VisitItem):
     """A child run of a `map` or `subflow` visit, under that visit; choosing it opens it."""
 
@@ -541,6 +562,11 @@ class RunDetailScreen(RunControl):
         self.selected: tuple[str, int] | None = None
         self.flow_diff = ""
         self.selected_child: str | None = None
+        # Whether selection follows the latest visit: until a visit is picked in the timeline.
+        self.follow_latest = True
+        self.latest: tuple[str, int] | None = None
+        self.followed: str | None = None  # the current node the graph last scrolled to
+        self.graph_state: tuple[dict[str, str], dict[str, int], set[str]] | None = None
         # Each child run's status as last shown: a child's progress adds no events here.
         self.child_status: dict[str, str] = {}
         # The inspector tab the person last picked, and the tab the screen is opening
@@ -560,7 +586,7 @@ class RunDetailScreen(RunControl):
             with VerticalScroll(id="graph-pane"):
                 yield GraphView(id="graph")
             with Vertical(id="side"):
-                yield ListView(id="timeline")
+                yield Timeline(id="timeline")
                 with TabbedContent(id="inspector"):
                     for tab in TABS:
                         with (
@@ -733,12 +759,19 @@ class RunDetailScreen(RunControl):
             banner.update(Text("\n".join(line for line in lines if line), style="magenta bold"))
         banner.display = bool(pending) or bool(changed)
         self.flow_diff = changed
-        if self.flow is not None:
-            self.query_one("#graph", GraphView).show(
-                self.flow, node_status(state, info["status"]), state.get("visits")
-            )
-            self.query_one("#limits", Static).update(_limits(info["totals"], self.flow.limits))
+        # The timeline picks the selection, which the graph marks.
         self._timeline(events, set(info["pending_human"]), info["status"])
+        if self.flow is not None:
+            # Reached: every visited node, and `end` or `fail` once a route led there.
+            reached = set(state.get("visits") or {})
+            reached |= {e["data"]["to"] for e in events if e["type"] == "route_taken"}
+            statuses = node_status(state, info["status"])
+            self.graph_state = (statuses, state.get("visits") or {}, reached)
+            self._draw_graph()
+            if info["current"] != self.followed:
+                self.followed = info["current"]
+                self._scroll_graph_to(info["current"])
+            self.query_one("#limits", Static).update(_limits(info["totals"], self.flow.limits))
         self._inspect()
 
     def _timeline(self, events: list[dict[str, Any]], waiting: set[str], status: str) -> None:
@@ -791,8 +824,10 @@ class RunDetailScreen(RunControl):
             for run_id, index in children.get(key, []):
                 rows.append((key, run_id))
                 timeline.append(ChildItem(key, run_id, Label(self._child_label(run_id, index))))
-        if self.selected is None and started:
-            self.selected = (started[-1]["node"], started[-1]["visit"])
+        if started:
+            self.latest = (started[-1]["node"], started[-1]["visit"])
+        if self.selected is None or self.follow_latest:
+            self.selected, self.selected_child = self.latest, None
         for row in ((self.selected, self.selected_child), (self.selected, None)):
             if row in rows:
                 timeline.index = rows.index(row)
@@ -836,12 +871,40 @@ class RunDetailScreen(RunControl):
             if status in runinfo.ACTIVE
         )
 
+    def _draw_graph(self) -> None:
+        if self.flow is None or self.graph_state is None:
+            return
+        statuses, visits, reached = self.graph_state
+        self.query_one("#graph", GraphView).show(
+            self.flow,
+            statuses,
+            visits,
+            selected=self.selected[0] if self.selected else None,
+            reached=reached,
+        )
+
+    def _scroll_graph_to(self, node: str | None) -> None:
+        """Scroll the graph, after its next layout, just enough to show `node`'s box."""
+        picture = self.query_one("#graph", GraphView).picture
+        box = picture.regions.get(node) if picture and node else None
+        if box is not None:
+            pane = self.query_one("#graph-pane", VerticalScroll)
+            region = Region(box.col, box.row, box.width, box.height)
+            self.call_after_refresh(pane.scroll_to_region, region, animate=False)
+
     @on(ListView.Highlighted, "#timeline")
     def _highlighted(self, event: ListView.Highlighted) -> None:
-        if event.item is not None:
-            self.selected = getattr(event.item, "visit", None)
-            self.selected_child = getattr(event.item, "run_id", None)
-            self._inspect()
+        timeline = self.query_one("#timeline", Timeline)
+        if event.item is None or not timeline.moved:
+            return  # the timeline redrew; the selection did not move
+        timeline.moved = False
+        row = (getattr(event.item, "visit", None), getattr(event.item, "run_id", None))
+        # A visit picked away from the latest one stops selection following the run.
+        self.follow_latest = row == (self.latest, None)
+        self.selected, self.selected_child = row
+        self._inspect()
+        self._draw_graph()
+        self._scroll_graph_to(self.selected[0] if self.selected else None)
 
     @on(ListView.Selected, "#timeline")
     def _chosen(self, event: ListView.Selected) -> None:
