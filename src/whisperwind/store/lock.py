@@ -1,12 +1,14 @@
 """The runner lock: one writer per run.
 
-`lock` is created with O_CREAT|O_EXCL and holds `{pid, host, started_at,
-heartbeat_at}`. The holder refreshes `heartbeat_at` every few seconds. A lock is
-stale when its host is this host and the PID is gone, or when its heartbeat is
-older than 30 seconds. A takeover happens inside a short critical section
-guarded by an exclusive `lock.takeover` marker, and replaces the lock only if
-it is still the stale lock that was judged, so two processes racing to take it
-over cannot both win.
+`lock` holds `{pid, host, started_at, heartbeat_at}`. It is written aside and
+hard-linked into place, which fails if it exists, so it never appears
+half-written: a half-written lock would read as stale and invite a takeover.
+The holder refreshes `heartbeat_at` every few seconds. A lock is stale when its
+host is this host and the PID is gone, or when its heartbeat is older than 30
+seconds. A takeover happens inside a short critical section guarded by an
+exclusive `lock.takeover` marker, created the same way, and replaces the lock
+only if it is still the stale lock that was judged, so two processes racing to
+take it over cannot both win.
 """
 
 from __future__ import annotations
@@ -46,6 +48,24 @@ class LockInfo:
             "started_at": self.started_at,
             "heartbeat_at": self.heartbeat_at,
         }
+
+
+def _create_exclusive(path: Path, data: dict[str, Any]) -> bool:
+    """Create `path` holding `data` unless it exists. The content is written to a
+    file of this process's own first, then linked into place whole."""
+    temp = path.with_name(f"{path.name}.new.{os.getpid()}")
+    fd = os.open(temp, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o600)
+    with os.fdopen(fd, "w") as handle:
+        json.dump(data, handle)
+        handle.flush()
+        os.fsync(handle.fileno())
+    try:
+        os.link(temp, path)
+    except FileExistsError:
+        return False
+    finally:
+        temp.unlink(missing_ok=True)
+    return True
 
 
 def hostname() -> str:
@@ -120,29 +140,19 @@ class RunLock:
         raise LockHeld(read_lock(self.path) or {})
 
     def _create(self, info: LockInfo) -> bool:
-        try:
-            fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        except FileExistsError:
+        if not _create_exclusive(self.path, info.to_json()):
             return False
-        with os.fdopen(fd, "w") as handle:
-            json.dump(info.to_json(), handle)
-            handle.flush()
-            os.fsync(handle.fileno())
         self.info = info
         return True
 
     def _take_over(self, stale: dict[str, Any], info: LockInfo) -> bool:
         marker = self.path.with_name("lock.takeover")
-        try:
-            fd = os.open(marker, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        except FileExistsError:
+        if not _create_exclusive(marker, info.to_json()):
             holder = read_lock(marker)
             if holder is not None and is_stale(holder, self.clock.now()):
                 marker.unlink(missing_ok=True)  # left behind by a process that died
             return False
         try:
-            with os.fdopen(fd, "w") as handle:
-                json.dump(info.to_json(), handle)
             if read_lock(self.path) != stale:
                 return False  # changed since it was judged stale: judge again
             self.path.unlink(missing_ok=True)
