@@ -18,6 +18,7 @@ from floxim.engine.respond import respond
 from floxim.engine.runner import Runner
 from floxim.testing import VirtualClock, run_virtual
 from floxim.tui.app import FloximApp
+from floxim.tui.common import NavKey
 from floxim.tui.screens import FlowGraphScreen, FlowsScreen, RunDetailScreen, RunsScreen
 
 FLOW = """name: demo
@@ -36,9 +37,13 @@ nodes:
 QUICK = "name: quick\nnodes:\n  a: {type: set, vars: {x: 1}}\n"
 
 
-def drive(app: FloximApp, scenario: Callable[[Any], Awaitable[None]]) -> None:
+def drive(
+    app: FloximApp,
+    scenario: Callable[[Any], Awaitable[None]],
+    size: tuple[int, int] = (140, 45),
+) -> None:
     async def main() -> None:
-        async with app.run_test(size=(140, 45)) as pilot:
+        async with app.run_test(size=size) as pilot:
             await pilot.pause()
             await scenario(pilot)
 
@@ -54,6 +59,50 @@ def project(tmp_path: Path) -> Path:
     run_flow(tmp_path, QUICK)
     run_flow(tmp_path, FLOW)  # stops waiting at `approve`
     return tmp_path
+
+
+def run_like_cli(app: FloximApp, scenario: Callable[[Any], Awaitable[None]]) -> int | None:
+    """Run the app with `App.run`, as `floxim tui` does, and return its exit code.
+
+    Unlike the pilot's `run_test`, `App.run` starts tasks eagerly, so a new screen composes
+    before the switch that created it has finished."""
+
+    async def auto_pilot(pilot: Any) -> None:
+        await pilot.pause()
+        await scenario(pilot)
+        if pilot.app.return_code is None:  # set when the app crashed
+            pilot.app.exit()
+
+    app.run(headless=True, auto_pilot=auto_pilot, size=(80, 24))
+    return app.return_code
+
+
+def test_given_a_project_when_the_tui_starts_as_floxim_tui_does_then_it_runs(
+    project: Path,
+) -> None:
+    config, _ = load_config(project)
+
+    async def nothing(pilot: Any) -> None:
+        pass
+
+    assert run_like_cli(FloximApp(config), nothing) == 0
+
+
+def test_given_views_when_switching_between_them_then_the_current_ones_key_is_highlighted(
+    project: Path,
+) -> None:
+    config, _ = load_config(project)
+    highlighted: list[list[str]] = []
+
+    async def switch(pilot: Any) -> None:
+        for key in ("f", "r", "f"):
+            await pilot.press(key)
+            await pilot.pause()
+            keys = pilot.app.screen.query(NavKey)
+            highlighted.append([str(k.render()).strip() for k in keys if k.has_class("-active")])
+
+    assert run_like_cli(FloximApp(config), switch) == 0
+    assert highlighted == [["f Flows"], ["r Runs"], ["f Flows"]]
 
 
 def test_given_runs_when_the_tui_opens_then_waiting_runs_come_first(project: Path) -> None:
@@ -147,6 +196,85 @@ def test_given_flow_files_when_listed_then_validity_and_last_run_show(project: P
         assert "waiting" in str(rows[1][3])
 
     drive(FloximApp(config), scenario)
+
+
+def test_given_lists_when_switching_runs_flows_runs_then_each_keeps_its_cursor_and_filter(
+    project: Path,
+) -> None:
+    (project / "flows").mkdir()
+    (project / "flows" / "demo.yaml").write_text(FLOW)
+    (project / "flows" / "quick.yaml").write_text(QUICK)
+    config, _ = load_config(project)
+
+    async def scenario(pilot: Any) -> None:
+        runs = pilot.app.screen
+        await pilot.press("down", "f", "down", "r")
+        assert pilot.app.screen is runs
+        assert runs.query_one("#runs", DataTable).cursor_row == 1
+        await pilot.press("s", "f")
+        flows = pilot.app.screen
+        assert isinstance(flows, FlowsScreen)
+        assert flows.query_one("#flows", DataTable).cursor_row == 1
+        await pilot.press("r")
+        assert runs.status_filter == "waiting"
+        assert runs.query_one("#runs", DataTable).row_count == 1
+
+    drive(FloximApp(config), scenario)
+
+
+def test_given_a_flow_open_when_switching_away_and_back_then_it_is_still_open(
+    project: Path,
+) -> None:
+    (project / "flows").mkdir()
+    (project / "flows" / "demo.yaml").write_text(FLOW)
+    config, _ = load_config(project)
+
+    async def scenario(pilot: Any) -> None:
+        await pilot.press("f", "enter", "r")
+        await pilot.pause()
+        assert isinstance(pilot.app.screen, RunsScreen)
+        await pilot.press("f")
+        assert isinstance(pilot.app.screen, FlowGraphScreen)
+        await pilot.press("f")  # again, from inside Flows: back to its list
+        assert isinstance(pilot.app.screen, FlowsScreen)
+
+    drive(FloximApp(config), scenario)
+
+
+def test_given_runs_when_the_pinned_flows_key_is_clicked_then_flows_show(project: Path) -> None:
+    config, _ = load_config(project)
+
+    async def scenario(pilot: Any) -> None:
+        flows_key = next(k for k in pilot.app.screen.query(NavKey) if k.action == "show_flows")
+        await pilot.click(flows_key)
+        await pilot.pause()
+        assert isinstance(pilot.app.screen, FlowsScreen)
+
+    drive(FloximApp(config), scenario)
+
+
+@pytest.mark.parametrize("view", ["runs", "flows"])
+def test_given_a_drilled_in_screen_at_80x24_then_the_root_views_stay_pinned_in_the_footer(
+    project: Path, view: str
+) -> None:
+    flow = project / "flow.yaml"
+    flow.write_text(FLOW)
+    config, _ = load_config(project)
+    run_id = next(p.name for p in config.runs_dir.iterdir() if "demo" in p.name)
+
+    async def scenario(pilot: Any) -> None:
+        screen = pilot.app.screen
+        assert isinstance(screen, RunDetailScreen if view == "runs" else FlowGraphScreen)
+        pinned = {str(key.render()).strip(): key for key in screen.query(NavKey)}
+        assert list(pinned) == ["r Runs", "f Flows"]
+        for key in pinned.values():
+            assert key.region.width and key.region.right <= 80 and key.region.y == 23
+        assert [d for d, key in pinned.items() if key.has_class("-active")] == [
+            {"runs": "r Runs", "flows": "f Flows"}[view]
+        ]
+
+    target = run_id if view == "runs" else str(flow)
+    drive(FloximApp(config, target=target), scenario, size=(80, 24))
 
 
 def test_given_flow_file_edited_while_shown_then_the_graph_follows_and_survives_bad_saves(

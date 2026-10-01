@@ -37,9 +37,11 @@ class FloximApp(App[None]):
 
     TITLE = "Floxim"
     CSS = CSS
+    # Runs and Flows are modes: each keeps its own screen stack while the other is shown.
+    DEFAULT_MODE = "runs"
     BINDINGS = [
-        Binding("r", "show_runs", "Runs"),
-        Binding("f", "show_flows", "Flows"),
+        Binding("r", "show_runs", "Runs", show=False),
+        Binding("f", "show_flows", "Flows", show=False),
         Binding("q", "quit", "Quit"),
     ]
 
@@ -47,23 +49,31 @@ class FloximApp(App[None]):
         super().__init__()
         self.config = config
         self.target = target
+        self.add_mode("runs", lambda: RunsScreen(config))
+        self.add_mode("flows", lambda: FlowsScreen(config))
 
     def on_mount(self) -> None:
-        self.push_screen(RunsScreen(self.config))
         if self.target:
             path = Path(self.target)
             if path.suffix in (".yaml", ".yml") and path.exists():
+                self.switch_mode("flows")
                 self.push_screen(FlowGraphScreen(path))
             elif (self.config.runs_dir / self.target).is_dir():
                 self.push_screen(RunDetailScreen(self.config, self.target))
 
-    def action_show_runs(self) -> None:
-        """Back to the runs list, the screen under every other one."""
-        while len(self.screen_stack) > 2:
+    def show_view(self, mode: str) -> None:
+        """Switch to a root view as it was left; from inside it, back to its list."""
+        if self.current_mode != mode:
+            self.switch_mode(mode)
+            return
+        while len(self.screen_stack) > 1:
             self.pop_screen()
 
+    def action_show_runs(self) -> None:
+        self.show_view("runs")
+
     def action_show_flows(self) -> None:
-        self.push_screen(FlowsScreen(self.config))
+        self.show_view("flows")
 
     def get_system_commands(self, screen: Screen[object]) -> Iterable[SystemCommand]:
         yield from super().get_system_commands(screen)
